@@ -29,6 +29,12 @@ const v1Data = {
   entries: [{ id: 'e1', goalId: 'g1', date: '2026-09-02', value: 20, note: '', createdAt: '2026-09-02T20:00:00.000Z' }],
 };
 
+/** Данные в формате v2: как их хранила предыдущая версия приложения. */
+function migrateToV2() {
+  const { materials: _m, notes: _n, reviews: _r, ...v2 } = migrate(v1Data, makeCtx());
+  return v2;
+}
+
 describe('migrate', () => {
   it('v1 → v2: категории превращаются в сферы, «другое» остаётся без сферы', () => {
     const db = migrate(v1Data, makeCtx());
@@ -37,6 +43,15 @@ describe('migrate', () => {
     expect(db.goals.map((g) => g.areaId)).toEqual([reading.id, null, languages.id]);
     expect(db.goals[0]).not.toHaveProperty('category');
     expect(db.entries).toHaveLength(1);
+  });
+
+  it('v2 → v3: добавляются пустые списки знаний', () => {
+    const v2 = { version: 2, ...migrateToV2() };
+    const db = migrate(v2, makeCtx());
+    expect(db.materials).toEqual([]);
+    expect(db.notes).toEqual([]);
+    expect(db.reviews).toEqual([]);
+    expect(db.goals).toHaveLength(3);
   });
 
   it('данные текущей версии не меняются', () => {
@@ -83,6 +98,70 @@ describe('validateDb', () => {
   });
 });
 
+describe('знания', () => {
+  function withKnowledge() {
+    const db = migrate(v1Data, makeCtx());
+    return {
+      ...db,
+      materials: [
+        {
+          id: 'm1',
+          title: 'Алгоритмы',
+          type: 'course',
+          author: '',
+          url: '',
+          areaId: db.areas[3].id,
+          status: 'active',
+          createdAt: '2026-09-01T08:00:00.000Z',
+        },
+      ],
+      notes: [
+        {
+          id: 'n1',
+          title: 'Графы',
+          materialId: 'm1',
+          questions: ['Чем BFS отличается от DFS?'],
+          summary: 'BFS — очередь, DFS — стек.',
+          obsidianUri: 'obsidian://open?vault=Study&file=Graphs',
+          status: 'active',
+          addedOn: '2026-09-01',
+          createdAt: '2026-09-01T08:00:00.000Z',
+        },
+      ],
+      reviews: [
+        { id: 'r1', noteId: 'n1', date: '2026-09-02', rating: 'good', explain: null, taught: false, createdAt: 'x' },
+        { id: 'r2', noteId: 'n1', date: '2026-09-05', rating: 'easy', explain: 'yes', taught: true, createdAt: 'y' },
+      ],
+    };
+  }
+
+  it('проходят проверку без изменений', () => {
+    const db = withKnowledge();
+    expect(validateDb(db)).toEqual(db);
+  });
+
+  it('заметка удалённого материала остаётся без материала, повторения удалённой заметки отбрасываются', () => {
+    const db = withKnowledge();
+    const fixed = validateDb({
+      ...db,
+      materials: [],
+      reviews: [...db.reviews, { ...db.reviews[0], id: 'r3', noteId: 'нет-такой' }],
+    });
+    expect(fixed.notes[0].materialId).toBeNull();
+    expect(fixed.reviews.map((r) => r.id)).toEqual(['r1', 'r2']);
+  });
+
+  it('отклоняет ошибки в заметках и повторениях', () => {
+    const db = withKnowledge();
+    expect(() => validateDb({ ...db, notes: [{ ...db.notes[0], obsidianUri: 'https://example.com' }] })).toThrow(
+      'obsidian://',
+    );
+    expect(() => validateDb({ ...db, notes: [{ ...db.notes[0], questions: [1] }] })).toThrow('списком строк');
+    expect(() => validateDb({ ...db, reviews: [{ ...db.reviews[0], rating: 'perfect' }] })).toThrow('rating');
+    expect(() => validateDb({ ...db, reviews: [{ ...db.reviews[0], taught: 'да' }] })).toThrow('true или false');
+  });
+});
+
 describe('резервная копия', () => {
   it('экспорт и импорт возвращают те же данные', () => {
     const db = migrate(v1Data, makeCtx());
@@ -99,6 +178,7 @@ describe('резервная копия', () => {
     const db = createEmptyDb(makeCtx());
     expect(db.areas).toHaveLength(4);
     expect(db.areas.map((a) => a.order)).toEqual([0, 1, 2, 3]);
+    expect(db.notes).toEqual([]);
     expect(validateDb(db)).toEqual(db);
   });
 });

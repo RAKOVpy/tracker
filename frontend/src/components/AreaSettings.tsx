@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronUp, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { useAreas, useCreateArea, useDeleteArea, useGoalsWithStats, useUpdateArea } from '../api/hooks';
+import { useAreas, useCreateArea, useDeleteArea, useGoalsWithStats, useKnowledge, useUpdateArea } from '../api/hooks';
 import { AREA_COLORS } from '../domain/meta';
 import type { Area, AreaInput } from '../domain/types';
 import { plural } from '../lib/format';
@@ -17,6 +17,7 @@ function nextColor(areas: Area[]): AreaInput['color'] {
 export function AreaSettings() {
   const { data: areas, isLoading, error } = useAreas();
   const { data: goals } = useGoalsWithStats();
+  const { data: knowledge } = useKnowledge();
   const createArea = useCreateArea();
   const updateArea = useUpdateArea();
   const deleteArea = useDeleteArea();
@@ -27,6 +28,18 @@ export function AreaSettings() {
 
   const list: Area[] = areas;
   const goalCount = (areaId: string) => goals?.filter((g) => g.goal.areaId === areaId).length ?? 0;
+  const materialCount = (areaId: string) => knowledge?.materials.filter((m) => m.areaId === areaId).length ?? 0;
+
+  /** «2 цели и 1 материал» — что лежит в сфере. */
+  function describeContents(areaId: string): string | null {
+    const g = goalCount(areaId);
+    const m = materialCount(areaId);
+    const parts = [
+      g > 0 ? `${g} ${plural(g, ['цель', 'цели', 'целей'])}` : null,
+      m > 0 ? `${m} ${plural(m, ['материал', 'материала', 'материалов'])}` : null,
+    ].filter(Boolean);
+    return parts.length ? parts.join(' и ') : null;
+  }
 
   /** Меняет местами соседние сферы. */
   async function move(index: number, direction: -1 | 1) {
@@ -59,16 +72,16 @@ export function AreaSettings() {
             );
           }
 
-          const count = goalCount(area.id);
+          const contents = describeContents(area.id);
           if (mode.kind === 'delete' && mode.id === area.id) {
             return (
               <li key={area.id} className="area-row" style={{ display: 'block' }}>
                 <div className="confirm">
                   <p>
                     Удалить сферу «{area.name}»?{' '}
-                    {count > 0
-                      ? `${count} ${plural(count, ['цель останется', 'цели останутся', 'целей останутся'])} без сферы, сами цели не удалятся.`
-                      : 'Целей в ней нет.'}
+                    {contents
+                      ? `${contents} останутся без сферы, сами они не удалятся.`
+                      : 'В ней ничего нет.'}
                   </p>
                   <div className="row">
                     <button
@@ -95,7 +108,7 @@ export function AreaSettings() {
                 {area.name}
                 <span className="muted small num">
                   {' '}
-                  · {count} {plural(count, ['цель', 'цели', 'целей'])}
+                  · {contents ?? 'пусто'}
                 </span>
               </span>
               <button

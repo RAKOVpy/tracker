@@ -11,13 +11,14 @@
 ## Этапы
 
 Модули продукта, исходные идеи с поправками и план этапов описаны в [PRODUCT.md](PRODUCT.md).
-Этот документ описывает техническое устройство того, что уже сделано (этапы 1–2),
-и проект бэкенда.
+Этот документ описывает техническое устройство того, что уже сделано
+(этапы 1, 2 и первая часть этапа 3), и проект бэкенда.
 
 ## Предметная модель
 
 ```
 Area 1 ──── * Goal 1 ──── * ProgressEntry
+Area 1 ──── * Material 1 ──── * Note 1 ──── * Review
 ```
 
 **Area** — сфера жизни: «Чтение», «Английский», «Спорт». Пользователь создаёт,
@@ -61,8 +62,53 @@ Area 1 ──── * Goal 1 ──── * ProgressEntry
 | `note` | строка, необязательно |
 | `createdAt` | дата-время |
 
-Что **не хранится**, а вычисляется: текущий прогресс, «достигнута», «просрочена»,
-«долгосрочная» (длительность > 30 дней), норма на сегодня, серия дней.
+**Material** — источник знаний: книга, курс, лекция, статья, видео.
+
+| Поле | Тип |
+|------|-----|
+| `id` | UUID |
+| `title` | строка |
+| `type` | `book` \| `course` \| `lecture` \| `article` \| `video` \| `other` |
+| `author`, `url` | строки, необязательно |
+| `areaId` | FK → Area или `null` |
+| `status` | `active` (изучаю) \| `queued` (хочу изучить) \| `done` \| `dropped` |
+| `createdAt` | дата-время |
+
+**Note** — заметка для повторения: тема, которую нужно помнить.
+
+| Поле | Тип |
+|------|-----|
+| `id` | UUID |
+| `title` | строка |
+| `materialId` | FK → Material или `null` |
+| `questions` | список строк — вопросы для самопроверки |
+| `summary` | ключевые мысли, с которыми сверяешься после ответа |
+| `obsidianUri` | `obsidian://…` или пустая строка |
+| `status` | `active` \| `paused` (повторения приостановлены) |
+| `addedOn` | дата добавления; первое повторение — на следующий день |
+| `createdAt` | дата-время |
+
+**Review** — одно повторение заметки.
+
+| Поле | Тип |
+|------|-----|
+| `id` | UUID |
+| `noteId` | FK → Note |
+| `date` | дата |
+| `rating` | `again` (забыл) \| `hard` (с трудом) \| `good` (хорошо) \| `easy` (легко) |
+| `explain` | «смог бы объяснить другому?»: `no` \| `hints` \| `yes` \| `null` (пропущено) |
+| `taught` | объяснил кому-то на деле |
+| `createdAt` | дата-время |
+
+Что **не хранится**, а вычисляется:
+
+- у целей — текущий прогресс, «достигнута», «просрочена», «долгосрочная»
+  (длительность > 30 дней), норма на сегодня, серия дней;
+- у заметок — уровень освоения, дата следующего повторения, последний интервал,
+  число забываний. Они получаются «проигрыванием» журнала повторений, поэтому
+  отмена оценки — это просто удаление записи из журнала, а смена алгоритма
+  (например, на FSRS) пересчитает расписание по уже накопленной истории.
+
 Так не бывает рассинхрона между записями и статусом.
 
 ## Правила расчёта
@@ -86,19 +132,42 @@ Area 1 ──── * Goal 1 ──── * ProgressEntry
 - **Серия** — дней подряд с прогрессом. Если сегодня ещё не отмечено, считаем со вчера,
   чтобы серия не «сгорала» утром.
 
+## Расписание повторений
+
+Логика — чистые функции в `frontend/src/domain/review.ts`, покрыта тестами.
+
+- **Лестница интервалов:** 1 → 3 → 7 → 16 → 35 → 90 → 180 дней. У заметки есть «ступень»
+  — сколько успешных шагов пройдено.
+- **Оценка после повторения:**
+  - «хорошо» — интервал текущей ступени, ступень +1;
+  - «легко» — интервал через ступень, ступень +2;
+  - «с трудом» — предыдущий интервал, ступень не меняется;
+  - «забыл» — повторить завтра, ступень падает вдвое (тему нужно освежить, но не с нуля).
+- **Первое повторение** — на следующий день после добавления заметки.
+  «Повторить сейчас» можно в любой момент, расписание считается от даты повторения.
+- **Уровень освоения:** 1 — меньше двух успешных шагов; 2 — от двух; 3 — от четырёх
+  (около месяца удержания); 4 — от уровня 2 и дважды подряд «смог бы объяснить: да, уверенно»
+  (пропущенная самооценка серию не прерывает); 5 — то же и «объяснил кому-то на деле».
+  «Забыл» сбрасывает серию уверенности и отметку «объяснил».
+- **Очередь** — заметки со сроком не позже сегодня, не на паузе; сначала самые
+  просроченные, затем слабее освоенные. Время на сессию — минута на вопрос,
+  не меньше двух минут на заметку.
+
 ## Хранение и резервные копии
 
 Пока данные лежат в `localStorage` браузера под ключом `tracker:data` в виде
-`{ version, areas, goals, entries }`. Код — `frontend/src/api/schema.ts` и `localApi.ts`.
+`{ version, areas, goals, entries, materials, notes, reviews }`.
+Код — `frontend/src/api/schema.ts` и `localApi.ts`.
 
 - **Версия схемы.** При каждом изменении модели растёт `SCHEMA_VERSION` и добавляется
   шаг миграции. При загрузке старые данные автоматически приводятся к текущей версии.
-  Первая миграция (v1 → v2) заменила категории целей сферами. Ключ `tracker:v1`
-  не удаляется и остаётся запасной копией.
+  v1 → v2 заменила категории целей сферами, v2 → v3 добавила материалы, заметки
+  и повторения. Ключ `tracker:v1` не удаляется и остаётся запасной копией.
 - **Проверка.** После миграции данные проверяются: типы полей, формат дат, уникальность id.
-  Висячие ссылки чинятся (цель удалённой сферы остаётся без сферы). Если данные повреждены,
+  Висячие ссылки чинятся: цель или материал удалённой сферы остаются без сферы, заметка
+  удалённого материала — без материала, повторения удалённой заметки отбрасываются. Если данные повреждены,
   приложение показывает ошибку и не начинает молча с чистого листа.
-- **Резервная копия** — JSON-файл `{ app: "tracker", version, exportedAt, areas, goals, entries }`.
+- **Резервная копия** — JSON-файл `{ app: "tracker", version, exportedAt, ...все списки }`.
   При восстановлении файл проходит ту же миграцию и проверку, поэтому копию старой версии
   можно восстановить в новой.
 
@@ -111,18 +180,21 @@ Area 1 ──── * Goal 1 ──── * ProgressEntry
 ```
 frontend/src/
 ├── domain/         # предметная область, без React
-│   ├── types.ts        Area, Goal, ProgressEntry, входные DTO
-│   ├── meta.ts         сферы по умолчанию, цвета и иконки, приоритеты, склонение единиц
-│   └── progress.ts     computeGoalStats, округление нормы, сортировка для «Сегодня»
+│   ├── types.ts        Area, Goal, ProgressEntry, Material, Note, Review, входные DTO
+│   ├── meta.ts         сферы по умолчанию, типы и статусы материалов, приоритеты, склонение единиц
+│   ├── progress.ts     computeGoalStats, округление нормы, сортировка для «Сегодня»
+│   └── review.ts       расписание повторений, уровни освоения, очередь
 ├── api/            # доступ к данным
 │   ├── types.ts        интерфейс TrackerApi — контракт с бэкендом
 │   ├── schema.ts       версия схемы, миграции, проверка, формат резервной копии
 │   ├── localApi.ts     реализация на localStorage
 │   ├── index.ts        выбор реализации, чтение резервной копии
-│   ├── hooks.ts        хуки TanStack Query: useGoalsWithStats, useAreas, useImportData, …
+│   ├── hooks.ts        хуки TanStack Query: useGoalsWithStats, useKnowledge, useAreas, …
 │   └── demo.ts         демо-данные
-├── components/     # Layout, GoalCard, QuickLog, GoalForm, ProgressChart, AreaSettings, DataSettings, …
-├── pages/          # TodayPage, GoalsPage, GoalPage, GoalFormPages, SettingsPage
+├── components/     # Layout, CreateMenu, GoalCard, GoalForm, ProgressChart, AreaSettings, DataSettings, …
+│   └── knowledge/      NoteForm, MaterialForm, MaterialCard, DueReviewsCard, лестница и строки заметок
+├── pages/          # TodayPage, GoalsPage, GoalPage, GoalFormPages, SettingsPage, CreatePage
+│   └── knowledge/      KnowledgePage, MaterialPages, NotePages, ReviewPage
 └── lib/            # даты (строки YYYY-MM-DD, расчёты в UTC), форматирование, склонения
 ```
 
@@ -130,12 +202,13 @@ frontend/src/
 `api/hooks.ts`, те обращаются к интерфейсу `TrackerApi`. Чтобы перейти на DRF,
 достаточно написать `httpApi.ts` с тем же интерфейсом и подключить его в `api/index.ts`.
 
-**Навигация:** на компьютере — боковая панель (Сегодня, Цели, список сфер, Настройки),
-на телефоне — нижняя панель (Сегодня, Цели, новая цель, Настройки).
+**Навигация:** на компьютере — боковая панель: кнопка «Создать» (цель, заметка, материал),
+Сегодня, Цели, Знания с числом заметок к повторению, список сфер, Настройки.
+На телефоне — нижняя панель: Сегодня, Цели, Создать, Знания, Настройки.
 
 **Экраны:**
 
-1. **Сегодня** (`/`) — приветствие, сводка «сделано N из M» и группы целей:
+1. **Сегодня** (`/`) — приветствие, карточка «N заметок к повторению», сводка «сделано N из M» и группы целей:
    «Нужно сделать сегодня» (сначала отстающие, затем по приоритету и сроку),
    «Срок прошёл», «Сегодня уже сделано», «Запланированы», «Достигнуты».
    На карточке: иконка сферы, прогресс с отметкой плана, норма на сегодня, быстрая запись
@@ -147,8 +220,21 @@ frontend/src/
    архив и удаление с подтверждением.
 4. **Создание / редактирование** (`/goals/new`, `/goals/:id/edit`) — выбор сферы,
    быстрые единицы и сроки, предпросмотр «≈ 16 стр. в день».
-5. **Настройки** (`/settings`) — сферы (добавить, переименовать, цвет, иконка, порядок,
-   удалить) и данные (скачать резервную копию, восстановить из файла, удалить всё).
+5. **Знания** (`/knowledge`) — карточка «к повторению», материалы «Изучаю» и «Хочу изучить»,
+   все заметки с уровнем и датой следующего повторения, изученные и отложенные материалы.
+6. **Материал** (`/knowledge/materials/:id`) — статус в одно нажатие, ссылка, заметки материала.
+7. **Заметка** (`/knowledge/notes/:id`) — следующее повторение, вопросы, ключевые мысли,
+   лестница освоения, журнал повторений (запись можно удалить), пауза, «Повторить сейчас»,
+   «Открыть в Obsidian».
+8. **Повторение** (`/review`, `/review?note=<id>`) — очередь фиксируется в начале сессии.
+   Вопросы → «Проверить себя» (или пробел) → ключевые мысли и ссылка на Obsidian →
+   необязательная самооценка «смог бы объяснить?» и «объяснил на деле» → оценка
+   (клавиши 1–4) с датой следующего повторения на кнопке. Последнюю оценку можно отменить.
+   В конце — итог: что повторено, у кого вырос уровень, когда следующее повторение.
+9. **Создание заметки и материала** (`/knowledge/notes/new?material=<id>`,
+   `/knowledge/materials/new`) — вопросы добавляются по Enter; ссылка на Obsidian проверяется.
+10. **Настройки** (`/settings`) — сферы (добавить, переименовать, цвет, иконка, порядок,
+    удалить) и данные (скачать резервную копию, восстановить из файла, удалить всё).
 
 ## Бэкенд (проект)
 
@@ -198,6 +284,44 @@ class ProgressEntry(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=["goal", "date"])]
+
+
+class Material(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="materials")
+    title = models.CharField(max_length=300)
+    type = models.CharField(max_length=10, choices=MaterialType.choices)
+    author = models.CharField(max_length=200, blank=True)
+    url = models.URLField(blank=True)
+    area = models.ForeignKey(Area, null=True, blank=True, on_delete=models.SET_NULL, related_name="materials")
+    status = models.CharField(max_length=10, choices=MaterialStatus.choices, default=MaterialStatus.ACTIVE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class Note(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notes")
+    title = models.CharField(max_length=300)
+    material = models.ForeignKey(Material, null=True, blank=True, on_delete=models.SET_NULL, related_name="notes")
+    questions = models.JSONField(default=list)
+    summary = models.TextField(blank=True)
+    obsidian_uri = models.CharField(max_length=1000, blank=True)
+    status = models.CharField(max_length=10, choices=NoteStatus.choices, default=NoteStatus.ACTIVE)
+    added_on = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class Review(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    note = models.ForeignKey(Note, on_delete=models.CASCADE, related_name="reviews")
+    date = models.DateField()
+    rating = models.CharField(max_length=5, choices=Rating.choices)
+    explain = models.CharField(max_length=5, choices=Explain.choices, null=True, blank=True)
+    taught = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["note", "date"])]
 ```
 
 **API** (все запросы — только по объектам текущего пользователя):
@@ -212,6 +336,12 @@ class ProgressEntry(models.Model):
 | GET | `/api/entries/?goal={id}&date_from=…` | записи (без `goal` — по всем целям) |
 | POST | `/api/entries/` | добавить запись |
 | DELETE | `/api/entries/{id}/` | удалить запись |
+| GET / POST | `/api/materials/` | материалы |
+| PATCH / DELETE | `/api/materials/{id}/` | материал (при удалении заметки остаются без материала) |
+| GET / POST | `/api/notes/` | заметки |
+| PATCH / DELETE | `/api/notes/{id}/` | заметка (удаляется вместе с повторениями) |
+| GET / POST | `/api/reviews/` | журнал повторений |
+| DELETE | `/api/reviews/{id}/` | отмена оценки |
 | GET | `/api/export/` | резервная копия в том же формате, что и сейчас |
 | POST | `/api/import/` | восстановление из резервной копии |
 | POST | `/api/auth/token/`, `/api/auth/token/refresh/` | JWT |

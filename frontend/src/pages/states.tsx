@@ -22,3 +22,15 @@ export function ErrorState({ error }: { error: unknown }) {
     </div>
   );
 }
+
+export function NotFoundState({ title, back }: { title: string; back: string }) {
+  return (
+    <div className="card empty">
+      <h2>{title}</h2>
+      <p className="muted">Возможно, запись удалили или ссылка устарела.</p>
+      <Link className="btn" to={back}>
+        Вернуться
+      </Link>
+    </div>
+  );
+}

@@ -7,11 +7,18 @@ import { plural } from '../lib/format';
 
 type Status = { kind: 'idle' } | { kind: 'success'; text: string } | { kind: 'error'; text: string };
 
-function describeCounts(db: Pick<Db, 'goals' | 'entries' | 'areas'>): string {
-  const g = db.goals.length;
-  const e = db.entries.length;
-  const a = db.areas.length;
-  return `${g} ${plural(g, ['цель', 'цели', 'целей'])}, ${e} ${plural(e, ['запись', 'записи', 'записей'])} прогресса, ${a} ${plural(a, ['сфера', 'сферы', 'сфер'])}`;
+function describeCounts(db: Db): string {
+  const parts: [number, [string, string, string]][] = [
+    [db.goals.length, ['цель', 'цели', 'целей']],
+    [db.entries.length, ['запись прогресса', 'записи прогресса', 'записей прогресса']],
+    [db.materials.length, ['материал', 'материала', 'материалов']],
+    [db.notes.length, ['заметка', 'заметки', 'заметок']],
+    [db.reviews.length, ['повторение', 'повторения', 'повторений']],
+    [db.areas.length, ['сфера', 'сферы', 'сфер']],
+  ];
+  const nonEmpty = parts.filter(([count]) => count > 0);
+  if (nonEmpty.length === 0) return 'данных нет';
+  return nonEmpty.map(([count, forms]) => `${count} ${plural(count, forms)}`).join(', ');
 }
 
 function downloadJson(data: unknown, filename: string): void {
@@ -132,7 +139,7 @@ export function DataSettings() {
       <div style={{ marginTop: 12 }}>
         {confirmingReset ? (
           <div className="confirm">
-            <p>Удалить все цели, записи и сферы в этом браузере? Если резервной копии нет, вернуть их не получится.</p>
+            <p>Удалить все цели, заметки, повторения и сферы в этом браузере? Если резервной копии нет, вернуть их не получится.</p>
             <div className="row">
               <button className="btn btn--sm btn--danger-solid" type="button" disabled={resetData.isPending} onClick={confirmReset}>
                 Удалить всё

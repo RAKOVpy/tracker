@@ -2,9 +2,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Sparkles, Target } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { seedDemoData } from '../api/demo';
-import { useAreaMap, useGoalsWithStats, useNow } from '../api/hooks';
+import { seedDemoData, seedKnowledgeDemo } from '../api/demo';
+import { useAreaMap, useGoalsWithStats, useKnowledge, useNow } from '../api/hooks';
 import { GoalCard } from '../components/GoalCard';
+import { DueReviewsCard } from '../components/knowledge/DueReviewsCard';
 import { compareForToday, type GoalWithStats } from '../domain/progress';
 import type { Area } from '../domain/types';
 import { formatLong, formatWeekday, type IsoDate } from '../lib/dates';
@@ -105,6 +106,7 @@ function EmptyState() {
     setSeeding(true);
     try {
       await seedDemoData();
+      await seedKnowledgeDemo();
       await client.invalidateQueries();
     } finally {
       setSeeding(false);
@@ -137,6 +139,7 @@ export function TodayPage() {
   const { data, today, isLoading, error } = useGoalsWithStats();
   const areas = useAreaMap();
   const now = useNow();
+  const knowledge = useKnowledge();
 
   if (isLoading) return <LoadingState />;
   if (error || !data) return <ErrorState error={error} />;
@@ -156,6 +159,17 @@ export function TodayPage() {
           <h1>{greeting(now)}</h1>
         </div>
       </div>
+
+      {knowledge.data && (
+        <div style={{ marginBottom: 16 }}>
+          <DueReviewsCard
+            due={knowledge.data.due}
+            notes={knowledge.data.notes}
+            today={today}
+            showDone={knowledge.data.notes.some((n) => n.state.lastReviewed === today)}
+          />
+        </div>
+      )}
 
       {data.length === 0 ? (
         <EmptyState />

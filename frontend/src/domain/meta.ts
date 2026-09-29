@@ -1,4 +1,4 @@
-import type { AreaColor, AreaIcon, AreaInput, Priority } from './types';
+import type { AreaColor, AreaIcon, AreaInput, MaterialStatus, MaterialType, Priority } from './types';
 
 export const AREA_COLORS: AreaColor[] = ['clay', 'ochre', 'sage', 'teal', 'slate', 'plum', 'rose', 'stone'];
 
@@ -68,3 +68,23 @@ export const PRIORITY_ORDER: Priority[] = ['high', 'medium', 'low'];
 
 /** Порог, после которого цель считается долгосрочной. */
 export const LONG_TERM_DAYS = 30;
+
+export const MATERIAL_TYPES: Record<MaterialType, string> = {
+  book: 'Книга',
+  course: 'Курс',
+  lecture: 'Лекция',
+  article: 'Статья',
+  video: 'Видео',
+  other: 'Другое',
+};
+
+export const MATERIAL_TYPE_ORDER: MaterialType[] = ['book', 'course', 'lecture', 'article', 'video', 'other'];
+
+export const MATERIAL_STATUSES: Record<MaterialStatus, string> = {
+  active: 'Изучаю',
+  queued: 'Хочу изучить',
+  done: 'Изучено',
+  dropped: 'Отложено',
+};
+
+export const MATERIAL_STATUS_ORDER: MaterialStatus[] = ['active', 'queued', 'done', 'dropped'];

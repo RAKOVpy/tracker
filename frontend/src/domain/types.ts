@@ -61,6 +61,73 @@ export interface ProgressEntry {
   createdAt: string;
 }
 
+// ---------- знания ----------
+
+export type MaterialType = 'book' | 'course' | 'lecture' | 'article' | 'video' | 'other';
+
+/** queued — «хочу изучить», active — изучаю сейчас, done — изучено, dropped — бросил. */
+export type MaterialStatus = 'queued' | 'active' | 'done' | 'dropped';
+
+/** Источник знаний: книга, курс, лекция. Заметки обычно относятся к материалу. */
+export interface Material {
+  id: string;
+  title: string;
+  type: MaterialType;
+  author: string;
+  url: string;
+  areaId: string | null;
+  status: MaterialStatus;
+  createdAt: string;
+}
+
+/**
+ * Заметка для повторения: тема, которую нужно помнить.
+ * Уровень освоения и дата следующего повторения не хранятся, а вычисляются из журнала повторений.
+ */
+export interface Note {
+  id: string;
+  title: string;
+  materialId: string | null;
+  /** Вопросы для самопроверки. */
+  questions: string[];
+  /** Ключевые мысли — с ними сверяешься после того, как вспомнил сам. */
+  summary: string;
+  /** Ссылка вида obsidian://open?vault=…&file=… или пустая строка. */
+  obsidianUri: string;
+  /** paused — повторения приостановлены, заметка не попадает в сессии. */
+  status: 'active' | 'paused';
+  /** Дата добавления: первое повторение — на следующий день. */
+  addedOn: IsoDate;
+  createdAt: string;
+}
+
+/** Как вспомнилось: забыл / с трудом / хорошо / легко. */
+export type Rating = 'again' | 'hard' | 'good' | 'easy';
+
+/** Самооценка «Смог бы объяснить другому?». */
+export type ExplainAnswer = 'no' | 'hints' | 'yes';
+
+export type MasteryLevel = 1 | 2 | 3 | 4 | 5;
+
+/** Одно повторение заметки. Весь журнал хранится, чтобы расписание можно было пересчитать. */
+export interface Review {
+  id: string;
+  noteId: string;
+  date: IsoDate;
+  rating: Rating;
+  /** null — самооценку пропустили. */
+  explain: ExplainAnswer | null;
+  /** Объяснил тему другому человеку на деле. */
+  taught: boolean;
+  createdAt: string;
+}
+
+export type MaterialInput = Omit<Material, 'id' | 'createdAt'>;
+export type MaterialPatch = Partial<MaterialInput>;
+export type NoteInput = Omit<Note, 'id' | 'createdAt' | 'status' | 'addedOn'>;
+export type NotePatch = Partial<NoteInput & Pick<Note, 'status'>>;
+export type ReviewInput = Omit<Review, 'id' | 'createdAt'>;
+
 export type AreaInput = Pick<Area, 'name' | 'color' | 'icon'>;
 export type AreaPatch = Partial<AreaInput & Pick<Area, 'order'>>;
 export type GoalInput = Omit<Goal, 'id' | 'createdAt' | 'status'>;

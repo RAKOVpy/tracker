@@ -6,8 +6,17 @@ import type {
   Goal,
   GoalInput,
   GoalPatch,
+  Material,
+  MaterialInput,
+  MaterialPatch,
+  Note,
+  NoteInput,
+  NotePatch,
   ProgressEntry,
+  Review,
+  ReviewInput,
 } from '../domain/types';
+import type { IsoDate } from '../lib/dates';
 import type { Backup, Db } from './schema';
 
 /**
@@ -31,6 +40,24 @@ export interface TrackerApi {
   listEntries(goalId?: string): Promise<ProgressEntry[]>;
   createEntry(input: EntryInput): Promise<ProgressEntry>;
   deleteEntry(id: string): Promise<void>;
+
+  listMaterials(): Promise<Material[]>;
+  createMaterial(input: MaterialInput): Promise<Material>;
+  updateMaterial(id: string, patch: MaterialPatch): Promise<Material>;
+  /** Заметки удалённого материала остаются без материала. */
+  deleteMaterial(id: string): Promise<void>;
+
+  listNotes(): Promise<Note[]>;
+  /** addedOn по умолчанию — сегодня; другое значение нужно при импорте и в демо-данных. */
+  createNote(input: NoteInput, options?: { addedOn?: IsoDate }): Promise<Note>;
+  updateNote(id: string, patch: NotePatch): Promise<Note>;
+  /** Удаляет заметку вместе с журналом её повторений. */
+  deleteNote(id: string): Promise<void>;
+
+  listReviews(): Promise<Review[]>;
+  createReview(input: ReviewInput): Promise<Review>;
+  /** Отмена оценки: расписание заметки пересчитается без неё. */
+  deleteReview(id: string): Promise<void>;
 
   exportData(): Promise<Backup>;
   /** Полностью заменяет данные. Данные уже проверены (см. parseBackup). */

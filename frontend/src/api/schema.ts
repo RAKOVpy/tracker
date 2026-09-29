@@ -1,16 +1,32 @@
 import { AREA_COLORS, AREA_ICONS, DEFAULT_AREAS } from '../domain/meta';
-import type { Area, Goal, GoalStatus, Priority, ProgressEntry } from '../domain/types';
+import type {
+  Area,
+  ExplainAnswer,
+  Goal,
+  GoalStatus,
+  Material,
+  MaterialStatus,
+  MaterialType,
+  Note,
+  Priority,
+  ProgressEntry,
+  Rating,
+  Review,
+} from '../domain/types';
 
 /**
  * Схема данных в хранилище и в файлах резервных копий.
  * При изменении модели: увеличить SCHEMA_VERSION и добавить шаг в MIGRATIONS.
  */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export interface Db {
   areas: Area[];
   goals: Goal[];
   entries: ProgressEntry[];
+  materials: Material[];
+  notes: Note[];
+  reviews: Review[];
 }
 
 export interface Backup extends Db {
@@ -37,7 +53,7 @@ export class DataError extends Error {
 }
 
 export function createEmptyDb(ctx: Ctx): Db {
-  return { areas: createDefaultAreas(ctx), goals: [], entries: [] };
+  return { areas: createDefaultAreas(ctx), goals: [], entries: [], materials: [], notes: [], reviews: [] };
 }
 
 function createDefaultAreas(ctx: Ctx): Area[] {
@@ -65,8 +81,14 @@ function v1ToV2(raw: Raw, ctx: Ctx): Raw {
   return { ...raw, areas, goals };
 }
 
+/** v2 → v3: появились знания — материалы, заметки и журнал повторений. */
+function v2ToV3(raw: Raw): Raw {
+  return { ...raw, materials: [], notes: [], reviews: [] };
+}
+
 const MIGRATIONS: Record<number, (raw: Raw, ctx: Ctx) => Raw> = {
   1: v1ToV2,
+  2: v2ToV3,
 };
 
 /** Приводит данные любой известной версии к текущей схеме и проверяет их. */
@@ -111,6 +133,11 @@ export function parseBackup(text: string, ctx: Ctx): Db {
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const PRIORITIES: Priority[] = ['low', 'medium', 'high'];
 const STATUSES: GoalStatus[] = ['active', 'archived'];
+const MATERIAL_TYPES: MaterialType[] = ['book', 'course', 'lecture', 'article', 'video', 'other'];
+const MATERIAL_STATUSES: MaterialStatus[] = ['queued', 'active', 'done', 'dropped'];
+const NOTE_STATUSES: Note['status'][] = ['active', 'paused'];
+const RATINGS: Rating[] = ['again', 'hard', 'good', 'easy'];
+const EXPLAIN_ANSWERS: ExplainAnswer[] = ['no', 'hints', 'yes'];
 
 function isObject(value: unknown): value is Raw {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -154,6 +181,20 @@ function oneOf<T extends string>(obj: Raw, key: string, allowed: readonly T[], w
   return value as T;
 }
 
+function bool(obj: Raw, key: string, where: string): boolean {
+  const value = obj[key];
+  if (typeof value !== 'boolean') throw new DataError(`${where}: поле «${key}» должно быть true или false`);
+  return value;
+}
+
+function strings(obj: Raw, key: string, where: string): string[] {
+  const value = obj[key];
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
+    throw new DataError(`${where}: поле «${key}» должно быть списком строк`);
+  }
+  return value as string[];
+}
+
 function uniqueIds(items: { id: string }[], what: string): void {
   const seen = new Set<string>();
   for (const item of items) {
@@ -164,7 +205,8 @@ function uniqueIds(items: { id: string }[], what: string): void {
 
 /**
  * Проверяет данные и возвращает чистую копию только с известными полями.
- * Висячие ссылки чинятся: цель с удалённой сферой остаётся без сферы, записи удалённых целей отбрасываются.
+ * Висячие ссылки чинятся: цель или материал удалённой сферы остаются без сферы, заметка удалённого
+ * материала — без материала, записи и повторения удалённых целей и заметок отбрасываются.
  */
 export function validateDb(raw: unknown): Db {
   const data = asObject(raw, 'data');
@@ -226,5 +268,61 @@ export function validateDb(raw: unknown): Db {
     .filter((entry) => goalIds.has(entry.goalId));
   uniqueIds(entries, 'Записи');
 
-  return { areas, goals, entries };
+  const materials: Material[] = asArray(data.materials, 'materials').map((item, i) => {
+    const m = asObject(item, `Материал ${i + 1}`);
+    const where = `Материал ${i + 1}`;
+    return {
+      id: str(m, 'id', where),
+      title: str(m, 'title', where),
+      type: oneOf(m, 'type', MATERIAL_TYPES, where),
+      author: str(m, 'author', where, { allowEmpty: true }),
+      url: str(m, 'url', where, { allowEmpty: true }),
+      areaId: typeof m.areaId === 'string' && areaIds.has(m.areaId) ? m.areaId : null,
+      status: oneOf(m, 'status', MATERIAL_STATUSES, where),
+      createdAt: str(m, 'createdAt', where),
+    };
+  });
+  uniqueIds(materials, 'Материалы');
+  const materialIds = new Set(materials.map((m) => m.id));
+
+  const notes: Note[] = asArray(data.notes, 'notes').map((item, i) => {
+    const n = asObject(item, `Заметка ${i + 1}`);
+    const where = `Заметка ${i + 1}`;
+    const note: Note = {
+      id: str(n, 'id', where),
+      title: str(n, 'title', where),
+      materialId: typeof n.materialId === 'string' && materialIds.has(n.materialId) ? n.materialId : null,
+      questions: strings(n, 'questions', where),
+      summary: str(n, 'summary', where, { allowEmpty: true }),
+      obsidianUri: str(n, 'obsidianUri', where, { allowEmpty: true }),
+      status: oneOf(n, 'status', NOTE_STATUSES, where),
+      addedOn: date(n, 'addedOn', where),
+      createdAt: str(n, 'createdAt', where),
+    };
+    if (note.obsidianUri && !note.obsidianUri.startsWith('obsidian://')) {
+      throw new DataError(`${where}: ссылка на Obsidian должна начинаться с obsidian://`);
+    }
+    return note;
+  });
+  uniqueIds(notes, 'Заметки');
+  const noteIds = new Set(notes.map((n) => n.id));
+
+  const reviews: Review[] = asArray(data.reviews, 'reviews')
+    .map((item, i) => {
+      const r = asObject(item, `Повторение ${i + 1}`);
+      const where = `Повторение ${i + 1}`;
+      return {
+        id: str(r, 'id', where),
+        noteId: str(r, 'noteId', where),
+        date: date(r, 'date', where),
+        rating: oneOf(r, 'rating', RATINGS, where),
+        explain: r.explain === null ? null : oneOf(r, 'explain', EXPLAIN_ANSWERS, where),
+        taught: bool(r, 'taught', where),
+        createdAt: str(r, 'createdAt', where),
+      };
+    })
+    .filter((review) => noteIds.has(review.noteId));
+  uniqueIds(reviews, 'Повторения');
+
+  return { areas, goals, entries, materials, notes, reviews };
 }

@@ -1,7 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { computeGoalStats, type GoalWithStats } from '../domain/progress';
-import type { Area, AreaInput, AreaPatch, EntryInput, GoalInput, GoalPatch, ProgressEntry } from '../domain/types';
+import { compareForReview, withState, type NoteWithState } from '../domain/review';
+import type {
+  Area,
+  AreaInput,
+  AreaPatch,
+  EntryInput,
+  GoalInput,
+  GoalPatch,
+  Material,
+  MaterialInput,
+  MaterialPatch,
+  NoteInput,
+  NotePatch,
+  ReviewInput,
+} from '../domain/types';
 import { todayIso } from '../lib/dates';
 import { api, type Db } from '.';
 
@@ -10,6 +24,9 @@ const keys = {
   goals: ['goals'] as const,
   goal: (id: string) => ['goals', id] as const,
   entries: (goalId?: string) => (goalId ? (['entries', goalId] as const) : (['entries'] as const)),
+  materials: ['materials'] as const,
+  notes: ['notes'] as const,
+  reviews: ['reviews'] as const,
 };
 
 /** Текущее время с точностью до минуты: экран обновится, если приложение открыто через полночь. */
@@ -26,12 +43,12 @@ export function useToday(): string {
   return todayIso(useNow());
 }
 
-function groupByGoal(entries: ProgressEntry[]): Map<string, ProgressEntry[]> {
-  const map = new Map<string, ProgressEntry[]>();
-  for (const entry of entries) {
-    const list = map.get(entry.goalId);
-    if (list) list.push(entry);
-    else map.set(entry.goalId, [entry]);
+function groupBy<T>(items: T[], key: (item: T) => string): Map<string, T[]> {
+  const map = new Map<string, T[]>();
+  for (const item of items) {
+    const list = map.get(key(item));
+    if (list) list.push(item);
+    else map.set(key(item), [item]);
   }
   return map;
 }
@@ -43,7 +60,7 @@ export function useGoalsWithStats() {
 
   const data = useMemo<GoalWithStats[] | undefined>(() => {
     if (!goals.data || !entries.data) return undefined;
-    const byGoal = groupByGoal(entries.data);
+    const byGoal = groupBy(entries.data, (e) => e.goalId);
     return goals.data.map((goal) => {
       const goalEntries = byGoal.get(goal.id) ?? [];
       return { goal, entries: goalEntries, stats: computeGoalStats(goal, goalEntries, today) };
@@ -171,5 +188,109 @@ export function useResetData() {
   return useMutation({
     mutationFn: () => api.resetData(),
     onSuccess: () => client.resetQueries(),
+  });
+}
+
+// ---------- знания ----------
+
+export interface Knowledge {
+  materials: Material[];
+  notes: NoteWithState[];
+  /** Заметки к повторению сегодня, в порядке очереди. */
+  due: NoteWithState[];
+}
+
+export function useKnowledge() {
+  const today = useToday();
+  const materials = useQuery({ queryKey: keys.materials, queryFn: () => api.listMaterials() });
+  const notes = useQuery({ queryKey: keys.notes, queryFn: () => api.listNotes() });
+  const reviews = useQuery({ queryKey: keys.reviews, queryFn: () => api.listReviews() });
+
+  const data = useMemo<Knowledge | undefined>(() => {
+    if (!materials.data || !notes.data || !reviews.data) return undefined;
+    const byNote = groupBy(reviews.data, (r) => r.noteId);
+    const items = notes.data.map((note) => withState(note, byNote.get(note.id) ?? [], today));
+    return {
+      materials: materials.data,
+      notes: items,
+      due: items.filter((item) => item.isDue).sort(compareForReview),
+    };
+  }, [materials.data, notes.data, reviews.data, today]);
+
+  return {
+    data,
+    today,
+    isLoading: materials.isLoading || notes.isLoading || reviews.isLoading,
+    error: materials.error ?? notes.error ?? reviews.error,
+  };
+}
+
+export function useCreateMaterial() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: MaterialInput) => api.createMaterial(input),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.materials }),
+  });
+}
+
+export function useUpdateMaterial() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: MaterialPatch }) => api.updateMaterial(id, patch),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.materials }),
+  });
+}
+
+export function useDeleteMaterial() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteMaterial(id),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: keys.materials });
+      client.invalidateQueries({ queryKey: keys.notes });
+    },
+  });
+}
+
+export function useCreateNote() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: NoteInput) => api.createNote(input),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.notes }),
+  });
+}
+
+export function useUpdateNote() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: NotePatch }) => api.updateNote(id, patch),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.notes }),
+  });
+}
+
+export function useDeleteNote() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteNote(id),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: keys.notes });
+      client.invalidateQueries({ queryKey: keys.reviews });
+    },
+  });
+}
+
+export function useCreateReview() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ReviewInput) => api.createReview(input),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.reviews }),
+  });
+}
+
+export function useDeleteReview() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteReview(id),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.reviews }),
   });
 }

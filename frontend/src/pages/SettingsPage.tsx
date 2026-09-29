@@ -12,7 +12,7 @@ export function SettingsPage() {
         <div>
           <h2 id="settings-areas">Сферы жизни</h2>
           <p className="muted small">
-            Сферы группируют цели: чтение, английский, спорт. Позже к ним добавятся задачи и материалы для изучения.
+            Сферы группируют цели и материалы для изучения: чтение, английский, спорт. Позже к ним добавятся задачи.
           </p>
         </div>
         <AreaSettings />
@@ -21,7 +21,7 @@ export function SettingsPage() {
       <section className="card settings-section" aria-labelledby="settings-data">
         <div>
           <h2 id="settings-data">Данные</h2>
-          <p className="muted small">Резервная копия — это файл JSON со всеми целями, записями и сферами.</p>
+          <p className="muted small">Резервная копия — это файл JSON со всеми целями, заметками, повторениями и сферами.</p>
         </div>
         <DataSettings />
       </section>

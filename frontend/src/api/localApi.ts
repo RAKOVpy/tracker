@@ -1,4 +1,5 @@
-import type { Area, Goal, ProgressEntry } from '../domain/types';
+import type { Area, Goal, Material, Note, ProgressEntry, Review } from '../domain/types';
+import { todayIso } from '../lib/dates';
 import { createEmptyDb, migrate, SCHEMA_VERSION, systemCtx, toBackup, type Db } from './schema';
 import { NotFoundError, type TrackerApi } from './types';
 
@@ -61,6 +62,7 @@ export const localApi: TrackerApi = {
     const db = load();
     db.areas = db.areas.filter((a) => a.id !== id);
     db.goals = db.goals.map((g) => (g.areaId === id ? { ...g, areaId: null } : g));
+    db.materials = db.materials.map((m) => (m.areaId === id ? { ...m, areaId: null } : m));
     save(db);
   },
 
@@ -114,6 +116,86 @@ export const localApi: TrackerApi = {
   async deleteEntry(id) {
     const db = load();
     db.entries = db.entries.filter((e) => e.id !== id);
+    save(db);
+  },
+
+  async listMaterials() {
+    return load().materials;
+  },
+
+  async createMaterial(input) {
+    const db = load();
+    const material: Material = { ...input, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+    db.materials.push(material);
+    save(db);
+    return material;
+  },
+
+  async updateMaterial(id, patch) {
+    const db = load();
+    const index = findIndex(db.materials, id, 'Материал');
+    db.materials[index] = { ...db.materials[index], ...patch };
+    save(db);
+    return db.materials[index];
+  },
+
+  async deleteMaterial(id) {
+    const db = load();
+    db.materials = db.materials.filter((m) => m.id !== id);
+    db.notes = db.notes.map((n) => (n.materialId === id ? { ...n, materialId: null } : n));
+    save(db);
+  },
+
+  async listNotes() {
+    return load().notes;
+  },
+
+  async createNote(input, options) {
+    const db = load();
+    const now = new Date();
+    const note: Note = {
+      ...input,
+      id: crypto.randomUUID(),
+      status: 'active',
+      addedOn: options?.addedOn ?? todayIso(now),
+      createdAt: now.toISOString(),
+    };
+    db.notes.push(note);
+    save(db);
+    return note;
+  },
+
+  async updateNote(id, patch) {
+    const db = load();
+    const index = findIndex(db.notes, id, 'Заметка');
+    db.notes[index] = { ...db.notes[index], ...patch };
+    save(db);
+    return db.notes[index];
+  },
+
+  async deleteNote(id) {
+    const db = load();
+    db.notes = db.notes.filter((n) => n.id !== id);
+    db.reviews = db.reviews.filter((r) => r.noteId !== id);
+    save(db);
+  },
+
+  async listReviews() {
+    return load().reviews;
+  },
+
+  async createReview(input) {
+    const db = load();
+    findIndex(db.notes, input.noteId, 'Заметка');
+    const review: Review = { ...input, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+    db.reviews.push(review);
+    save(db);
+    return review;
+  },
+
+  async deleteReview(id) {
+    const db = load();
+    db.reviews = db.reviews.filter((r) => r.id !== id);
     save(db);
   },
 
