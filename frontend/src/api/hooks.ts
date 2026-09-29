@@ -1,24 +1,29 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { computeGoalStats, type GoalWithStats } from '../domain/progress';
-import type { EntryInput, GoalInput, GoalPatch, ProgressEntry } from '../domain/types';
+import type { Area, AreaInput, AreaPatch, EntryInput, GoalInput, GoalPatch, ProgressEntry } from '../domain/types';
 import { todayIso } from '../lib/dates';
-import { api } from '.';
+import { api, type Db } from '.';
 
 const keys = {
+  areas: ['areas'] as const,
   goals: ['goals'] as const,
   goal: (id: string) => ['goals', id] as const,
   entries: (goalId?: string) => (goalId ? (['entries', goalId] as const) : (['entries'] as const)),
 };
 
-/** Текущая дата; обновляется, если приложение открыто через полночь. */
-export function useToday(): string {
-  const [today, setToday] = useState(todayIso);
+/** Текущее время с точностью до минуты: экран обновится, если приложение открыто через полночь. */
+export function useNow(): Date {
+  const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const timer = setInterval(() => setToday(todayIso()), 60_000);
+    const timer = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(timer);
   }, []);
-  return today;
+  return now;
+}
+
+export function useToday(): string {
+  return todayIso(useNow());
 }
 
 function groupByGoal(entries: ProgressEntry[]): Map<string, ProgressEntry[]> {
@@ -112,5 +117,59 @@ export function useDeleteEntry() {
   return useMutation({
     mutationFn: (id: string) => api.deleteEntry(id),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.entries() }),
+  });
+}
+
+export function useAreas() {
+  return useQuery({ queryKey: keys.areas, queryFn: () => api.listAreas() });
+}
+
+/** Сферы по id — для подписей и иконок на карточках целей. */
+export function useAreaMap(): Map<string, Area> {
+  const { data } = useAreas();
+  return useMemo(() => new Map((data ?? []).map((area) => [area.id, area])), [data]);
+}
+
+export function useCreateArea() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AreaInput) => api.createArea(input),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.areas }),
+  });
+}
+
+export function useUpdateArea() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: AreaPatch }) => api.updateArea(id, patch),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.areas }),
+  });
+}
+
+export function useDeleteArea() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteArea(id),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: keys.areas });
+      client.invalidateQueries({ queryKey: keys.goals });
+    },
+  });
+}
+
+/** Импорт и сброс заменяют все данные, поэтому после них сбрасывается весь кэш. */
+export function useImportData() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (db: Db) => api.importData(db),
+    onSuccess: () => client.resetQueries(),
+  });
+}
+
+export function useResetData() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.resetData(),
+    onSuccess: () => client.resetQueries(),
   });
 }

@@ -1,3 +1,4 @@
+import { Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { useCreateEntry } from '../api/hooks';
 import type { Goal } from '../domain/types';
@@ -39,9 +40,15 @@ export function QuickLog({ goal, today, suggested }: Props) {
         onChange={(e) => setRaw(e.target.value)}
         aria-label={`Сколько сделано сегодня, ${goal.unit}`}
       />
-      <span className="muted small">{goal.unit}</span>
-      <button className="btn btn--primary btn--sm" type="submit" disabled={!isValid || createEntry.isPending}>
-        + Записать
+      <span className="muted small" aria-hidden>
+        {goal.unit}
+      </span>
+      <button
+        className={suggested > 0 ? 'btn btn--primary btn--sm' : 'btn btn--sm'}
+        type="submit"
+        disabled={!isValid || createEntry.isPending}
+      >
+        <Plus size={15} strokeWidth={2.2} aria-hidden /> Записать
       </button>
     </form>
   );

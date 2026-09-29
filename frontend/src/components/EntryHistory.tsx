@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import { useDeleteEntry } from '../api/hooks';
 import type { Goal, ProgressEntry } from '../domain/types';
 import { formatRelative, formatWeekday, type IsoDate } from '../lib/dates';
@@ -35,15 +36,15 @@ export function EntryHistory({ goal, entries, today }: Props) {
               {dayEntries.map((entry) => (
                 <div className="history__entry" key={entry.id}>
                   <strong>+{formatAmount(entry.value, goal.unit)}</strong>
-                  <span className="spacer muted">{entry.note}</span>
+                  <span className="spacer muted history__note">{entry.note}</span>
                   <button
-                    className="icon-btn"
+                    className="icon-btn icon-btn--danger"
                     type="button"
                     title="Удалить запись"
                     aria-label="Удалить запись"
                     onClick={() => deleteEntry.mutate(entry.id)}
                   >
-                    ✕
+                    <X size={15} aria-hidden />
                   </button>
                 </div>
               ))}

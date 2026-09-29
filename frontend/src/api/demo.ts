@@ -1,14 +1,21 @@
+import type { AreaInput } from '../domain/types';
 import { addDays, todayIso } from '../lib/dates';
 import { api } from '.';
 
 /** Пример целей с историей прогресса, чтобы сразу увидеть, как выглядит приложение. */
 export async function seedDemoData(): Promise<void> {
   const today = todayIso();
+  const areas = await api.listAreas();
+  // Сферы ищем по иконке: пользователь мог их переименовать. Если сферы нет — создаём.
+  async function areaId(input: AreaInput): Promise<string> {
+    const existing = areas.find((a) => a.icon === input.icon);
+    return existing ? existing.id : (await api.createArea(input)).id;
+  }
 
   const book = await api.createGoal({
     title: 'Прочитать «Атлант расправил плечи»',
     description: 'Том 1. Читать перед сном хотя бы полчаса.',
-    category: 'reading',
+    areaId: await areaId({ name: 'Чтение', color: 'ochre', icon: 'book' }),
     unit: 'стр.',
     targetValue: 480,
     startDate: addDays(today, -9),
@@ -25,7 +32,7 @@ export async function seedDemoData(): Promise<void> {
   const english = await api.createGoal({
     title: 'Английский: 30 часов разговорной практики',
     description: 'Созвоны с преподавателем + подкасты.',
-    category: 'language',
+    areaId: await areaId({ name: 'Языки', color: 'slate', icon: 'languages' }),
     unit: 'часов',
     targetValue: 30,
     startDate: addDays(today, -14),
@@ -42,7 +49,7 @@ export async function seedDemoData(): Promise<void> {
   const sport = await api.createGoal({
     title: '12 тренировок в зале за месяц',
     description: '',
-    category: 'sport',
+    areaId: await areaId({ name: 'Спорт', color: 'sage', icon: 'dumbbell' }),
     unit: 'тренировок',
     targetValue: 12,
     startDate: addDays(today, -6),

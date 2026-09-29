@@ -22,8 +22,10 @@ export interface GoalStats {
   totalDays: number;
   /** Сколько дней осталось, включая сегодня. 0 — дедлайн прошёл. */
   daysLeft: number;
-  /** Норма в день по исходному плану. */
+  /** Норма в день по исходному плану (точное значение, для расчётов). */
   dailyPlan: number;
+  /** Та же норма, округлённая вверх для показа: «≈ 3,4 км в день». */
+  dailyNorm: number;
   /** Сколько должно быть сделано к концу сегодняшнего дня по плану. */
   expectedByToday: number;
   status: PaceStatus;
@@ -52,8 +54,11 @@ export function sumByDate(entries: ProgressEntry[]): Map<IsoDate, number> {
   return totals;
 }
 
-/** Округление вверх: крупные нормы — до целых, мелкие — до десятых. */
-function roundUpNorm(value: number, dailyPlan: number): number {
+/**
+ * Округление нормы вверх: крупные нормы — до целых, мелкие — до десятых.
+ * Округляем вверх, чтобы, выполняя норму, точно успеть к сроку.
+ */
+export function roundUpNorm(value: number, dailyPlan: number = value): number {
   const step = dailyPlan >= 5 ? 1 : 0.1;
   return Math.ceil(value / step - EPS) * step;
 }
@@ -117,6 +122,7 @@ export function computeGoalStats(goal: Goal, entries: ProgressEntry[], today: Is
     totalDays,
     daysLeft,
     dailyPlan,
+    dailyNorm: roundUpNorm(dailyPlan),
     expectedByToday,
     status,
     gap,

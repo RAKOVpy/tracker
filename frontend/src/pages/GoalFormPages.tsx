@@ -1,11 +1,20 @@
-import { useNavigate, useParams } from 'react-router-dom';
-import { useCreateGoal, useGoalWithStats, useUpdateGoal } from '../api/hooks';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useAreas, useCreateGoal, useGoalWithStats, useUpdateGoal } from '../api/hooks';
 import { GoalForm } from '../components/GoalForm';
 import type { GoalInput } from '../domain/types';
+import { ErrorState, LoadingState } from './states';
 
 export function NewGoalPage() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const areas = useAreas();
   const createGoal = useCreateGoal();
+
+  if (areas.isLoading) return <LoadingState />;
+  if (areas.error || !areas.data) return <ErrorState error={areas.error} />;
+
+  const requestedArea = params.get('area');
+  const defaultAreaId = areas.data.some((a) => a.id === requestedArea) ? requestedArea : null;
 
   return (
     <>
@@ -13,6 +22,8 @@ export function NewGoalPage() {
         <h1>Новая цель</h1>
       </div>
       <GoalForm
+        areas={areas.data}
+        defaultAreaId={defaultAreaId}
         submitLabel="Создать цель"
         isSubmitting={createGoal.isPending}
         onSubmit={(input) => createGoal.mutate(input, { onSuccess: (goal) => navigate(`/goals/${goal.id}`) })}
@@ -25,30 +36,36 @@ export function NewGoalPage() {
 export function EditGoalPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
-  const { data, isLoading } = useGoalWithStats(id);
+  const goal = useGoalWithStats(id);
+  const areas = useAreas();
   const updateGoal = useUpdateGoal(id);
 
-  if (isLoading) return <p className="muted">Загрузка…</p>;
-  if (!data) return <p className="field__error">Цель не найдена</p>;
+  if (goal.isLoading || areas.isLoading) return <LoadingState />;
+  if (areas.error || !areas.data) return <ErrorState error={areas.error} />;
+  if (!goal.data) return <ErrorState error={goal.error ?? new Error('Цель не найдена')} />;
 
-  const { goal } = data;
+  const { goal: g } = goal.data;
   const initial: GoalInput = {
-    title: goal.title,
-    description: goal.description,
-    category: goal.category,
-    unit: goal.unit,
-    targetValue: goal.targetValue,
-    startDate: goal.startDate,
-    deadline: goal.deadline,
-    priority: goal.priority,
+    title: g.title,
+    description: g.description,
+    areaId: g.areaId,
+    unit: g.unit,
+    targetValue: g.targetValue,
+    startDate: g.startDate,
+    deadline: g.deadline,
+    priority: g.priority,
   };
 
   return (
     <>
       <div className="page-head">
-        <h1>Редактирование</h1>
+        <div>
+          <p className="page-head__eyebrow">Редактирование</p>
+          <h1>{g.title}</h1>
+        </div>
       </div>
       <GoalForm
+        areas={areas.data}
         initial={initial}
         submitLabel="Сохранить"
         isSubmitting={updateGoal.isPending}

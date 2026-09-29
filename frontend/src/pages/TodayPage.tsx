@@ -1,12 +1,15 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { Plus, Sparkles, Target } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
 import { seedDemoData } from '../api/demo';
-import { useGoalsWithStats } from '../api/hooks';
+import { useAreaMap, useGoalsWithStats, useNow } from '../api/hooks';
 import { GoalCard } from '../components/GoalCard';
 import { compareForToday, type GoalWithStats } from '../domain/progress';
+import type { Area } from '../domain/types';
 import { formatLong, formatWeekday, type IsoDate } from '../lib/dates';
 import { plural } from '../lib/format';
+import { ErrorState, LoadingState } from './states';
 
 interface Groups {
   todo: GoalWithStats[];
@@ -31,32 +34,48 @@ function groupGoals(items: GoalWithStats[]): Groups {
   return groups;
 }
 
+function greeting(now: Date): string {
+  const hour = now.getHours();
+  if (hour < 5) return 'Доброй ночи';
+  if (hour < 12) return 'Доброе утро';
+  if (hour < 18) return 'Добрый день';
+  return 'Добрый вечер';
+}
+
 function Ring({ done, total }: { done: number; total: number }) {
   const r = 22;
   const c = 2 * Math.PI * r;
   const part = total > 0 ? done / total : 0;
   return (
-    <svg className="summary__ring" width="56" height="56" viewBox="0 0 56 56" aria-hidden>
-      <circle cx="28" cy="28" r={r} fill="none" stroke="var(--surface-2)" strokeWidth="6" />
+    <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden style={{ flex: 'none' }}>
+      <circle cx="28" cy="28" r={r} fill="none" stroke="var(--sheet-2)" strokeWidth="5" />
       <circle
         cx="28"
         cy="28"
         r={r}
         fill="none"
         stroke={part >= 1 ? 'var(--good)' : 'var(--accent)'}
-        strokeWidth="6"
+        strokeWidth="5"
         strokeLinecap="round"
         strokeDasharray={`${c * part} ${c}`}
         transform="rotate(-90 28 28)"
       />
-      <text x="28" y="33" textAnchor="middle" fontSize="14" fontWeight="700" fill="var(--text)">
+      <text x="28" y="33" textAnchor="middle" fontSize="14" fontWeight="600" fill="var(--ink)" fontFamily="var(--font-ui)">
         {done}/{total}
       </text>
     </svg>
   );
 }
 
-function Section({ title, items, today, compact }: { title: string; items: GoalWithStats[]; today: IsoDate; compact?: boolean }) {
+interface SectionProps {
+  title: string;
+  items: GoalWithStats[];
+  areas: Map<string, Area>;
+  today: IsoDate;
+  compact?: boolean;
+}
+
+function Section({ title, items, areas, today, compact }: SectionProps) {
   if (items.length === 0) return null;
   return (
     <section className="section">
@@ -65,7 +84,13 @@ function Section({ title, items, today, compact }: { title: string; items: GoalW
       </h2>
       <div className="stack">
         {items.map((item) => (
-          <GoalCard key={item.goal.id} item={item} today={today} compact={compact} />
+          <GoalCard
+            key={item.goal.id}
+            item={item}
+            area={item.goal.areaId ? areas.get(item.goal.areaId) : undefined}
+            today={today}
+            compact={compact}
+          />
         ))}
       </div>
     </section>
@@ -78,25 +103,30 @@ function EmptyState() {
 
   async function seed() {
     setSeeding(true);
-    await seedDemoData();
-    await client.invalidateQueries();
-    setSeeding(false);
+    try {
+      await seedDemoData();
+      await client.invalidateQueries();
+    } finally {
+      setSeeding(false);
+    }
   }
 
   return (
     <div className="card empty">
-      <div className="empty__icon">🎯</div>
+      <span className="empty__icon">
+        <Target size={26} strokeWidth={1.8} aria-hidden />
+      </span>
       <h2>Пока нет ни одной цели</h2>
       <p className="muted">
-        Добавьте цель с конкретным числом и сроком, например «прочитать 320 страниц к 31 октября», и отмечайте прогресс
-        каждый день.
+        Поставьте цель с числом и сроком, например «прочитать 320 страниц к 31 октября». Приложение посчитает, сколько
+        делать каждый день, и напомнит, если начнёте отставать.
       </p>
-      <div className="row">
+      <div className="row" style={{ justifyContent: 'center' }}>
         <Link className="btn btn--primary" to="/goals/new">
-          Создать цель
+          <Plus size={16} aria-hidden /> Создать цель
         </Link>
         <button className="btn" type="button" onClick={seed} disabled={seeding}>
-          Показать пример
+          <Sparkles size={16} aria-hidden /> Показать пример
         </button>
       </div>
     </div>
@@ -105,22 +135,25 @@ function EmptyState() {
 
 export function TodayPage() {
   const { data, today, isLoading, error } = useGoalsWithStats();
+  const areas = useAreaMap();
+  const now = useNow();
 
-  if (isLoading) return <p className="muted">Загрузка…</p>;
-  if (error || !data) return <p className="field__error">Не удалось загрузить цели: {String(error)}</p>;
+  if (isLoading) return <LoadingState />;
+  if (error || !data) return <ErrorState error={error} />;
 
   const groups = groupGoals(data);
   const activeToday = groups.todo.length + groups.doneToday.length;
   const weekday = formatWeekday(today);
+  const sectionProps = { areas, today };
 
   return (
     <>
       <div className="page-head">
         <div>
-          <h1>Сегодня</h1>
-          <p className="muted">
+          <p className="page-head__eyebrow">
             {weekday.charAt(0).toUpperCase() + weekday.slice(1)}, {formatLong(today)}
           </p>
+          <h1>{greeting(now)}</h1>
         </div>
       </div>
 
@@ -134,32 +167,23 @@ export function TodayPage() {
               <div>
                 <div className="summary__title">
                   {groups.todo.length === 0
-                    ? 'Всё на сегодня сделано 🎉'
+                    ? 'На сегодня всё сделано'
                     : `Осталось ${groups.todo.length} ${plural(groups.todo.length, ['цель', 'цели', 'целей'])} на сегодня`}
                 </div>
-                <div className="muted small">Выполните дневную норму, чтобы успеть к дедлайну.</div>
+                <div className="muted small">
+                  {groups.todo.length === 0
+                    ? 'Можно отдохнуть или сделать немного впрок.'
+                    : 'Выполните дневную норму, чтобы успеть к сроку.'}
+                </div>
               </div>
             </div>
           )}
 
-          <Section title="Нужно сделать сегодня" items={groups.todo} today={today} />
-          <Section title="Дедлайн прошёл" items={groups.overdue} today={today} />
-          <Section title="Сегодня уже сделано" items={groups.doneToday} today={today} />
-          <Section title="Запланированы" items={groups.upcoming} today={today} compact />
-          <Section title="Достигнуты" items={groups.achieved} today={today} compact />
-
-          {groups.archived.length > 0 && (
-            <details className="section details">
-              <summary>
-                Архив <span className="section__count">{groups.archived.length}</span>
-              </summary>
-              <div className="stack" style={{ marginTop: 12 }}>
-                {groups.archived.map((item) => (
-                  <GoalCard key={item.goal.id} item={item} today={today} compact />
-                ))}
-              </div>
-            </details>
-          )}
+          <Section title="Нужно сделать сегодня" items={groups.todo} {...sectionProps} />
+          <Section title="Срок прошёл" items={groups.overdue} {...sectionProps} />
+          <Section title="Сегодня уже сделано" items={groups.doneToday} {...sectionProps} />
+          <Section title="Запланированы" items={groups.upcoming} {...sectionProps} compact />
+          <Section title="Достигнуты" items={groups.achieved} {...sectionProps} compact />
         </>
       )}
     </>

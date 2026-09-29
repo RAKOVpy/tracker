@@ -11,14 +11,27 @@
 ## Этапы
 
 Модули продукта, исходные идеи с поправками и план этапов описаны в [PRODUCT.md](PRODUCT.md).
-Этот документ описывает техническое устройство того, что уже сделано (этап 1),
+Этот документ описывает техническое устройство того, что уже сделано (этапы 1–2),
 и проект бэкенда.
 
-## Предметная модель (MVP)
+## Предметная модель
 
 ```
-Goal 1 ──── * ProgressEntry
+Area 1 ──── * Goal 1 ──── * ProgressEntry
 ```
+
+**Area** — сфера жизни: «Чтение», «Английский», «Спорт». Пользователь создаёт,
+переименовывает, перекрашивает и упорядочивает их сам. При первом запуске создаются
+четыре сферы по умолчанию.
+
+| Поле | Тип |
+|------|-----|
+| `id` | UUID |
+| `name` | строка |
+| `color` | `clay` \| `ochre` \| `sage` \| `teal` \| `slate` \| `plum` \| `rose` \| `stone` |
+| `icon` | ключ иконки: `book`, `languages`, `dumbbell`, `study`, … |
+| `order` | число, порядок в списке |
+| `createdAt` | дата-время |
 
 **Goal** — измеримая цель.
 
@@ -27,7 +40,7 @@ Goal 1 ──── * ProgressEntry
 | `id` | UUID | |
 | `title` | строка | «Прочитать „Атлант расправил плечи“» |
 | `description` | текст | заметки, мотивация |
-| `category` | `reading` \| `language` \| `sport` \| `study` \| `other` | `reading` |
+| `areaId` | FK → Area или `null` | цель без сферы |
 | `unit` | строка | «стр.», «часов», «тренировок» |
 | `targetValue` | число > 0 | 480 |
 | `startDate` | дата | 2026-09-20 |
@@ -73,25 +86,43 @@ Goal 1 ──── * ProgressEntry
 - **Серия** — дней подряд с прогрессом. Если сегодня ещё не отмечено, считаем со вчера,
   чтобы серия не «сгорала» утром.
 
+## Хранение и резервные копии
+
+Пока данные лежат в `localStorage` браузера под ключом `tracker:data` в виде
+`{ version, areas, goals, entries }`. Код — `frontend/src/api/schema.ts` и `localApi.ts`.
+
+- **Версия схемы.** При каждом изменении модели растёт `SCHEMA_VERSION` и добавляется
+  шаг миграции. При загрузке старые данные автоматически приводятся к текущей версии.
+  Первая миграция (v1 → v2) заменила категории целей сферами. Ключ `tracker:v1`
+  не удаляется и остаётся запасной копией.
+- **Проверка.** После миграции данные проверяются: типы полей, формат дат, уникальность id.
+  Висячие ссылки чинятся (цель удалённой сферы остаётся без сферы). Если данные повреждены,
+  приложение показывает ошибку и не начинает молча с чистого листа.
+- **Резервная копия** — JSON-файл `{ app: "tracker", version, exportedAt, areas, goals, entries }`.
+  При восстановлении файл проходит ту же миграцию и проверку, поэтому копию старой версии
+  можно восстановить в новой.
+
 ## Фронтенд
 
-**Стек:** React 19 + TypeScript, Vite, React Router, TanStack Query, Vitest.
-Стили — обычный CSS с переменными (светлая и тёмная тема), без UI-библиотек.
+**Стек:** React 19 + TypeScript, Vite, React Router, TanStack Query, Vitest,
+иконки Lucide, шрифты Literata и Onest (устанавливаются пакетами Fontsource, без внешних CDN).
+Стили — обычный CSS на токенах: светлая и тёмная тема, цвета сфер, без UI-библиотек.
 
 ```
 frontend/src/
 ├── domain/         # предметная область, без React
-│   ├── types.ts        Goal, ProgressEntry, входные DTO
-│   ├── meta.ts         категории, приоритеты, склонение единиц
-│   └── progress.ts     computeGoalStats, сортировка для экрана «Сегодня»
+│   ├── types.ts        Area, Goal, ProgressEntry, входные DTO
+│   ├── meta.ts         сферы по умолчанию, цвета и иконки, приоритеты, склонение единиц
+│   └── progress.ts     computeGoalStats, округление нормы, сортировка для «Сегодня»
 ├── api/            # доступ к данным
 │   ├── types.ts        интерфейс TrackerApi — контракт с бэкендом
-│   ├── localApi.ts     реализация на localStorage (MVP)
-│   ├── index.ts        выбор реализации
-│   ├── hooks.ts        хуки TanStack Query: useGoalsWithStats, useCreateEntry, …
+│   ├── schema.ts       версия схемы, миграции, проверка, формат резервной копии
+│   ├── localApi.ts     реализация на localStorage
+│   ├── index.ts        выбор реализации, чтение резервной копии
+│   ├── hooks.ts        хуки TanStack Query: useGoalsWithStats, useAreas, useImportData, …
 │   └── demo.ts         демо-данные
-├── components/     # GoalCard, QuickLog, GoalForm, ProgressChart, EntryForm, EntryHistory, …
-├── pages/          # TodayPage, GoalPage, NewGoalPage / EditGoalPage
+├── components/     # Layout, GoalCard, QuickLog, GoalForm, ProgressChart, AreaSettings, DataSettings, …
+├── pages/          # TodayPage, GoalsPage, GoalPage, GoalFormPages, SettingsPage
 └── lib/            # даты (строки YYYY-MM-DD, расчёты в UTC), форматирование, склонения
 ```
 
@@ -99,17 +130,25 @@ frontend/src/
 `api/hooks.ts`, те обращаются к интерфейсу `TrackerApi`. Чтобы перейти на DRF,
 достаточно написать `httpApi.ts` с тем же интерфейсом и подключить его в `api/index.ts`.
 
+**Навигация:** на компьютере — боковая панель (Сегодня, Цели, список сфер, Настройки),
+на телефоне — нижняя панель (Сегодня, Цели, новая цель, Настройки).
+
 **Экраны:**
 
-1. **Сегодня** (`/`) — сводка «сделано N из M» и группы целей: «Нужно сделать сегодня»
-   (сначала отстающие, затем по приоритету и дедлайну), «Дедлайн прошёл»,
-   «Сегодня уже сделано», «Запланированы», «Достигнуты», «Архив».
-   На карточке: прогресс-бар с отметкой плана, норма на сегодня, быстрая запись
-   (пустое поле = записать остаток нормы), статус темпа, серия, активность за 7 дней.
-2. **Цель** (`/goals/:id`) — показатели, график «факт против плана», запись прогресса
-   за любой прошедший день с комментарием, история с удалением, архив и удаление цели.
-3. **Создание / редактирование** (`/goals/new`, `/goals/:id/edit`) — форма с быстрыми
-   сроками (неделя, месяц, 3 месяца, полгода, год) и предпросмотром «≈ 16 стр. в день».
+1. **Сегодня** (`/`) — приветствие, сводка «сделано N из M» и группы целей:
+   «Нужно сделать сегодня» (сначала отстающие, затем по приоритету и сроку),
+   «Срок прошёл», «Сегодня уже сделано», «Запланированы», «Достигнуты».
+   На карточке: иконка сферы, прогресс с отметкой плана, норма на сегодня, быстрая запись
+   (пустое поле = записать остаток нормы), темп, серия, активность за 7 дней.
+2. **Цели** (`/goals`, `/goals?area=<id>`) — все цели по группам «В работе»,
+   «Запланированы», «Достигнуты», «Архив» с фильтром по сферам.
+3. **Цель** (`/goals/:id`) — показатели, подсказка «что делать дальше», график
+   «факт против плана», запись прогресса за любой прошедший день, история,
+   архив и удаление с подтверждением.
+4. **Создание / редактирование** (`/goals/new`, `/goals/:id/edit`) — выбор сферы,
+   быстрые единицы и сроки, предпросмотр «≈ 16 стр. в день».
+5. **Настройки** (`/settings`) — сферы (добавить, переименовать, цвет, иконка, порядок,
+   удалить) и данные (скачать резервную копию, восстановить из файла, удалить всё).
 
 ## Бэкенд (проект)
 
@@ -118,12 +157,25 @@ frontend/src/
 `django-filter`, `drf-spectacular` (OpenAPI-схема).
 
 ```python
+class Area(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="areas")
+    name = models.CharField(max_length=40)
+    color = models.CharField(max_length=10, choices=AreaColor.choices)
+    icon = models.CharField(max_length=20, choices=AreaIcon.choices)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["order"]
+
+
 class Goal(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="goals")
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
-    category = models.CharField(max_length=20, choices=Category.choices)
+    area = models.ForeignKey(Area, null=True, blank=True, on_delete=models.SET_NULL, related_name="goals")
     unit = models.CharField(max_length=30)
     target_value = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0.01)])
     start_date = models.DateField()
@@ -152,12 +204,16 @@ class ProgressEntry(models.Model):
 
 | Метод | URL | Назначение |
 |-------|-----|------------|
+| GET / POST | `/api/areas/` | сферы |
+| PATCH / DELETE | `/api/areas/{id}/` | сфера (при удалении цели остаются без сферы) |
 | GET | `/api/goals/?status=active` | список целей |
 | POST | `/api/goals/` | создать |
 | GET / PATCH / DELETE | `/api/goals/{id}/` | цель |
 | GET | `/api/entries/?goal={id}&date_from=…` | записи (без `goal` — по всем целям) |
 | POST | `/api/entries/` | добавить запись |
 | DELETE | `/api/entries/{id}/` | удалить запись |
+| GET | `/api/export/` | резервная копия в том же формате, что и сейчас |
+| POST | `/api/import/` | восстановление из резервной копии |
 | POST | `/api/auth/token/`, `/api/auth/token/refresh/` | JWT |
 
 Расчёт статистики на MVP-этапе остаётся на клиенте: он мгновенный, работает офлайн

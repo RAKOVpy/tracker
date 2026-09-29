@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeGoalStats, compareForToday, type GoalWithStats } from './progress';
+import { computeGoalStats, compareForToday, roundUpNorm, type GoalWithStats } from './progress';
 import type { Goal, ProgressEntry } from './types';
 
 function makeGoal(overrides: Partial<Goal> = {}): Goal {
@@ -7,7 +7,7 @@ function makeGoal(overrides: Partial<Goal> = {}): Goal {
     id: 'g1',
     title: 'Прочитать «Мастер и Маргарита»',
     description: '',
-    category: 'reading',
+    areaId: null,
     unit: 'стр.',
     targetValue: 300,
     startDate: '2026-10-01',
@@ -99,6 +99,16 @@ describe('computeGoalStats', () => {
     const goal = makeGoal({ targetValue: 10, unit: 'часов' });
     const s = computeGoalStats(goal, [], '2026-10-01');
     expect(s.todayTarget).toBeCloseTo(0.4);
+    expect(s.dailyNorm).toBeCloseTo(0.4);
+  });
+
+  it('норма для показа совпадает с нормой первого дня', () => {
+    const goal = makeGoal({ targetValue: 100, unit: 'км' }); // 3,33 км в день
+    const s = computeGoalStats(goal, [], '2026-10-01');
+    expect(s.dailyNorm).toBeCloseTo(3.4);
+    expect(s.todayTarget).toBeCloseTo(s.dailyNorm);
+    expect(roundUpNorm(384 / 30)).toBe(13);
+    expect(roundUpNorm(10)).toBe(10);
   });
 
   it('серия считается со вчера, если сегодня ещё не отмечено', () => {

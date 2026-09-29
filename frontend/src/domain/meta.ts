@@ -1,12 +1,44 @@
-import type { Category, Priority } from './types';
+import type { AreaColor, AreaIcon, AreaInput, Priority } from './types';
 
-export const CATEGORIES: Record<Category, { label: string; icon: string; units: string[] }> = {
-  reading: { label: 'Чтение', icon: '📚', units: ['стр.', 'глав', 'книг', 'минут'] },
-  language: { label: 'Языки', icon: '🗣️', units: ['минут', 'уроков', 'слов', 'часов'] },
-  sport: { label: 'Спорт', icon: '🏃', units: ['тренировок', 'км', 'минут', 'повторений'] },
-  study: { label: 'Учёба', icon: '🎓', units: ['уроков', 'часов', 'задач', 'минут'] },
-  other: { label: 'Другое', icon: '⭐', units: ['раз', 'часов', 'минут', 'шт.'] },
-};
+export const AREA_COLORS: AreaColor[] = ['clay', 'ochre', 'sage', 'teal', 'slate', 'plum', 'rose', 'stone'];
+
+export const AREA_ICONS: AreaIcon[] = [
+  'book',
+  'languages',
+  'dumbbell',
+  'study',
+  'work',
+  'health',
+  'code',
+  'music',
+  'money',
+  'home',
+  'travel',
+  'star',
+];
+
+/** Сферы, которые создаются при первом запуске. */
+export const DEFAULT_AREAS: AreaInput[] = [
+  { name: 'Чтение', color: 'ochre', icon: 'book' },
+  { name: 'Языки', color: 'slate', icon: 'languages' },
+  { name: 'Спорт', color: 'sage', icon: 'dumbbell' },
+  { name: 'Учёба', color: 'clay', icon: 'study' },
+];
+
+export const UNIT_SUGGESTIONS = [
+  'стр.',
+  'глав',
+  'книг',
+  'минут',
+  'часов',
+  'уроков',
+  'слов',
+  'тренировок',
+  'км',
+  'повторений',
+  'задач',
+  'раз',
+];
 
 /**
  * Формы для склонения известных единиц: «1 час», «2 часа», «5 часов».
@@ -25,8 +57,6 @@ export const UNIT_FORMS: Record<string, [one: string, few: string, many: string]
   задач: ['задача', 'задачи', 'задач'],
   раз: ['раз', 'раза', 'раз'],
 };
-
-export const CATEGORY_ORDER: Category[] = ['reading', 'language', 'sport', 'study', 'other'];
 
 export const PRIORITIES: Record<Priority, { label: string; rank: number }> = {
   high: { label: 'Высокий', rank: 0 },

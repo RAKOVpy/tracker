@@ -17,16 +17,16 @@ export function formatAmount(value: number, unit: string): string {
 export function describePace(goal: Goal, stats: GoalStats): { text: string; tone: Tone } {
   switch (stats.status) {
     case 'achieved':
-      return { text: '🎉 Цель достигнута', tone: 'good' };
+      return { text: 'Цель достигнута', tone: 'good' };
     case 'upcoming':
       return { text: `Старт ${formatShort(goal.startDate)}`, tone: 'muted' };
     case 'overdue':
-      return { text: `Дедлайн прошёл, осталось ${formatAmount(stats.remaining, goal.unit)}`, tone: 'bad' };
+      return { text: `Срок прошёл, осталось ${formatAmount(stats.remaining, goal.unit)}`, tone: 'bad' };
     case 'ahead':
       return { text: `Опережаете план на ${formatAmount(stats.gap, goal.unit)}`, tone: 'good' };
     case 'on_track':
       return { text: 'Идёте по плану', tone: 'good' };
     case 'behind':
-      return { text: `Отстаёте от плана на ${formatAmount(stats.gap, goal.unit)}`, tone: 'warn' };
+      return { text: `Нужно наверстать ${formatAmount(stats.gap, goal.unit)}`, tone: 'warn' };
   }
 }
