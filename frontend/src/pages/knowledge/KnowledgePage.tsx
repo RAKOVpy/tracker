@@ -5,13 +5,16 @@ import { Link } from 'react-router-dom';
 import { seedKnowledgeDemo } from '../../api/demo';
 import { useAreaMap, useKnowledge } from '../../api/hooks';
 import { DueReviewsCard } from '../../components/knowledge/DueReviewsCard';
+import { LoadForecast } from '../../components/knowledge/LoadForecast';
 import { MaterialCard } from '../../components/knowledge/MaterialCard';
 import { NoteRow } from '../../components/knowledge/parts';
 import { SyncButton, SyncPhaseView } from '../../components/obsidian/ObsidianSettings';
+import { VacationBanner } from '../../components/VacationBanner';
 import { MATERIAL_STATUSES } from '../../domain/meta';
 import { useObsidian } from '../../obsidian/useObsidian';
 import type { NoteWithState } from '../../domain/review';
 import type { Material, MaterialStatus } from '../../domain/types';
+import { plural } from '../../lib/format';
 import { ErrorState, LoadingState } from '../states';
 
 function EmptyKnowledge() {
@@ -58,7 +61,9 @@ export function KnowledgePage() {
   if (isLoading) return <LoadingState />;
   if (error || !data) return <ErrorState error={error} />;
 
-  const { materials, notes, due } = data;
+  const { materials, notes, load, forecast, settings } = data;
+  const activeCount = materials.filter((m) => m.status === 'active').length;
+  const freeSlots = settings.activeMaterialsLimit - activeCount;
   const notesByMaterial = new Map<string, NoteWithState[]>();
   for (const item of notes) {
     if (!item.note.materialId) continue;
@@ -78,8 +83,30 @@ export function KnowledgePage() {
     return (
       <section className="section" key={status}>
         <h2 className="section__title">
-          {MATERIAL_STATUSES[status]} <span className="section__count">{list.length}</span>
+          {MATERIAL_STATUSES[status]}{' '}
+          {status === 'active' ? (
+            <span
+              className={freeSlots < 0 ? 'section__count section__count--warn' : 'section__count'}
+              title="Сколько материалов изучается и лимит из настроек"
+            >
+              {list.length} из {settings.activeMaterialsLimit}
+            </span>
+          ) : (
+            <span className="section__count">{list.length}</span>
+          )}
         </h2>
+        {status === 'queued' && (
+          <p className="muted small section__hint">
+            {freeSlots > 0
+              ? `Можно начать ещё ${freeSlots} ${plural(freeSlots, ['материал', 'материала', 'материалов'])} — откройте материал и выберите «Изучаю».`
+              : 'Начните, когда закончите или отложите что-то из «Изучаю».'}
+          </p>
+        )}
+        {status === 'active' && freeSlots < 0 && (
+          <p className="muted small section__hint">
+            Изучается больше, чем задано в <Link to="/settings#load">настройках</Link>. Может, что-то стоит отложить?
+          </p>
+        )}
         <div className="material-grid">
           {list.map((m) => (
             <MaterialCard
@@ -124,11 +151,22 @@ export function KnowledgePage() {
         </div>
       )}
 
+      {load.vacation && (
+        <div className="slot">
+          <VacationBanner vacation={load.vacation} />
+        </div>
+      )}
+
       {notes.length === 0 && materials.length === 0 ? (
         <EmptyKnowledge />
       ) : (
         <>
-          <DueReviewsCard due={due} notes={notes} today={today} showDone />
+          <DueReviewsCard load={load} notes={notes} forecast={forecast} today={today} showDone />
+          {!load.vacation && notes.some((n) => n.note.status === 'active') && (
+            <div className="slot slot--top">
+              <LoadForecast forecast={forecast} budget={settings.dailyReviewLimit} today={today} />
+            </div>
+          )}
 
           {materialSection('active')}
           {materialSection('queued')}

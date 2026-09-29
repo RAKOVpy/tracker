@@ -1,8 +1,9 @@
-import type { Area, Goal, Material, Note, ProgressEntry, Review } from '../domain/types';
+import type { Area, Goal, Material, Note, ProgressEntry, Review, Vacation } from '../domain/types';
+import { sortVacations, vacationError } from '../domain/vacation';
 import { todayIso } from '../lib/dates';
 import { applyVault } from '../obsidian/sync';
 import { createEmptyDb, migrate, SCHEMA_VERSION, systemCtx, toBackup, type Db } from './schema';
-import { NotFoundError, type TrackerApi } from './types';
+import { NotFoundError, VacationError, type TrackerApi } from './types';
 
 const STORAGE_KEY = 'tracker:data';
 /** Ключ версии 1. Не удаляется после миграции и служит запасной копией. */
@@ -203,6 +204,48 @@ export const localApi: TrackerApi = {
   async deleteReview(id) {
     const db = load();
     db.reviews = db.reviews.filter((r) => r.id !== id);
+    save(db);
+  },
+
+  async getSettings() {
+    return load().settings;
+  },
+
+  async updateSettings(patch) {
+    const db = load();
+    db.settings = { ...db.settings, ...patch };
+    save(db);
+    return db.settings;
+  },
+
+  async listVacations() {
+    return load().vacations;
+  },
+
+  async createVacation(input) {
+    const db = load();
+    const error = vacationError(input, db.vacations, todayIso());
+    if (error) throw new VacationError(error);
+    const vacation: Vacation = { ...input, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+    db.vacations = sortVacations([...db.vacations, vacation]);
+    save(db);
+    return vacation;
+  },
+
+  async updateVacation(id, input) {
+    const db = load();
+    const index = findIndex(db.vacations, id, 'Отпуск');
+    const error = vacationError(input, db.vacations.filter((v) => v.id !== id), todayIso());
+    if (error) throw new VacationError(error);
+    db.vacations[index] = { ...db.vacations[index], ...input };
+    db.vacations = sortVacations(db.vacations);
+    save(db);
+    return db.vacations.find((v) => v.id === id)!;
+  },
+
+  async deleteVacation(id) {
+    const db = load();
+    db.vacations = db.vacations.filter((v) => v.id !== id);
     save(db);
   },
 

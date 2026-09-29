@@ -267,6 +267,13 @@ export function NewNotePage() {
           <h1>Новая заметка</h1>
         </div>
       </div>
+      {data.load.inDebt && (
+        <p className="notice notice--warn" style={{ marginBottom: 16 }}>
+          С прошлых дней ждут повторения {data.load.overdue} {plural(data.load.overdue, ['заметка', 'заметки', 'заметок'])} —
+          больше дневного лимита. Новая заметка добавит ещё одно повторение завтра. Может, сначала{' '}
+          <Link to="/review">повторить старое</Link>?
+        </p>
+      )}
       <NoteForm
         materials={data.materials}
         defaultMaterialId={defaultMaterialId}

@@ -48,6 +48,7 @@ const longFormatter = new Intl.DateTimeFormat('ru-RU', {
   timeZone: 'UTC',
 });
 const weekdayFormatter = new Intl.DateTimeFormat('ru-RU', { weekday: 'short', timeZone: 'UTC' });
+const dayMonthFormatter = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', timeZone: 'UTC' });
 
 export function formatShort(date: IsoDate): string {
   return shortFormatter.format(toUtcMs(date)).replace('.', '');
@@ -55,6 +56,11 @@ export function formatShort(date: IsoDate): string {
 
 export function formatLong(date: IsoDate): string {
   return longFormatter.format(toUtcMs(date));
+}
+
+/** «14 октября» — без года. */
+export function formatDayMonth(date: IsoDate): string {
+  return dayMonthFormatter.format(toUtcMs(date));
 }
 
 export function formatWeekday(date: IsoDate): string {

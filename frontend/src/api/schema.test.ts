@@ -31,7 +31,7 @@ const v1Data = {
 
 /** Данные в формате v2: как их хранила предыдущая версия приложения. */
 function migrateToV2() {
-  const { materials: _m, notes: _n, reviews: _r, ...v2 } = migrate(v1Data, makeCtx());
+  const { materials: _m, notes: _n, reviews: _r, settings: _s, vacations: _v, ...v2 } = migrate(v1Data, makeCtx());
   return v2;
 }
 
@@ -49,6 +49,12 @@ describe('migrate', () => {
     const note = { id: 'n1', title: 'Т', materialId: null, questions: [], summary: '', obsidianUri: '', status: 'active', addedOn: '2026-09-01', createdAt: 'x' };
     const db = migrate({ version: 3, ...migrateToV2(), materials: [], notes: [note], reviews: [] }, makeCtx());
     expect(db.notes[0].obsidianPath).toBeNull();
+  });
+
+  it('v4 → v5: настройки нагрузки по умолчанию и пустой список отпусков', () => {
+    const db = migrate({ version: 4, ...migrateToV2(), materials: [], notes: [], reviews: [] }, makeCtx());
+    expect(db.settings).toEqual({ dailyReviewLimit: 15, activeMaterialsLimit: 3, newNotesPerDay: 5, strictMode: false });
+    expect(db.vacations).toEqual([]);
   });
 
   it('v2 → v3: добавляются пустые списки знаний', () => {
@@ -167,6 +173,34 @@ describe('знания', () => {
     expect(() => validateDb({ ...db, notes: [{ ...db.notes[0], questions: [1] }] })).toThrow('списком строк');
     expect(() => validateDb({ ...db, reviews: [{ ...db.reviews[0], rating: 'perfect' }] })).toThrow('rating');
     expect(() => validateDb({ ...db, reviews: [{ ...db.reviews[0], taught: 'да' }] })).toThrow('true или false');
+  });
+});
+
+describe('нагрузка', () => {
+  const base = () => migrate(v1Data, makeCtx());
+  const vacation = (id: string, start: string, end: string | null) => ({ id, start, end, createdAt: 'x' });
+
+  it('настройки вне диапазона приводятся к допустимым, неизвестные поля отбрасываются', () => {
+    const db = base();
+    const fixed = validateDb({ ...db, settings: { dailyReviewLimit: 500, activeMaterialsLimit: 2.4, newNotesPerDay: 'пять', junk: 1 } });
+    expect(fixed.settings).toEqual({ dailyReviewLimit: 100, activeMaterialsLimit: 2, newNotesPerDay: 5, strictMode: false });
+  });
+
+  it('отпуска сортируются по дате начала', () => {
+    const db = base();
+    const fixed = validateDb({ ...db, vacations: [vacation('b', '2026-10-10', null), vacation('a', '2026-09-01', '2026-09-05')] });
+    expect(fixed.vacations.map((v) => v.id)).toEqual(['a', 'b']);
+  });
+
+  it('отклоняет пересекающиеся отпуска и неверные даты', () => {
+    const db = base();
+    expect(() =>
+      validateDb({ ...db, vacations: [vacation('a', '2026-09-01', '2026-09-10'), vacation('b', '2026-09-10', '2026-09-12')] }),
+    ).toThrow('пересекаются');
+    expect(() =>
+      validateDb({ ...db, vacations: [vacation('a', '2026-09-01', null), vacation('b', '2026-10-01', '2026-10-02')] }),
+    ).toThrow('пересекаются');
+    expect(() => validateDb({ ...db, vacations: [vacation('a', '2026-09-10', '2026-09-01')] })).toThrow('раньше');
   });
 });
 

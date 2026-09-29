@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NEW_NOTES_PER_DAY, type SyncReport } from '../../obsidian/sync';
+import type { SyncReport } from '../../obsidian/sync';
 import { formatShort } from '../../lib/dates';
 import { plural } from '../../lib/format';
 
@@ -59,8 +59,18 @@ export function SyncReportView({ report, isVaultRoot, onPauseMissing }: Props) {
 
       {report.firstReviewsUntil && (
         <p className="notice">
-          Новых заметок много, поэтому первые повторения распределены по {NEW_NOTES_PER_DAY} в день — последние{' '}
-          {formatShort(report.firstReviewsUntil)}. Так импорт не превратится в гору повторений на завтра.
+          Новых заметок много, поэтому первые повторения распределены по {report.newNotesPerDay} в день — последние{' '}
+          {formatShort(report.firstReviewsUntil)}. Так импорт не превратится в гору повторений на завтра. Сколько вводить в
+          день, можно поменять в настройках нагрузки.
+        </p>
+      )}
+
+      {report.materialsQueued.length > 0 && (
+        <p className="notice">
+          {n(report.materialsQueued.length, ['новый материал встал', 'новых материала встали', 'новых материалов встали'])} в
+          очередь «Хочу изучить»: одновременно можно изучать не больше{' '}
+          {n(report.activeMaterialsLimit, ['материала', 'материалов', 'материалов'])}. Заметки по ним повторяются как обычно,
+          а начать материал можно на его странице.
         </p>
       )}
 

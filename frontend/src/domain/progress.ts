@@ -1,6 +1,7 @@
 import { addDays, diffDays, type IsoDate } from '../lib/dates';
 import { LONG_TERM_DAYS, PRIORITIES } from './meta';
-import type { Goal, ProgressEntry } from './types';
+import type { Goal, ProgressEntry, Vacation } from './types';
+import { isVacationDay } from './vacation';
 
 /**
  * Статус цели относительно линейного плана «равномерно каждый день от старта до дедлайна»:
@@ -63,17 +64,19 @@ export function roundUpNorm(value: number, dailyPlan: number = value): number {
   return Math.ceil(value / step - EPS) * step;
 }
 
-function countStreak(totals: Map<IsoDate, number>, today: IsoDate): number {
+/** Дни подряд с прогрессом. Дни отпуска без записей серию не прерывают, но и не продлевают. */
+function countStreak(totals: Map<IsoDate, number>, today: IsoDate, vacations: Vacation[]): number {
   let day = (totals.get(today) ?? 0) > 0 ? today : addDays(today, -1);
   let streak = 0;
-  while ((totals.get(day) ?? 0) > 0) {
-    streak += 1;
+  for (;;) {
+    if ((totals.get(day) ?? 0) > 0) streak += 1;
+    else if (!isVacationDay(day, vacations, today)) break;
     day = addDays(day, -1);
   }
   return streak;
 }
 
-export function computeGoalStats(goal: Goal, entries: ProgressEntry[], today: IsoDate): GoalStats {
+export function computeGoalStats(goal: Goal, entries: ProgressEntry[], today: IsoDate, vacations: Vacation[] = []): GoalStats {
   const { targetValue: target, startDate, deadline } = goal;
   const dailyTotals = sumByDate(entries);
 
@@ -129,7 +132,7 @@ export function computeGoalStats(goal: Goal, entries: ProgressEntry[], today: Is
     todayValue,
     todayTarget,
     todayLeft: todayLeft < EPS ? 0 : todayLeft,
-    streak: countStreak(dailyTotals, today),
+    streak: countStreak(dailyTotals, today, vacations),
     isLongTerm: totalDays > LONG_TERM_DAYS,
     dailyTotals,
   };

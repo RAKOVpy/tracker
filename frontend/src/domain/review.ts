@@ -1,5 +1,6 @@
 import { addDays, diffDays, type IsoDate } from '../lib/dates';
-import type { ExplainAnswer, MasteryLevel, Note, Rating, Review } from './types';
+import type { ExplainAnswer, MasteryLevel, Note, Rating, Review, Vacation } from './types';
+import { isVacationDay, shiftForVacations } from './vacation';
 
 /**
  * Интервалы между повторениями в днях. Каждое успешное повторение переводит заметку
@@ -91,13 +92,23 @@ function byTime(a: Review, b: Review): number {
   return a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt);
 }
 
-/** Состояние заметки — результат «проигрывания» всего журнала повторений. */
-export function computeNoteState(note: Note, reviews: Review[]): NoteState {
+/** Сегодняшний день и отпуска — всё, что кроме журнала влияет на расписание. */
+export interface ReviewCalendar {
+  today: IsoDate;
+  vacations: Vacation[];
+}
+
+/**
+ * Состояние заметки — результат «проигрывания» всего журнала повторений.
+ * С календарём срок сдвигается на дни отпуска (см. domain/vacation.ts).
+ */
+export function computeNoteState(note: Note, reviews: Review[], calendar?: ReviewCalendar): NoteState {
   let step = 0;
   let lapses = 0;
   let confidentStreak = 0;
   let taught = false;
-  let dueDate = addDays(note.addedOn, 1);
+  let anchor = note.addedOn;
+  let interval = 1;
   let lastReviewed: IsoDate | null = null;
   let lastInterval: number | null = null;
 
@@ -113,10 +124,15 @@ export function computeNoteState(note: Note, reviews: Review[]): NoteState {
       else if (review.explain !== null) confidentStreak = 0;
       if (review.taught) taught = true;
     }
-    dueDate = addDays(review.date, next.interval);
+    anchor = review.date;
+    interval = next.interval;
     lastReviewed = review.date;
     lastInterval = next.interval;
   }
+
+  const rawDue = addDays(anchor, interval);
+  const dueDate =
+    calendar && calendar.vacations.length > 0 ? shiftForVacations(anchor, rawDue, calendar.vacations, calendar.today) : rawDue;
 
   return {
     step,
@@ -131,9 +147,10 @@ export function computeNoteState(note: Note, reviews: Review[]): NoteState {
   };
 }
 
-export function withState(note: Note, reviews: Review[], today: IsoDate): NoteWithState {
-  const state = computeNoteState(note, reviews);
-  const isDue = note.status === 'active' && state.dueDate <= today;
+/** В отпуске повторять нечего: заметки ждут возвращения. */
+export function withState(note: Note, reviews: Review[], today: IsoDate, vacations: Vacation[] = []): NoteWithState {
+  const state = computeNoteState(note, reviews, { today, vacations });
+  const isDue = note.status === 'active' && state.dueDate <= today && !isVacationDay(today, vacations, today);
   return { note, reviews, state, isDue, overdueDays: isDue ? diffDays(state.dueDate, today) : 0 };
 }
 
@@ -143,9 +160,10 @@ export function projectReview(
   reviews: Review[],
   input: Pick<Review, 'rating' | 'explain' | 'taught'>,
   today: IsoDate,
+  vacations: Vacation[] = [],
 ): NoteState {
   const next: Review = { ...input, id: '__preview__', noteId: note.id, date: today, createdAt: '￿' };
-  return computeNoteState(note, [...reviews, next]);
+  return computeNoteState(note, [...reviews, next], { today, vacations });
 }
 
 /** Примерное время на повторение: минута на вопрос, но не меньше двух минут на заметку. */

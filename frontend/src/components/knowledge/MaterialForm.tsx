@@ -1,21 +1,25 @@
 import { useState, type FormEvent } from 'react';
+import type { StartCheck } from '../../domain/load';
 import { MATERIAL_STATUSES, MATERIAL_STATUS_ORDER, MATERIAL_TYPES, MATERIAL_TYPE_ORDER } from '../../domain/meta';
 import type { Area, MaterialInput } from '../../domain/types';
 import { AREA_ICON_COMPONENTS } from '../areaIcons';
 import { MATERIAL_ICONS } from './format';
+import { StartMaterialNotice } from './StartMaterial';
 
 interface Props {
   areas: Area[];
   initial?: MaterialInput;
   submitLabel: string;
   isSubmitting?: boolean;
+  /** Проверка лимитов для материала, который ещё не изучается; нет — проверять нечего. */
+  startCheck?: StartCheck;
   onSubmit: (input: MaterialInput) => void;
   onCancel: () => void;
 }
 
 const EMPTY: MaterialInput = { title: '', type: 'book', author: '', url: '', areaId: null, status: 'active' };
 
-export function MaterialForm({ areas, initial = EMPTY, submitLabel, isSubmitting, onSubmit, onCancel }: Props) {
+export function MaterialForm({ areas, initial = EMPTY, submitLabel, isSubmitting, startCheck, onSubmit, onCancel }: Props) {
   const [values, setValues] = useState<MaterialInput>(initial);
   const [submitted, setSubmitted] = useState(false);
 
@@ -25,6 +29,9 @@ export function MaterialForm({ areas, initial = EMPTY, submitLabel, isSubmitting
     url: !url || /^https?:\/\//.test(url) ? null : 'Ссылка должна начинаться с http:// или https://',
   };
   const isValid = !errors.title && !errors.url;
+  const blocked = startCheck && startCheck.blockers.length > 0 ? startCheck : null;
+  // В строгом режиме «Изучаю» недоступно, пока лимит заполнен или есть долг.
+  const activeLocked = Boolean(blocked?.strict);
 
   function set<K extends keyof MaterialInput>(key: K, value: MaterialInput[K]) {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -107,11 +114,19 @@ export function MaterialForm({ areas, initial = EMPTY, submitLabel, isSubmitting
         </span>
         <div className="segmented" role="group" aria-labelledby="material-status-label">
           {MATERIAL_STATUS_ORDER.map((status) => (
-            <button key={status} type="button" className="chip" aria-pressed={values.status === status} onClick={() => set('status', status)}>
+            <button
+              key={status}
+              type="button"
+              className="chip"
+              aria-pressed={values.status === status}
+              disabled={status === 'active' && activeLocked}
+              onClick={() => set('status', status)}
+            >
               {MATERIAL_STATUSES[status]}
             </button>
           ))}
         </div>
+        {blocked && (values.status === 'active' || activeLocked) && <StartMaterialNotice check={blocked} />}
       </div>
 
       <div className="field">

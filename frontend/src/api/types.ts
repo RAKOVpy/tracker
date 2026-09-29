@@ -15,6 +15,10 @@ import type {
   ProgressEntry,
   Review,
   ReviewInput,
+  Settings,
+  SettingsPatch,
+  Vacation,
+  VacationInput,
 } from '../domain/types';
 import type { IsoDate } from '../lib/dates';
 import type { ParsedVault, SyncReport } from '../obsidian/sync';
@@ -60,6 +64,16 @@ export interface TrackerApi {
   /** Отмена оценки: расписание заметки пересчитается без неё. */
   deleteReview(id: string): Promise<void>;
 
+  getSettings(): Promise<Settings>;
+  updateSettings(patch: SettingsPatch): Promise<Settings>;
+
+  /** Отпуска по дате начала. */
+  listVacations(): Promise<Vacation[]>;
+  /** Бросает VacationError, если даты неверны или пересекаются с другим отпуском. */
+  createVacation(input: VacationInput): Promise<Vacation>;
+  updateVacation(id: string, input: VacationInput): Promise<Vacation>;
+  deleteVacation(id: string): Promise<void>;
+
   /** Переносит заметки и материалы из хранилища Obsidian (см. obsidian/sync.ts). */
   syncObsidian(vault: ParsedVault): Promise<SyncReport>;
 
@@ -68,6 +82,13 @@ export interface TrackerApi {
   importData(db: Db): Promise<void>;
   /** Удаляет всё и создаёт сферы по умолчанию. */
   resetData(): Promise<void>;
+}
+
+export class VacationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'VacationError';
+  }
 }
 
 export class NotFoundError extends Error {

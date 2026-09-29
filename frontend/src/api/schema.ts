@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS, SETTINGS_RANGES } from '../domain/load';
 import { AREA_COLORS, AREA_ICONS, DEFAULT_AREAS } from '../domain/meta';
 import type {
   Area,
@@ -12,13 +13,16 @@ import type {
   ProgressEntry,
   Rating,
   Review,
+  Settings,
+  Vacation,
 } from '../domain/types';
+import { sortVacations } from '../domain/vacation';
 
 /**
  * Схема данных в хранилище и в файлах резервных копий.
  * При изменении модели: увеличить SCHEMA_VERSION и добавить шаг в MIGRATIONS.
  */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export interface Db {
   areas: Area[];
@@ -27,6 +31,8 @@ export interface Db {
   materials: Material[];
   notes: Note[];
   reviews: Review[];
+  settings: Settings;
+  vacations: Vacation[];
 }
 
 export interface Backup extends Db {
@@ -53,7 +59,16 @@ export class DataError extends Error {
 }
 
 export function createEmptyDb(ctx: Ctx): Db {
-  return { areas: createDefaultAreas(ctx), goals: [], entries: [], materials: [], notes: [], reviews: [] };
+  return {
+    areas: createDefaultAreas(ctx),
+    goals: [],
+    entries: [],
+    materials: [],
+    notes: [],
+    reviews: [],
+    settings: { ...DEFAULT_SETTINGS },
+    vacations: [],
+  };
 }
 
 function createDefaultAreas(ctx: Ctx): Area[] {
@@ -93,10 +108,16 @@ function v3ToV4(raw: Raw): Raw {
   return { ...raw, materials: withPath(raw.materials, 'materials'), notes: withPath(raw.notes, 'notes') };
 }
 
+/** v4 → v5: мягкие лимиты нагрузки и отпуска. */
+function v4ToV5(raw: Raw): Raw {
+  return { ...raw, settings: { ...DEFAULT_SETTINGS }, vacations: [] };
+}
+
 const MIGRATIONS: Record<number, (raw: Raw, ctx: Ctx) => Raw> = {
   1: v1ToV2,
   2: v2ToV3,
   3: v3ToV4,
+  4: v4ToV5,
 };
 
 /** Приводит данные любой известной версии к текущей схеме и проверяет их. */
@@ -343,5 +364,48 @@ export function validateDb(raw: unknown): Db {
     .filter((review) => noteIds.has(review.noteId));
   uniqueIds(reviews, 'Повторения');
 
-  return { areas, goals, entries, materials, notes, reviews };
+  const settings = validateSettings(asObject(data.settings, 'settings'));
+
+  const vacations: Vacation[] = sortVacations(
+    asArray(data.vacations, 'vacations').map((item, i) => {
+      const v = asObject(item, `Отпуск ${i + 1}`);
+      const where = `Отпуск ${i + 1}`;
+      const vacation: Vacation = {
+        id: str(v, 'id', where),
+        start: date(v, 'start', where),
+        end: v.end === null ? null : date(v, 'end', where),
+        createdAt: str(v, 'createdAt', where),
+      };
+      if (vacation.end !== null && vacation.end < vacation.start) {
+        throw new DataError(`${where}: отпуск заканчивается раньше, чем начинается`);
+      }
+      return vacation;
+    }),
+  );
+  uniqueIds(vacations, 'Отпуска');
+  // Пересечения удвоили бы сдвиг расписания; отпуск без даты окончания может быть только последним.
+  vacations.forEach((vacation, i) => {
+    const next = vacations[i + 1];
+    if (next && (vacation.end === null || vacation.end >= next.start)) {
+      throw new DataError('Отпуска пересекаются');
+    }
+  });
+
+  return { areas, goals, entries, materials, notes, reviews, settings, vacations };
+}
+
+/**
+ * Настройки не критичны, поэтому значение вне допустимого диапазона приводится к ближайшему,
+ * а недопустимое заменяется значением по умолчанию — вместо того чтобы отказываться открывать данные.
+ */
+function validateSettings(raw: Raw): Settings {
+  const settings: Settings = { ...DEFAULT_SETTINGS };
+  for (const [key, range] of Object.entries(SETTINGS_RANGES) as [keyof typeof SETTINGS_RANGES, { min: number; max: number }][]) {
+    const value = raw[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      settings[key] = Math.min(range.max, Math.max(range.min, Math.round(value)));
+    }
+  }
+  if (typeof raw.strictMode === 'boolean') settings.strictMode = raw.strictMode;
+  return settings;
 }

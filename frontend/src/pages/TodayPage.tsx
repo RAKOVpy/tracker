@@ -6,6 +6,7 @@ import { seedDemoData, seedKnowledgeDemo } from '../api/demo';
 import { useAreaMap, useGoalsWithStats, useKnowledge, useNow } from '../api/hooks';
 import { GoalCard } from '../components/GoalCard';
 import { DueReviewsCard } from '../components/knowledge/DueReviewsCard';
+import { VacationBanner } from '../components/VacationBanner';
 import { compareForToday, type GoalWithStats } from '../domain/progress';
 import type { Area } from '../domain/types';
 import { formatLong, formatWeekday, type IsoDate } from '../lib/dates';
@@ -160,11 +161,18 @@ export function TodayPage() {
         </div>
       </div>
 
+      {knowledge.data?.load.vacation && (
+        <div className="slot">
+          <VacationBanner vacation={knowledge.data.load.vacation} />
+        </div>
+      )}
+
       {knowledge.data && (
-        <div style={{ marginBottom: 16 }}>
+        <div className="slot">
           <DueReviewsCard
-            due={knowledge.data.due}
+            load={knowledge.data.load}
             notes={knowledge.data.notes}
+            forecast={knowledge.data.forecast}
             today={today}
             showDone={knowledge.data.notes.some((n) => n.state.lastReviewed === today)}
           />

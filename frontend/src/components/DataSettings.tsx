@@ -16,6 +16,7 @@ function describeCounts(db: Db): string {
     [db.notes.length, ['заметка', 'заметки', 'заметок']],
     [db.reviews.length, ['повторение', 'повторения', 'повторений']],
     [db.areas.length, ['сфера', 'сферы', 'сфер']],
+    [db.vacations.length, ['отпуск', 'отпуска', 'отпусков']],
   ];
   const nonEmpty = parts.filter(([count]) => count > 0);
   if (nonEmpty.length === 0) return 'данных нет';

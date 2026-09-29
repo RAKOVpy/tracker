@@ -29,7 +29,7 @@ const SETTINGS: NavItem = { to: '/settings', label: 'Настройки', icon: 
 /** Сколько заметок ждёт повторения — число рядом с пунктом «Знания». */
 function useDueCount(): number {
   const { data } = useKnowledge();
-  return data?.due.length ?? 0;
+  return data?.load.queue.length ?? 0;
 }
 
 function Sidebar() {

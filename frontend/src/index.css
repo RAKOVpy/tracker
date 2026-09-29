@@ -379,6 +379,11 @@ textarea {
     padding: 24px 16px calc(var(--bottom-nav-height) + 40px);
   }
 
+  /* Раздел по ссылке /settings#… не прячется под липкой шапкой. */
+  .settings-section {
+    scroll-margin-top: calc(56px + 16px + env(safe-area-inset-top, 0px));
+  }
+
   .bottom-nav {
     position: fixed;
     left: 0;
@@ -1971,6 +1976,239 @@ textarea {
   content: '▾';
 }
 
+/* ================= нагрузка и отпуск ================= */
+
+.slot {
+  margin-bottom: 16px;
+}
+
+.slot:empty {
+  display: none;
+}
+
+.slot--top {
+  margin: 16px 0 0;
+}
+
+.section__count--warn {
+  color: var(--warn);
+}
+
+.section__hint {
+  margin: -6px 0 12px;
+}
+
+.chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.review-cta__debt {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--sheet);
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+
+.review-cta__debt b {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.confirm--soft {
+  background: var(--warn-soft);
+}
+
+.vacation-banner {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.vacation-banner .banner__text {
+  min-width: 0;
+  flex: 1 1 260px;
+}
+
+.vacation-status .vault-status__name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vacation-form {
+  display: grid;
+  gap: 12px;
+}
+
+.vacation-list {
+  margin-top: 10px;
+}
+
+.setting-list {
+  display: grid;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+
+.setting-row:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.setting-row:last-child {
+  padding-bottom: 0;
+}
+
+.setting-row__text {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.setting-row__label {
+  font-weight: 600;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+.stepper__input {
+  width: 3.6em;
+  padding-inline: 4px;
+  text-align: center;
+}
+
+/* Прогноз нагрузки: столбики по дням и пунктир дневного лимита. */
+.forecast {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+}
+
+.forecast__caption {
+  display: grid;
+  gap: 4px;
+}
+
+.forecast__plot {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(14, minmax(0, 1fr));
+  gap: 4px;
+  height: 104px;
+  margin-top: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.forecast__col {
+  position: relative;
+  height: 100%;
+}
+
+.forecast__bar {
+  position: absolute;
+  inset: auto 0 0;
+  display: flex;
+  flex-direction: column-reverse;
+  overflow: hidden;
+  border-radius: 4px 4px 0 0;
+  background: var(--accent-soft);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.forecast__done {
+  display: block;
+  background: var(--accent);
+}
+
+.forecast__col--full .forecast__bar {
+  background: var(--warn-soft);
+  box-shadow: inset 0 2px 0 var(--warn);
+}
+
+.forecast__col--vacation {
+  border-radius: 4px 4px 0 0;
+  background: repeating-linear-gradient(135deg, var(--sheet-2) 0 4px, transparent 4px 8px);
+}
+
+.forecast__value {
+  position: absolute;
+  left: 0;
+  right: 0;
+  font-size: 11px;
+  line-height: 1;
+  text-align: center;
+  color: var(--ink-2);
+}
+
+.forecast__col--full .forecast__value {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.forecast__budget {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  border-top: 1.5px dashed var(--ink-3);
+  pointer-events: none;
+}
+
+.forecast__axis {
+  display: grid;
+  grid-template-columns: repeat(14, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: -8px;
+}
+
+.forecast__tick {
+  display: grid;
+  justify-items: center;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--ink-3);
+}
+
+.forecast__tick--today {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.legend .forecast__swatch,
+.legend .forecast__swatch--done,
+.legend .forecast__swatch--vacation {
+  width: 10px;
+  height: 10px;
+  border: none;
+  border-radius: 2px;
+  background: var(--accent-soft);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.legend .forecast__swatch--done {
+  background: var(--accent);
+}
+
+.legend .forecast__swatch--vacation {
+  background: repeating-linear-gradient(135deg, var(--ink-3) 0 2px, transparent 2px 4px);
+  box-shadow: none;
+}
+
 @media (max-width: 640px) {
   h1 {
     font-size: 1.6rem;
@@ -2029,6 +2267,25 @@ textarea {
 
   .review-history__date {
     width: 84px;
+  }
+
+  .setting-row {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .setting-row__text {
+    flex-basis: 100%;
+  }
+
+  .forecast__plot,
+  .forecast__axis {
+    gap: 2px;
+  }
+
+  /* Кнопка уходит на свою строку, чтобы не сжимать текст карточки. */
+  .review-cta > .btn {
+    flex-basis: 100%;
   }
 }
 

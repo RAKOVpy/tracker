@@ -129,6 +129,35 @@ export interface Review {
   createdAt: string;
 }
 
+// ---------- нагрузка ----------
+
+/** Мягкие лимиты: сколько повторять в день и сколько изучать одновременно. */
+export interface Settings {
+  /** Дневной бюджет повторений в заметках. Остальные заметки переносятся на следующие дни. */
+  dailyReviewLimit: number;
+  /** Сколько материалов можно изучать одновременно; остальные ждут в «Хочу изучить». */
+  activeMaterialsLimit: number;
+  /** Сколько новых заметок из Obsidian вводить в повторение за день. */
+  newNotesPerDay: number;
+  /** Строгий режим: при превышении лимита или долге повторений новый материал начать нельзя. */
+  strictMode: boolean;
+}
+
+/**
+ * Отпуск: повторения на паузе, дни отпуска не считаются в расписании, серии не прерываются.
+ * Прошедшие отпуска хранятся: расписание вычисляется из них заново.
+ */
+export interface Vacation {
+  id: string;
+  start: IsoDate;
+  /** Последний день отпуска включительно; null — пока не выключу. */
+  end: IsoDate | null;
+  createdAt: string;
+}
+
+export type SettingsPatch = Partial<Settings>;
+export type VacationInput = Pick<Vacation, 'start' | 'end'>;
+
 export type MaterialInput = Omit<Material, 'id' | 'createdAt' | 'obsidianPath'>;
 export type MaterialPatch = Partial<MaterialInput>;
 export type NoteInput = Omit<Note, 'id' | 'createdAt' | 'status' | 'addedOn' | 'obsidianPath'>;

@@ -118,6 +118,16 @@ describe('computeGoalStats', () => {
     expect(computeGoalStats(makeGoal(), entries, '2026-10-06').streak).toBe(0);
   });
 
+  it('дни отпуска не прерывают серию', () => {
+    const entries = [entry('2026-10-01', 5), entry('2026-10-02', 5), entry('2026-10-06', 5)];
+    const vacation = { id: 'v', start: '2026-10-03', end: '2026-10-05', createdAt: 'x' };
+    expect(computeGoalStats(makeGoal(), entries, '2026-10-06').streak).toBe(1);
+    expect(computeGoalStats(makeGoal(), entries, '2026-10-06', [vacation]).streak).toBe(3);
+    // Отпуск идёт сейчас: сегодня ничего не отмечено, серия не сгорает.
+    const open = { ...vacation, start: '2026-10-07', end: null };
+    expect(computeGoalStats(makeGoal(), entries, '2026-10-09', [vacation, open]).streak).toBe(3);
+  });
+
   it('долгосрочная — дольше 30 дней', () => {
     expect(computeGoalStats(makeGoal(), [], '2026-10-01').isLongTerm).toBe(false);
     expect(computeGoalStats(makeGoal({ deadline: '2026-12-31' }), [], '2026-10-01').isLongTerm).toBe(true);

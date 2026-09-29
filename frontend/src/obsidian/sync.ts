@@ -1,4 +1,5 @@
-import type { Area, Material, Note } from '../domain/types';
+import type { Area, Material, Note, Settings, Vacation } from '../domain/types';
+import { isVacationDay } from '../domain/vacation';
 import { addDays, type IsoDate } from '../lib/dates';
 import type { ParsedVault } from './parse';
 import { obsidianUri } from './uri';
@@ -17,18 +18,18 @@ export interface SyncReport {
   notesUnchanged: number;
   materialsCreated: string[];
   materialsUpdated: string[];
+  /** Новые материалы, которые встали в «Хочу изучить», потому что лимит «Изучаю» заполнен. */
+  materialsQueued: string[];
   /** Заметки из Obsidian, которых больше нет в хранилище или у которых убрали тег review. */
   missing: { id: string; title: string }[];
   withoutQuestions: string[];
   /** Если новых заметок много, их первые повторения распределены по дням — до этой даты. */
   firstReviewsUntil: IsoDate | null;
+  /** Сколько новых заметок вводится в повторение за день (из настроек). */
+  newNotesPerDay: number;
+  /** Лимит «Изучаю» (из настроек). */
+  activeMaterialsLimit: number;
 }
-
-/**
- * Сколько новых заметок из Obsidian вводится в повторение за день.
- * Иначе импорт сотни старых заметок превратится в сотню повторений на завтра.
- */
-export const NEW_NOTES_PER_DAY = 5;
 
 export interface SyncCtx {
   today: IsoDate;
@@ -42,6 +43,14 @@ function sameFields<T extends object>(a: T, b: T, fields: (keyof T)[]): boolean 
   return fields.every((f) => JSON.stringify(a[f]) === JSON.stringify(b[f]));
 }
 
+export interface SyncState {
+  areas: Area[];
+  materials: Material[];
+  notes: Note[];
+  settings: Pick<Settings, 'newNotesPerDay' | 'activeMaterialsLimit'>;
+  vacations: Vacation[];
+}
+
 /**
  * Переносит содержимое хранилища в данные трекера. Чистая функция: возвращает новые списки и отчёт.
  * Правила:
@@ -50,13 +59,17 @@ function sameFields<T extends object>(a: T, b: T, fields: (keyof T)[]): boolean 
  * - из Obsidian обновляются название, вопросы, суть, ссылка и материал (если он указан в файле),
  *   а статус, дата добавления и история повторений остаются в трекере;
  * - материал берётся со страницы с `type: material` или создаётся по ссылке из свойства material;
- *   статус материала ведётся в трекере и при синхронизации не меняется.
+ *   статус материала ведётся в трекере и при синхронизации не меняется. Новый материал встаёт
+ *   в «Изучаю», пока не заполнен лимит, а дальше — в «Хочу изучить»;
+ * - новые заметки вводятся в повторение не больше `newNotesPerDay` в день, дни отпуска пропускаются:
+ *   иначе импорт сотни старых заметок превратится в сотню повторений на завтра.
  */
 export function applyVault(
-  current: { areas: Area[]; materials: Material[]; notes: Note[] },
+  current: SyncState,
   vault: ParsedVault,
   ctx: SyncCtx,
 ): { materials: Material[]; notes: Note[]; report: SyncReport } {
+  const { newNotesPerDay, activeMaterialsLimit } = current.settings;
   const report: SyncReport = {
     vaultName: vault.vaultName,
     filesRead: vault.filesRead,
@@ -70,10 +83,24 @@ export function applyVault(
     missing: [],
     withoutQuestions: [],
     firstReviewsUntil: null,
+    materialsQueued: [],
+    newNotesPerDay,
+    activeMaterialsLimit,
   };
   const areaByName = new Map(current.areas.map((a) => [key(a.name), a.id]));
   const materials = current.materials.map((m) => ({ ...m }));
   const notes = current.notes.map((n) => ({ ...n }));
+  let activeMaterials = materials.filter((m) => m.status === 'active').length;
+
+  /** Статус нового материала: «Изучаю», пока есть место, иначе — в очередь. */
+  function newMaterialStatus(title: string): Material['status'] {
+    if (activeMaterials < activeMaterialsLimit) {
+      activeMaterials += 1;
+      return 'active';
+    }
+    report.materialsQueued.push(title);
+    return 'queued';
+  }
 
   // --- материалы со своих страниц ---
   for (const parsed of vault.materials) {
@@ -95,7 +122,7 @@ export function applyVault(
         report.materialsUpdated.push(parsed.title);
       }
     } else {
-      materials.push({ ...fields, id: ctx.newId(), areaId, status: 'active', createdAt: ctx.now });
+      materials.push({ ...fields, id: ctx.newId(), areaId, status: newMaterialStatus(parsed.title), createdAt: ctx.now });
       report.materialsCreated.push(parsed.title);
     }
   }
@@ -110,7 +137,7 @@ export function applyVault(
       author: '',
       url: '',
       areaId: null,
-      status: 'active',
+      status: newMaterialStatus(ref),
       obsidianPath: null,
       createdAt: ctx.now,
     };
@@ -127,7 +154,9 @@ export function applyVault(
   }
   function nextIntroductionDay(): IsoDate {
     let day = ctx.today;
-    while ((introduced.get(day) ?? 0) >= NEW_NOTES_PER_DAY) day = addDays(day, 1);
+    while ((introduced.get(day) ?? 0) >= newNotesPerDay || isVacationDay(day, current.vacations, ctx.today)) {
+      day = addDays(day, 1);
+    }
     introduced.set(day, (introduced.get(day) ?? 0) + 1);
     return day;
   }
