@@ -45,6 +45,7 @@ export function MaterialPage() {
               <span className="badge">{MATERIAL_TYPES[material.type]}</span>
               {material.author && <span className="badge">{material.author}</span>}
               {area && <span className={`badge badge--tone tone-${area.color}`}>{area.name}</span>}
+              {material.obsidianPath && <span className="badge">Из Obsidian</span>}
             </div>
           </div>
         </div>
@@ -189,6 +190,12 @@ export function EditMaterialPage() {
           <h1>{material.title}</h1>
         </div>
       </div>
+      {material.obsidianPath && (
+        <p className="notice" style={{ marginBottom: 16 }}>
+          Материал взят из Obsidian («{material.obsidianPath}»). Название, тип, автор, ссылка и сфера обновятся из файла при
+          следующей синхронизации. Статус меняется только здесь.
+        </p>
+      )}
       <MaterialForm
         areas={areas.data}
         initial={initial}

@@ -84,6 +84,7 @@ export function NotePage() {
   const { note, state, reviews } = item;
   const material = note.materialId ? data.materials.find((m) => m.id === note.materialId) : undefined;
   const paused = note.status === 'paused';
+  const fromObsidian = note.obsidianPath !== null;
 
   return (
     <>
@@ -100,12 +101,19 @@ export function NotePage() {
             <span className="badge badge--accent">
               Уровень {state.level}: {LEVELS[state.level].label}
             </span>
+            {fromObsidian && <span className="badge">Из Obsidian</span>}
             {paused && <span className="badge">На паузе</span>}
           </div>
         </div>
-        <Link className="btn btn--sm" to={`/knowledge/notes/${note.id}/edit`}>
-          <Pencil size={14} aria-hidden /> Изменить
-        </Link>
+        {fromObsidian ? (
+          <a className="btn btn--sm" href={note.obsidianUri}>
+            <Pencil size={14} aria-hidden /> Изменить в Obsidian
+          </a>
+        ) : (
+          <Link className="btn btn--sm" to={`/knowledge/notes/${note.id}/edit`}>
+            <Pencil size={14} aria-hidden /> Изменить
+          </Link>
+        )}
       </div>
 
       <div className="stack" style={{ gap: 16 }}>
@@ -135,12 +143,17 @@ export function NotePage() {
             <Link className="btn btn--primary btn--sm" to={`/review?note=${note.id}`}>
               <RotateCcw size={14} aria-hidden /> Повторить сейчас
             </Link>
-            {note.obsidianUri && (
+            {note.obsidianUri && !fromObsidian && (
               <a className="btn btn--sm" href={note.obsidianUri}>
                 <ExternalLink size={14} aria-hidden /> Открыть в Obsidian
               </a>
             )}
           </div>
+          {fromObsidian && (
+            <p className="muted small">
+              Файл «{note.obsidianPath}». Вопросы и суть обновляются из Obsidian при синхронизации.
+            </p>
+          )}
         </div>
 
         <section className="card stack">
@@ -156,7 +169,11 @@ export function NotePage() {
           ) : (
             <p className="muted">
               Вопросов нет. На повторении нужно будет пересказать тему целиком.{' '}
-              <Link to={`/knowledge/notes/${note.id}/edit`}>Добавить вопросы</Link>
+              {fromObsidian ? (
+                'Добавьте в заметку раздел «Вопросы» или выноски > [!question] и синхронизируйте.'
+              ) : (
+                <Link to={`/knowledge/notes/${note.id}/edit`}>Добавить вопросы</Link>
+              )}
             </p>
           )}
           {note.summary && (
@@ -190,7 +207,10 @@ export function NotePage() {
         {confirmingDelete ? (
           <div className="confirm">
             <p>
-              Удалить заметку «{note.title}» вместе с историей повторений? Сама заметка в Obsidian не изменится.
+              Удалить заметку «{note.title}» вместе с историей повторений?{' '}
+              {fromObsidian
+                ? 'Файл в Obsidian не изменится. Если у него останется тег review, при следующей синхронизации заметка появится снова, но уже без истории. Чтобы просто не повторять её, лучше приостановите повторения.'
+                : 'Отменить это нельзя.'}
             </p>
             <div className="row">
               <button
@@ -273,6 +293,25 @@ export function EditNotePage() {
   if (!item) return <NotFoundState title="Заметка не найдена" back="/knowledge" />;
 
   const { note } = item;
+  if (note.obsidianPath !== null) {
+    return (
+      <div className="card empty">
+        <h2>Заметка редактируется в Obsidian</h2>
+        <p className="muted">
+          Название, вопросы и суть берутся из файла «{note.obsidianPath}». Измените их в Obsidian и нажмите
+          «Синхронизировать».
+        </p>
+        <div className="row" style={{ justifyContent: 'center' }}>
+          <a className="btn btn--primary" href={note.obsidianUri}>
+            Открыть в Obsidian
+          </a>
+          <Link className="btn" to={`/knowledge/notes/${note.id}`}>
+            К заметке
+          </Link>
+        </div>
+      </div>
+    );
+  }
   const initial: NoteInput = {
     title: note.title,
     materialId: note.materialId,

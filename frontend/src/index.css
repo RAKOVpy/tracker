@@ -1786,6 +1786,145 @@ textarea {
   cursor: default;
 }
 
+/* ================= obsidian ================= */
+
+.notice--warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.vault-status {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--sheet-2);
+}
+
+.vault-status__name {
+  font-weight: 600;
+}
+
+.sync-report {
+  display: grid;
+  gap: 8px;
+}
+
+.sync-list > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  list-style: none;
+}
+
+.sync-list > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sync-list > summary::before {
+  content: '▸';
+  color: var(--ink-3);
+}
+
+.sync-list[open] > summary::before {
+  content: '▾';
+}
+
+.sync-list--warn > summary {
+  color: var(--warn);
+}
+
+.sync-list ul {
+  margin: 6px 0 0;
+  padding-left: 1.6em;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+
+.sync-missing {
+  display: grid;
+  gap: 6px;
+}
+
+.guide {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.guide > summary {
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+}
+
+.guide > summary::-webkit-details-marker {
+  display: none;
+}
+
+.guide > summary::before {
+  content: '▸ ';
+  color: var(--ink-3);
+}
+
+.guide[open] > summary::before {
+  content: '▾ ';
+}
+
+.guide__body {
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.guide__steps {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 1.4em;
+  max-width: 68ch;
+}
+
+.guide__steps li::marker {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.guide__tip {
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  font-size: var(--text-sm);
+}
+
+.template-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.template-card > div:first-child {
+  flex: 1;
+  min-width: 220px;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ================= misc ================= */
 
 .empty {

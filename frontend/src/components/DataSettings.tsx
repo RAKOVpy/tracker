@@ -3,6 +3,7 @@ import { useRef, useState, type ChangeEvent } from 'react';
 import { api, readBackup, type Db } from '../api';
 import { useImportData, useResetData } from '../api/hooks';
 import { todayIso } from '../lib/dates';
+import { downloadText } from '../lib/download';
 import { plural } from '../lib/format';
 
 type Status = { kind: 'idle' } | { kind: 'success'; text: string } | { kind: 'error'; text: string };
@@ -21,17 +22,6 @@ function describeCounts(db: Db): string {
   return nonEmpty.map(([count, forms]) => `${count} ${plural(count, forms)}`).join(', ');
 }
 
-function downloadJson(data: unknown, filename: string): void {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  // Firefox отменяет скачивание, если ссылку отозвать сразу после клика.
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : 'Неизвестная ошибка.';
 }
@@ -47,7 +37,7 @@ export function DataSettings() {
   async function exportBackup() {
     try {
       const backup = await api.exportData();
-      downloadJson(backup, `tracker-backup-${todayIso()}.json`);
+      downloadText(JSON.stringify(backup, null, 2), `tracker-backup-${todayIso()}.json`, 'application/json');
       setStatus({ kind: 'success', text: `Резервная копия сохранена: ${describeCounts(backup)}.` });
     } catch (error) {
       setStatus({ kind: 'error', text: `Не удалось сохранить копию. ${errorText(error)}` });

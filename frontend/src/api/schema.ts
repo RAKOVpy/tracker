@@ -18,7 +18,7 @@ import type {
  * Схема данных в хранилище и в файлах резервных копий.
  * При изменении модели: увеличить SCHEMA_VERSION и добавить шаг в MIGRATIONS.
  */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export interface Db {
   areas: Area[];
@@ -86,9 +86,17 @@ function v2ToV3(raw: Raw): Raw {
   return { ...raw, materials: [], notes: [], reviews: [] };
 }
 
+/** v3 → v4: заметки и материалы помнят путь к файлу в Obsidian. */
+function v3ToV4(raw: Raw): Raw {
+  const withPath = (items: unknown, what: string) =>
+    asArray(items, what).map((item) => ({ ...asObject(item, what), obsidianPath: null }));
+  return { ...raw, materials: withPath(raw.materials, 'materials'), notes: withPath(raw.notes, 'notes') };
+}
+
 const MIGRATIONS: Record<number, (raw: Raw, ctx: Ctx) => Raw> = {
   1: v1ToV2,
   2: v2ToV3,
+  3: v3ToV4,
 };
 
 /** Приводит данные любой известной версии к текущей схеме и проверяет их. */
@@ -179,6 +187,15 @@ function oneOf<T extends string>(obj: Raw, key: string, allowed: readonly T[], w
   const value = obj[key];
   if (!allowed.includes(value as T)) throw new DataError(`${where}: недопустимое значение поля «${key}»`);
   return value as T;
+}
+
+function optionalStr(obj: Raw, key: string, where: string): string | null {
+  const value = obj[key];
+  if (value === null) return null;
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new DataError(`${where}: поле «${key}» должно быть строкой или null`);
+  }
+  return value;
 }
 
 function bool(obj: Raw, key: string, where: string): boolean {
@@ -279,6 +296,7 @@ export function validateDb(raw: unknown): Db {
       url: str(m, 'url', where, { allowEmpty: true }),
       areaId: typeof m.areaId === 'string' && areaIds.has(m.areaId) ? m.areaId : null,
       status: oneOf(m, 'status', MATERIAL_STATUSES, where),
+      obsidianPath: optionalStr(m, 'obsidianPath', where),
       createdAt: str(m, 'createdAt', where),
     };
   });
@@ -297,6 +315,7 @@ export function validateDb(raw: unknown): Db {
       obsidianUri: str(n, 'obsidianUri', where, { allowEmpty: true }),
       status: oneOf(n, 'status', NOTE_STATUSES, where),
       addedOn: date(n, 'addedOn', where),
+      obsidianPath: optionalStr(n, 'obsidianPath', where),
       createdAt: str(n, 'createdAt', where),
     };
     if (note.obsidianUri && !note.obsidianUri.startsWith('obsidian://')) {

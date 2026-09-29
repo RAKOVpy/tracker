@@ -77,6 +77,8 @@ export interface Material {
   url: string;
   areaId: string | null;
   status: MaterialStatus;
+  /** Путь к странице материала в хранилище Obsidian; null — создан в трекере. */
+  obsidianPath: string | null;
   createdAt: string;
 }
 
@@ -98,6 +100,11 @@ export interface Note {
   status: 'active' | 'paused';
   /** Дата добавления: первое повторение — на следующий день. */
   addedOn: IsoDate;
+  /**
+   * Путь к файлу в хранилище Obsidian, например «Заметки/Двоичный поиск.md».
+   * Такие заметки обновляются при синхронизации; null — заметка создана в трекере.
+   */
+  obsidianPath: string | null;
   createdAt: string;
 }
 
@@ -122,9 +129,9 @@ export interface Review {
   createdAt: string;
 }
 
-export type MaterialInput = Omit<Material, 'id' | 'createdAt'>;
+export type MaterialInput = Omit<Material, 'id' | 'createdAt' | 'obsidianPath'>;
 export type MaterialPatch = Partial<MaterialInput>;
-export type NoteInput = Omit<Note, 'id' | 'createdAt' | 'status' | 'addedOn'>;
+export type NoteInput = Omit<Note, 'id' | 'createdAt' | 'status' | 'addedOn' | 'obsidianPath'>;
 export type NotePatch = Partial<NoteInput & Pick<Note, 'status'>>;
 export type ReviewInput = Omit<Review, 'id' | 'createdAt'>;
 

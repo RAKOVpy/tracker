@@ -12,7 +12,8 @@
 
 Модули продукта, исходные идеи с поправками и план этапов описаны в [PRODUCT.md](PRODUCT.md).
 Этот документ описывает техническое устройство того, что уже сделано
-(этапы 1, 2 и первая часть этапа 3), и проект бэкенда.
+(этапы 1, 2, 3.1 и 3.2), и проект бэкенда. Формат заметок Obsidian описан
+в [obsidian/README.md](../obsidian/README.md).
 
 ## Предметная модель
 
@@ -72,6 +73,7 @@ Area 1 ──── * Material 1 ──── * Note 1 ──── * Review
 | `author`, `url` | строки, необязательно |
 | `areaId` | FK → Area или `null` |
 | `status` | `active` (изучаю) \| `queued` (хочу изучить) \| `done` \| `dropped` |
+| `obsidianPath` | путь к странице материала в хранилище или `null` |
 | `createdAt` | дата-время |
 
 **Note** — заметка для повторения: тема, которую нужно помнить.
@@ -86,6 +88,7 @@ Area 1 ──── * Material 1 ──── * Note 1 ──── * Review
 | `obsidianUri` | `obsidian://…` или пустая строка |
 | `status` | `active` \| `paused` (повторения приостановлены) |
 | `addedOn` | дата добавления; первое повторение — на следующий день |
+| `obsidianPath` | путь к файлу в хранилище, например `Заметки/Двоичный поиск.md`, или `null` |
 | `createdAt` | дата-время |
 
 **Review** — одно повторение заметки.
@@ -153,6 +156,32 @@ Area 1 ──── * Material 1 ──── * Note 1 ──── * Review
   просроченные, затем слабее освоенные. Время на сессию — минута на вопрос,
   не меньше двух минут на заметку.
 
+## Синхронизация с Obsidian
+
+Код — `frontend/src/obsidian/`. Разбор и сопоставление — чистые функции с тестами
+на файлах из `obsidian/example-vault`.
+
+- **Чтение папки** (`vault.ts`). В Chrome и Edge — File System Access API: дескриптор папки
+  хранится в IndexedDB, при синхронизации браузер может переспросить разрешение.
+  В Firefox и Safari — `<input webkitdirectory>`, папку выбирают каждый раз.
+  Читаются только `.md` до 1 МБ, служебные папки (`.obsidian`, `.trash`, `.git`) пропускаются.
+  Файлы никуда не отправляются.
+- **Разбор** (`parse.ts`, загружается отдельным чанком только при синхронизации — в нём YAML).
+  Заметка для повторения — тег `review` или `review: true`; вопросы — список в разделе
+  «Вопросы» и выноски `[!question]`; суть — раздел «Суть»; материал — свойство
+  `material: "[[…]]"`; страница материала — `type: material`. Шаблоны (`{{title}}`, `{{date}}`)
+  и комментарии `%% %%` пропускаются.
+- **Сопоставление** (`sync.ts`, `applyVault`). Заметка узнаётся по пути к файлу; переименованный
+  файл — по названию среди пропавших; заметка, созданная вручную, связывается с файлом
+  с тем же названием. Из файла обновляются название, вопросы, суть, ссылка и материал;
+  статус, дата добавления и журнал повторений остаются в трекере. Статус материала
+  ведётся в трекере. Пропавшие заметки не удаляются — их можно приостановить из отчёта.
+- **Новые заметки вводятся по 5 в день** (`NEW_NOTES_PER_DAY`): дата добавления
+  распределяется по дням с учётом прошлых импортов. Дата создания заметки в Obsidian
+  не используется, иначе старые заметки сразу стали бы просроченными.
+- Заметки из Obsidian редактируются в Obsidian: в трекере вместо «Изменить» —
+  «Изменить в Obsidian» (ссылка `obsidian://open?vault=…&file=…`).
+
 ## Хранение и резервные копии
 
 Пока данные лежат в `localStorage` браузера под ключом `tracker:data` в виде
@@ -162,7 +191,9 @@ Area 1 ──── * Material 1 ──── * Note 1 ──── * Review
 - **Версия схемы.** При каждом изменении модели растёт `SCHEMA_VERSION` и добавляется
   шаг миграции. При загрузке старые данные автоматически приводятся к текущей версии.
   v1 → v2 заменила категории целей сферами, v2 → v3 добавила материалы, заметки
-  и повторения. Ключ `tracker:v1` не удаляется и остаётся запасной копией.
+  и повторения, v3 → v4 — путь к файлу Obsidian. Ключ `tracker:v1` не удаляется
+  и остаётся запасной копией. Сведения о подключённом хранилище (`tracker:obsidian`)
+  и дескриптор папки (IndexedDB) хранятся отдельно и в резервную копию не входят.
 - **Проверка.** После миграции данные проверяются: типы полей, формат дат, уникальность id.
   Висячие ссылки чинятся: цель или материал удалённой сферы остаются без сферы, заметка
   удалённого материала — без материала, повторения удалённой заметки отбрасываются. Если данные повреждены,
@@ -193,6 +224,8 @@ frontend/src/
 │   └── demo.ts         демо-данные
 ├── components/     # Layout, CreateMenu, GoalCard, GoalForm, ProgressChart, AreaSettings, DataSettings, …
 │   └── knowledge/      NoteForm, MaterialForm, MaterialCard, DueReviewsCard, лестница и строки заметок
+│   └── obsidian/       ObsidianSettings, SyncReportView, ObsidianGuide (шаблоны с копированием)
+├── obsidian/       # parse.ts, sync.ts, vault.ts, useObsidian.ts, templates.ts (из ../obsidian/templates)
 ├── pages/          # TodayPage, GoalsPage, GoalPage, GoalFormPages, SettingsPage, CreatePage
 │   └── knowledge/      KnowledgePage, MaterialPages, NotePages, ReviewPage
 └── lib/            # даты (строки YYYY-MM-DD, расчёты в UTC), форматирование, склонения
@@ -234,7 +267,9 @@ frontend/src/
 9. **Создание заметки и материала** (`/knowledge/notes/new?material=<id>`,
    `/knowledge/materials/new`) — вопросы добавляются по Enter; ссылка на Obsidian проверяется.
 10. **Настройки** (`/settings`) — сферы (добавить, переименовать, цвет, иконка, порядок,
-    удалить) и данные (скачать резервную копию, восстановить из файла, удалить всё).
+    удалить), Obsidian (`/settings#obsidian`: выбрать папку, синхронизировать, отчёт,
+    инструкция и шаблоны) и данные (скачать резервную копию, восстановить, удалить всё).
+    В «Знаниях» — кнопка синхронизации с Obsidian.
 
 ## Бэкенд (проект)
 
@@ -306,6 +341,7 @@ class Note(models.Model):
     questions = models.JSONField(default=list)
     summary = models.TextField(blank=True)
     obsidian_uri = models.CharField(max_length=1000, blank=True)
+    obsidian_path = models.CharField(max_length=1000, null=True, blank=True)
     status = models.CharField(max_length=10, choices=NoteStatus.choices, default=NoteStatus.ACTIVE)
     added_on = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)

@@ -1,5 +1,6 @@
 import type { Area, Goal, Material, Note, ProgressEntry, Review } from '../domain/types';
 import { todayIso } from '../lib/dates';
+import { applyVault } from '../obsidian/sync';
 import { createEmptyDb, migrate, SCHEMA_VERSION, systemCtx, toBackup, type Db } from './schema';
 import { NotFoundError, type TrackerApi } from './types';
 
@@ -125,7 +126,12 @@ export const localApi: TrackerApi = {
 
   async createMaterial(input) {
     const db = load();
-    const material: Material = { ...input, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+    const material: Material = {
+      ...input,
+      id: crypto.randomUUID(),
+      obsidianPath: null,
+      createdAt: new Date().toISOString(),
+    };
     db.materials.push(material);
     save(db);
     return material;
@@ -158,6 +164,7 @@ export const localApi: TrackerApi = {
       id: crypto.randomUUID(),
       status: 'active',
       addedOn: options?.addedOn ?? todayIso(now),
+      obsidianPath: null,
       createdAt: now.toISOString(),
     };
     db.notes.push(note);
@@ -197,6 +204,18 @@ export const localApi: TrackerApi = {
     const db = load();
     db.reviews = db.reviews.filter((r) => r.id !== id);
     save(db);
+  },
+
+  async syncObsidian(vault) {
+    const db = load();
+    const now = new Date();
+    const { materials, notes, report } = applyVault(db, vault, {
+      today: todayIso(now),
+      now: now.toISOString(),
+      newId: () => crypto.randomUUID(),
+    });
+    save({ ...db, materials, notes });
+    return report;
   },
 
   async exportData() {

@@ -21,6 +21,7 @@ const note: Note = {
   obsidianUri: '',
   status: 'active',
   addedOn: '2026-10-01',
+  obsidianPath: null,
   createdAt: '2026-10-01T10:00:00.000Z',
 };
 

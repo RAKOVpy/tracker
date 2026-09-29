@@ -17,6 +17,7 @@ import type {
   ReviewInput,
 } from '../domain/types';
 import type { IsoDate } from '../lib/dates';
+import type { ParsedVault, SyncReport } from '../obsidian/sync';
 import type { Backup, Db } from './schema';
 
 /**
@@ -58,6 +59,9 @@ export interface TrackerApi {
   createReview(input: ReviewInput): Promise<Review>;
   /** Отмена оценки: расписание заметки пересчитается без неё. */
   deleteReview(id: string): Promise<void>;
+
+  /** Переносит заметки и материалы из хранилища Obsidian (см. obsidian/sync.ts). */
+  syncObsidian(vault: ParsedVault): Promise<SyncReport>;
 
   exportData(): Promise<Backup>;
   /** Полностью заменяет данные. Данные уже проверены (см. parseBackup). */

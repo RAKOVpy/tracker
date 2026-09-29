@@ -1,7 +1,17 @@
+import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { AreaSettings } from '../components/AreaSettings';
 import { DataSettings } from '../components/DataSettings';
+import { ObsidianSettings } from '../components/obsidian/ObsidianSettings';
 
 export function SettingsPage() {
+  const { hash } = useLocation();
+
+  // Ссылка /settings#obsidian ведёт сразу к нужному разделу.
+  useEffect(() => {
+    if (hash) document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
+  }, [hash]);
+
   return (
     <>
       <div className="page-head">
@@ -16,6 +26,14 @@ export function SettingsPage() {
           </p>
         </div>
         <AreaSettings />
+      </section>
+
+      <section className="card settings-section" id="obsidian" aria-labelledby="settings-obsidian">
+        <div>
+          <h2 id="settings-obsidian">Obsidian</h2>
+          <p className="muted small">Заметки для повторения можно вести в Obsidian — трекер будет забирать их оттуда.</p>
+        </div>
+        <ObsidianSettings />
       </section>
 
       <section className="card settings-section" aria-labelledby="settings-data">

@@ -45,6 +45,12 @@ describe('migrate', () => {
     expect(db.entries).toHaveLength(1);
   });
 
+  it('v3 → v4: у заметок и материалов появляется obsidianPath = null', () => {
+    const note = { id: 'n1', title: 'Т', materialId: null, questions: [], summary: '', obsidianUri: '', status: 'active', addedOn: '2026-09-01', createdAt: 'x' };
+    const db = migrate({ version: 3, ...migrateToV2(), materials: [], notes: [note], reviews: [] }, makeCtx());
+    expect(db.notes[0].obsidianPath).toBeNull();
+  });
+
   it('v2 → v3: добавляются пустые списки знаний', () => {
     const v2 = { version: 2, ...migrateToV2() };
     const db = migrate(v2, makeCtx());
@@ -112,6 +118,7 @@ describe('знания', () => {
           url: '',
           areaId: db.areas[3].id,
           status: 'active',
+          obsidianPath: null,
           createdAt: '2026-09-01T08:00:00.000Z',
         },
       ],
@@ -125,6 +132,7 @@ describe('знания', () => {
           obsidianUri: 'obsidian://open?vault=Study&file=Graphs',
           status: 'active',
           addedOn: '2026-09-01',
+          obsidianPath: 'Заметки/Графы.md',
           createdAt: '2026-09-01T08:00:00.000Z',
         },
       ],

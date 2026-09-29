@@ -7,7 +7,9 @@ import { useAreaMap, useKnowledge } from '../../api/hooks';
 import { DueReviewsCard } from '../../components/knowledge/DueReviewsCard';
 import { MaterialCard } from '../../components/knowledge/MaterialCard';
 import { NoteRow } from '../../components/knowledge/parts';
+import { SyncButton, SyncPhaseView } from '../../components/obsidian/ObsidianSettings';
 import { MATERIAL_STATUSES } from '../../domain/meta';
+import { useObsidian } from '../../obsidian/useObsidian';
 import type { NoteWithState } from '../../domain/review';
 import type { Material, MaterialStatus } from '../../domain/types';
 import { ErrorState, LoadingState } from '../states';
@@ -51,6 +53,7 @@ function EmptyKnowledge() {
 export function KnowledgePage() {
   const { data, today, isLoading, error } = useKnowledge();
   const areas = useAreaMap();
+  const obsidian = useObsidian();
 
   if (isLoading) return <LoadingState />;
   if (error || !data) return <ErrorState error={error} />;
@@ -99,6 +102,13 @@ export function KnowledgePage() {
           <h1>Знания</h1>
         </div>
         <div className="row">
+          {obsidian.info ? (
+            <SyncButton obsidian={obsidian} label="Obsidian" />
+          ) : (
+            <Link className="btn btn--sm btn--ghost" to="/settings#obsidian">
+              Подключить Obsidian
+            </Link>
+          )}
           <Link className="btn btn--sm" to="/knowledge/materials/new">
             <Plus size={15} aria-hidden /> Материал
           </Link>
@@ -107,6 +117,12 @@ export function KnowledgePage() {
           </Link>
         </div>
       </div>
+
+      {obsidian.phase.kind !== 'idle' && (
+        <div style={{ marginBottom: 16 }}>
+          <SyncPhaseView phase={obsidian.phase} obsidian={obsidian} />
+        </div>
+      )}
 
       {notes.length === 0 && materials.length === 0 ? (
         <EmptyKnowledge />

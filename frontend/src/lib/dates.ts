@@ -68,3 +68,10 @@ export function formatRelative(date: IsoDate, today: IsoDate = todayIso()): stri
   if (diff === 1) return 'вчера';
   return formatShort(date);
 }
+
+const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+/** «29 сент., 19:40» — время по часовому поясу пользователя. */
+export function formatDateTime(isoDateTime: string): string {
+  return dateTimeFormatter.format(new Date(isoDateTime));
+}
