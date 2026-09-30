@@ -14,7 +14,11 @@ python3 -m venv .venv
 .venv/bin/python manage.py runserver 8000     # http://localhost:8000/api/
 ```
 
+На Windows: `python -m venv .venv`, а вместо `.venv/bin/` — `.venv\Scripts\`
+(`.venv\Scripts\pip install -r requirements-dev.txt`, `.venv\Scripts\python manage.py migrate`).
+
 Без переменных окружения включён режим разработки и база SQLite `backend/db.sqlite3`.
+После обновления кода — снова `manage.py migrate`: новые этапы добавляют таблицы и поля.
 С PostgreSQL: `DATABASE_URL=postgres://user:password@localhost:5432/tracker`.
 Все настройки — в [.env.example](.env.example).
 
@@ -33,6 +37,9 @@ Django на порту 8000, фронтенд — с адресом API:
 cd frontend
 VITE_API_URL=/api npm run dev        # http://localhost:5173
 ```
+
+На Windows (или чтобы не набирать каждый раз) — строка `VITE_API_URL=/api` в файле `frontend/.env.local`
+и просто `npm run dev`.
 
 Vite проксирует `/api` на `http://127.0.0.1:8000` (другой адрес — переменная `BACKEND_URL`),
 поэтому для браузера сайт и API на одном адресе и кука сессии работает как на рабочем сервере.

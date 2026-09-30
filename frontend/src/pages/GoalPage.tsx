@@ -389,7 +389,7 @@ function HabitView({ item, area, today }: { item: Extract<GoalView, { kind: 'hab
             </div>
           </div>
 
-          <div className={`banner banner--${advice.tone}`}>
+          <div className={`banner banner--${advice.tone} banner--action`}>
             <AdviceIcon size={18} strokeWidth={2} aria-hidden />
             <div className="banner__text spacer">
               <strong>{advice.title}</strong>

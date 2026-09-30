@@ -7,6 +7,7 @@ import { TodayHabits } from '../components/habits/TodayHabits';
 import { DueReviewsCard } from '../components/knowledge/DueReviewsCard';
 import { TodayTasks } from '../components/tasks/TodayTasks';
 import { VacationBanner } from '../components/VacationBanner';
+import { WeekFocusCard } from '../components/week/WeekFocusCard';
 import { compareForToday, type GoalWithStats } from '../domain/progress';
 import { summarizeDay } from '../domain/day';
 import { completedOn, isForToday } from '../domain/tasks';
@@ -177,6 +178,8 @@ export function TodayPage() {
           </div>
         </div>
       )}
+
+      <WeekFocusCard today={today} />
 
       {knowledge.data?.load.vacation && (
         <div className="slot">
