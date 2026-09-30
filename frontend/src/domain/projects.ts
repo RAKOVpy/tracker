@@ -5,7 +5,7 @@ import type { Milestone, Project, ProjectInput, ProjectPatch, ProjectStatus, Tas
 /**
  * Проекты. Прогресс, следующий шаг и готовность вех не хранятся, а вычисляются из задач.
  * Задачи проектов на паузе, завершённых и отменённых не попадают в «Сегодня» и список задач:
- * проект отложили — отложили и его дела.
+ * проект отложили — отложили и его дела. Срок вехи и проекта действует на их задачи без своего срока.
  */
 
 export const PROJECT_STATUSES: Record<ProjectStatus, string> = {
@@ -20,10 +20,35 @@ export const PROJECT_STATUS_ORDER: ProjectStatus[] = ['active', 'paused', 'done'
 const isClosedStatus = (status: ProjectStatus) => status === 'done' || status === 'dropped';
 const isOpenTask = (task: Task) => task.status === 'todo' || task.status === 'inbox';
 
-/** Задачи в работе: без проекта или из проекта в работе. Проект, которого нет, не прячет задачу. */
-export function tasksInWork(tasks: Task[], projects: Project[]): Task[] {
-  const paused = new Set(projects.filter((p) => p.status !== 'active').map((p) => p.id));
-  return tasks.filter((t) => t.projectId === null || !paused.has(t.projectId));
+/** Чей срок у задачи, если своего у неё нет. */
+export type DeadlineSource = 'milestone' | 'project';
+
+/** Задача в работе: `deadline` — срок с учётом вехи и проекта, `deadlineFrom` — чей он; null — свой. */
+export type WorkTask = Task & { deadlineFrom: DeadlineSource | null };
+
+/**
+ * Срок задачи: свой, а если его нет — срок вехи, у вехи без срока — срок проекта. Задачу вехи со сроком
+ * «сегодня» нужно сделать сегодня, даже если своего срока у неё нет, — иначе она не попадёт в «Сегодня».
+ * Свой срок важнее: его поставили этой задаче нарочно.
+ */
+export function workTask(task: Task, project: Project | undefined): WorkTask {
+  if (task.deadline !== null || !project) return { ...task, deadlineFrom: null };
+  const milestone = project.milestones.find((m) => m.id === task.milestoneId);
+  if (milestone?.deadline) return { ...task, deadline: milestone.deadline, deadlineFrom: 'milestone' };
+  if (project.deadline) return { ...task, deadline: project.deadline, deadlineFrom: 'project' };
+  return { ...task, deadlineFrom: null };
+}
+
+/**
+ * Задачи в работе: без проекта или из проекта в работе, со сроками вех и проектов.
+ * Проект, которого нет, не прячет задачу.
+ */
+export function tasksInWork(tasks: Task[], projects: Project[]): WorkTask[] {
+  const byId = new Map(projects.map((p) => [p.id, p]));
+  return tasks.flatMap((t) => {
+    const project = t.projectId === null ? undefined : byId.get(t.projectId);
+    return project && project.status !== 'active' ? [] : [workTask(t, project)];
+  });
 }
 
 export interface ProjectProgress {

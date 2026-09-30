@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { currentMilestone, nextStep, PROJECT_STATUSES, projectProgress } from '../../domain/projects';
+import { currentMilestone, nextStep, PROJECT_STATUSES, projectProgress, workTask } from '../../domain/projects';
 import type { Area, Goal, Project, Task } from '../../domain/types';
 import { formatShort, type IsoDate } from '../../lib/dates';
 import { plural } from '../../lib/format';
@@ -28,7 +28,9 @@ export function ProjectCard({ project, tasks, area, goal, today }: Props) {
   const progress = projectProgress(tasks);
   const next = project.status === 'active' ? nextStep(project, tasks, today) : null;
   const milestone = milestoneText(project, tasks, today);
-  const nextDeadline = next?.deadline ? deadlineTag(next.deadline, today) : null;
+  // Срок проекта и так виден в шапке карточки, а срок вехи у следующего шага — подсказка, когда его сделать.
+  const due = next ? workTask(next, project) : null;
+  const nextDeadline = due?.deadline && due.deadlineFrom !== 'project' ? deadlineTag(due.deadline, today, due.deadlineFrom) : null;
   const meta = [
     area?.name,
     project.deadline && `до ${formatShort(project.deadline)}`,

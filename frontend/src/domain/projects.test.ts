@@ -9,8 +9,9 @@ import {
   nextStep,
   projectProgress,
   tasksInWork,
+  workTask,
 } from './projects';
-import { taskInput } from './tasks';
+import { isForToday, taskInput } from './tasks';
 import type { Project, Task } from './types';
 
 const TODAY = '2026-10-07';
@@ -43,6 +44,40 @@ describe('tasksInWork', () => {
     const projects = [project(), project({ id: 'p2', status: 'paused' }), project({ id: 'p3', status: 'done' })];
     const tasks = [task('a'), task('b', { projectId: 'p2' }), task('c', { projectId: 'p3' }), task('d', { projectId: null }), task('e', { projectId: 'нет' })];
     expect(tasksInWork(tasks, projects).map((t) => t.id)).toEqual(['a', 'd', 'e']);
+  });
+
+  it('задачи вехи со сроком сегодня — на «Сегодня», даже добавленные после того, как веха была готова', () => {
+    const invite = project({ milestones: [{ id: 'm1', title: 'Создать приглашение', deadline: TODAY }] });
+    const done = (id: string) => task(id, { milestoneId: 'm1', status: 'done', completedAt: '2026-10-06T10:00:00Z' });
+    const tasks = [done('a'), done('b'), done('c'), task('d', { milestoneId: 'm1' }), task('e', { milestoneId: 'm1' })];
+    expect(milestoneState(invite.milestones[0], tasks, TODAY)).toMatchObject({ done: 3, total: 5 });
+    const forToday = tasksInWork(tasks, [invite]).filter((t) => isForToday(t, TODAY));
+    expect(forToday.map((t) => [t.id, t.deadline, t.deadlineFrom])).toEqual([
+      ['d', TODAY, 'milestone'],
+      ['e', TODAY, 'milestone'],
+    ]);
+  });
+});
+
+describe('workTask', () => {
+  const ielts = project({ deadline: '2026-12-01' });
+
+  it('своего срока нет — срок вехи, у вехи без срока — срок проекта', () => {
+    expect(workTask(task('a', { milestoneId: 'm1' }), ielts)).toMatchObject({ deadline: '2026-10-05', deadlineFrom: 'milestone' });
+    const noDate = project({ deadline: '2026-12-01', milestones: [{ id: 'm1', title: 'Диагностика', deadline: null }] });
+    expect(workTask(task('a', { milestoneId: 'm1' }), noDate)).toMatchObject({ deadline: '2026-12-01', deadlineFrom: 'project' });
+    expect(workTask(task('a'), ielts)).toMatchObject({ deadline: '2026-12-01', deadlineFrom: 'project' });
+  });
+
+  it('свой срок важнее, а без сроков и без проекта задача остаётся без срока', () => {
+    expect(workTask(task('a', { milestoneId: 'm1', deadline: '2026-10-20' }), ielts)).toMatchObject({ deadline: '2026-10-20', deadlineFrom: null });
+    expect(workTask(task('a'), project())).toMatchObject({ deadline: null, deadlineFrom: null });
+    expect(workTask(task('a', { projectId: null }), undefined)).toMatchObject({ deadline: null, deadlineFrom: null });
+  });
+
+  it('срок вехи прошёл — задача просрочена', () => {
+    expect(isForToday(workTask(task('a', { milestoneId: 'm1' }), ielts), TODAY)).toBe(true);
+    expect(isForToday(task('a', { milestoneId: 'm1' }), TODAY)).toBe(false);
   });
 });
 
