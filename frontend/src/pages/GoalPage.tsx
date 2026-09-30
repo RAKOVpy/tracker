@@ -1,7 +1,7 @@
-import { Archive, ArchiveRestore, CalendarClock, CircleCheck, Flag, Pencil, Trash2, TrendingUp, TriangleAlert } from 'lucide-react';
+import { Archive, ArchiveRestore, CalendarClock, CircleCheck, Flag, FolderKanban, Pencil, Plus, Trash2, TrendingUp, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useAreaMap, useDeleteGoal, useGoalWithStats, useUpdateGoal } from '../api/hooks';
+import { useAreaMap, useDeleteGoal, useGoalWithStats, useUpdateGoal, useWork } from '../api/hooks';
 import { AreaMark } from '../components/AreaIcon';
 import { BackButton } from '../components/BackButton';
 import { EntryForm } from '../components/EntryForm';
@@ -10,6 +10,7 @@ import { describePace, formatAmount, type Tone } from '../components/pace';
 import { ProgressBar } from '../components/ProgressBar';
 import { ProgressChart } from '../components/ProgressChart';
 import type { GoalStats } from '../domain/progress';
+import { nextStep, PROJECT_STATUSES, projectProgress } from '../domain/projects';
 import type { Goal } from '../domain/types';
 import { formatLong, formatShort } from '../lib/dates';
 import { formatDays, formatNumber, plural } from '../lib/format';
@@ -49,6 +50,7 @@ export function GoalPage() {
   const areas = useAreaMap();
   const updateGoal = useUpdateGoal(id);
   const deleteGoal = useDeleteGoal();
+  const work = useWork();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   if (isLoading) return <LoadingState />;
@@ -70,6 +72,7 @@ export function GoalPage() {
   const pace = describePace(goal, stats);
   const PaceIcon = TONE_ICONS[pace.tone];
   const isArchived = goal.status === 'archived';
+  const projects = work.data?.projects.filter((p) => p.goalId === goal.id) ?? [];
 
   return (
     <>
@@ -154,6 +157,47 @@ export function GoalPage() {
             {formatLong(goal.startDate)} → {formatLong(goal.deadline)}
           </div>
         </div>
+
+        <section className="card stack">
+          <div className="panel-head">
+            <h2 className="section__title" style={{ margin: 0 }}>
+              Проекты {projects.length > 0 && <span className="section__count">{projects.length}</span>}
+            </h2>
+            <Link className="btn btn--sm btn--ghost" to={`/projects/new?goal=${goal.id}`}>
+              <Plus size={15} aria-hidden /> Проект
+            </Link>
+          </div>
+          {projects.length === 0 ? (
+            <p className="muted small" style={{ margin: 0 }}>
+              Проект — путь к цели по шагам: для «набрать 7.0 на IELTS» это «подготовиться к IELTS» с вехами и задачами.
+            </p>
+          ) : (
+            <ul className="goal-projects">
+              {projects.map((project) => {
+                const tasks = work.data?.tasks.filter((t) => t.projectId === project.id) ?? [];
+                const progress = projectProgress(tasks);
+                const next = project.status === 'active' ? nextStep(project, tasks, today) : null;
+                return (
+                  <li key={project.id} className="goal-projects__row">
+                    <FolderKanban size={16} aria-hidden />
+                    <span className="spacer">
+                      <Link to={`/projects/${project.id}`} className="task-row__title">
+                        {project.title}
+                      </Link>
+                      <span className="task-row__meta">
+                        <span className="num">
+                          {progress.done} из {progress.total}
+                        </span>
+                        {project.status !== 'active' && <span>{PROJECT_STATUSES[project.status].toLowerCase()}</span>}
+                        {next && <span>дальше: {next.title}</span>}
+                      </span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
 
         <section className="card stack">
           <h2 className="section__title" style={{ margin: 0 }}>

@@ -2,6 +2,7 @@ import { Flag, Inbox } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useCreateTask, useToday } from '../../api/hooks';
+import { taskInput } from '../../domain/tasks';
 import { addDays, type IsoDate } from '../../lib/dates';
 
 interface Props {
@@ -13,6 +14,7 @@ type When = 'inbox' | 'today' | 'tomorrow';
 
 const MORE = [
   { to: '/tasks/new', label: 'Задача' },
+  { to: '/projects/new', label: 'Проект' },
   { to: '/goals/new', label: 'Цель' },
   { to: '/knowledge/notes/new', label: 'Заметка' },
   { to: '/knowledge/materials/new', label: 'Материал' },
@@ -61,16 +63,7 @@ export function QuickCapture({ open, onClose }: Props) {
     if (!text) return;
     const plannedDate: IsoDate | null = when === 'today' ? today : when === 'tomorrow' ? addDays(today, 1) : null;
     create.mutate(
-      {
-        title: text,
-        notes: '',
-        status: plannedDate ? 'todo' : 'inbox',
-        important,
-        deadline: null,
-        plannedDate,
-        areaId: null,
-        checklist: [],
-      },
+      taskInput({ title: text, status: plannedDate ? 'todo' : 'inbox', important, plannedDate }),
       {
         onSuccess: () => {
           setSaved({ title: text, where: when === 'today' ? 'на сегодня' : when === 'tomorrow' ? 'на завтра' : 'во «Входящие»' });

@@ -1,3 +1,4 @@
+import { applyProjectPatch, createProject, detachRemovedMilestones } from '../domain/projects';
 import { applyTaskPatch, createTask } from '../domain/tasks';
 import type { Area, Goal, Material, Note, ProgressEntry, Review, Vacation } from '../domain/types';
 import { sortVacations, vacationError } from '../domain/vacation';
@@ -67,6 +68,7 @@ export const localApi: TrackerApi = {
     db.goals = db.goals.map((g) => (g.areaId === id ? { ...g, areaId: null } : g));
     db.materials = db.materials.map((m) => (m.areaId === id ? { ...m, areaId: null } : m));
     db.tasks = db.tasks.map((t) => (t.areaId === id ? { ...t, areaId: null } : t));
+    db.projects = db.projects.map((p) => (p.areaId === id ? { ...p, areaId: null } : p));
     save(db);
   },
 
@@ -100,6 +102,7 @@ export const localApi: TrackerApi = {
     const db = load();
     db.goals = db.goals.filter((g) => g.id !== id);
     db.entries = db.entries.filter((e) => e.goalId !== id);
+    db.projects = db.projects.map((p) => (p.goalId === id ? { ...p, goalId: null } : p));
     save(db);
   },
 
@@ -274,6 +277,34 @@ export const localApi: TrackerApi = {
   async deleteTask(id) {
     const db = load();
     db.tasks = db.tasks.filter((t) => t.id !== id);
+    save(db);
+  },
+
+  async listProjects() {
+    return load().projects;
+  },
+
+  async createProject(input) {
+    const db = load();
+    const project = createProject(input, { id: crypto.randomUUID(), now: new Date().toISOString() });
+    db.projects.push(project);
+    save(db);
+    return project;
+  },
+
+  async updateProject(id, patch) {
+    const db = load();
+    const index = findIndex(db.projects, id, 'Проект');
+    db.projects[index] = applyProjectPatch(db.projects[index], patch, new Date().toISOString());
+    db.tasks = detachRemovedMilestones(db.tasks, db.projects[index]);
+    save(db);
+    return db.projects[index];
+  },
+
+  async deleteProject(id) {
+    const db = load();
+    db.projects = db.projects.filter((p) => p.id !== id);
+    db.tasks = db.tasks.map((t) => (t.projectId === id ? { ...t, projectId: null, milestoneId: null } : t));
     save(db);
   },
 

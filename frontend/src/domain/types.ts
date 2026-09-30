@@ -182,6 +182,9 @@ export interface Task {
   /** Когда делаю: «сяду в среду». Не путать с дедлайном. */
   plannedDate: IsoDate | null;
   areaId: string | null;
+  /** Проект, к которому относится задача, и его веха. Веха бывает только у задачи проекта. */
+  projectId: string | null;
+  milestoneId: string | null;
   /** Подзадачи — чек-лист. */
   checklist: ChecklistItem[];
   /** Когда задачу сделали или отменили. */
@@ -189,8 +192,45 @@ export interface Task {
   createdAt: string;
 }
 
-export type TaskInput = Pick<Task, 'title' | 'notes' | 'status' | 'important' | 'deadline' | 'plannedDate' | 'areaId' | 'checklist'>;
+export type TaskInput = Pick<
+  Task,
+  'title' | 'notes' | 'status' | 'important' | 'deadline' | 'plannedDate' | 'areaId' | 'projectId' | 'milestoneId' | 'checklist'
+>;
 export type TaskPatch = Partial<TaskInput>;
+
+// ---------- проекты ----------
+
+/** active — в работе; paused — на паузе; done — завершён; dropped — отменён. */
+export type ProjectStatus = 'active' | 'paused' | 'done' | 'dropped';
+
+/** Веха — этап проекта: «Диагностика до 10 окт». Сделана, когда сделаны все её задачи. */
+export interface Milestone {
+  id: string;
+  title: string;
+  deadline: IsoDate | null;
+}
+
+/**
+ * Проект — набор задач с вехами: «Подготовиться к IELTS». Можно связать с измеримой целью
+ * («Набрать 7.0»). Прогресс и следующий шаг не хранятся, а вычисляются из задач.
+ */
+export interface Project {
+  id: string;
+  title: string;
+  description: string;
+  areaId: string | null;
+  goalId: string | null;
+  status: ProjectStatus;
+  deadline: IsoDate | null;
+  /** Вехи по порядку. */
+  milestones: Milestone[];
+  /** Когда проект завершили или отменили. */
+  completedAt: string | null;
+  createdAt: string;
+}
+
+export type ProjectInput = Pick<Project, 'title' | 'description' | 'areaId' | 'goalId' | 'status' | 'deadline' | 'milestones'>;
+export type ProjectPatch = Partial<ProjectInput>;
 
 export type SettingsPatch = Partial<Settings>;
 export type VacationInput = Pick<Vacation, 'start' | 'end'>;

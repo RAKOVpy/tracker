@@ -9,6 +9,7 @@ import {
   postponeCandidates,
   quadrant,
   taskBucket,
+  taskInput,
 } from './tasks';
 import type { Task } from './types';
 
@@ -24,6 +25,8 @@ function task(overrides: Partial<Task> = {}): Task {
     deadline: null,
     plannedDate: null,
     areaId: null,
+    projectId: null,
+    milestoneId: null,
     checklist: [],
     completedAt: null,
     createdAt: '2026-10-01T10:00:00.000Z',
@@ -125,10 +128,18 @@ describe('закрытие задачи', () => {
     expect(applyTaskPatch(task(), { title: 'Новое' }, now).completedAt).toBeNull();
   });
 
+  it('смена проекта сбрасывает веху, если новая не указана', () => {
+    const inProject = task({ projectId: 'p1', milestoneId: 'm1' });
+    expect(applyTaskPatch(inProject, { projectId: 'p2' }, now).milestoneId).toBeNull();
+    expect(applyTaskPatch(inProject, { projectId: null }, now).milestoneId).toBeNull();
+    expect(applyTaskPatch(inProject, { projectId: 'p2', milestoneId: 'm7' }, now).milestoneId).toBe('m7');
+    expect(applyTaskPatch(inProject, { title: 'Новое' }, now).milestoneId).toBe('m1');
+    expect(createTask(taskInput({ title: 'x', milestoneId: 'm1' }), { id: 'a', now }).milestoneId).toBeNull();
+  });
+
   it('новая задача сразу сделанной получает время', () => {
-    const input = { title: 'x', notes: '', important: false, deadline: null, plannedDate: null, areaId: null, checklist: [] };
-    expect(createTask({ ...input, status: 'done' }, { id: 'a', now }).completedAt).toBe(now);
-    expect(createTask({ ...input, status: 'inbox' }, { id: 'a', now }).completedAt).toBeNull();
+    expect(createTask(taskInput({ title: 'x', status: 'done' }), { id: 'a', now }).completedAt).toBe(now);
+    expect(createTask(taskInput({ title: 'x', status: 'inbox' }), { id: 'a', now }).completedAt).toBeNull();
   });
 });
 

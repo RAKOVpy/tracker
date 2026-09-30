@@ -1,7 +1,7 @@
-import { Brain, Inbox, ListTodo, Plus, Settings, Sun, Target, type LucideIcon } from 'lucide-react';
+import { Brain, FolderKanban, Inbox, ListTodo, Plus, Settings, Sun, Target, type LucideIcon } from 'lucide-react';
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { useAreas, useKnowledge, useTasks, useToday } from '../api/hooks';
+import { useAreas, useKnowledge, useToday, useWork } from '../api/hooks';
 import { isForToday } from '../domain/tasks';
 import { isTyping } from '../lib/keyboard';
 import { LoadingState } from '../pages/states';
@@ -18,6 +18,9 @@ interface NavItem {
 const TODAY: NavItem = { to: '/', label: 'Сегодня', icon: Sun, isActive: (p) => p === '/' };
 const INBOX: NavItem = { to: '/inbox', label: 'Входящие', icon: Inbox, isActive: (p) => p === '/inbox' };
 const TASKS: NavItem = { to: '/tasks', label: 'Задачи', icon: ListTodo, isActive: (p) => p.startsWith('/tasks') };
+const PROJECTS: NavItem = { to: '/projects', label: 'Проекты', icon: FolderKanban, isActive: (p) => p.startsWith('/projects') };
+/** На телефоне проекты открываются из «Задач», поэтому и подсвечивается «Задачи». */
+const TASKS_MOBILE: NavItem = { ...TASKS, isActive: (p) => p.startsWith('/tasks') || p.startsWith('/projects') };
 const GOALS: NavItem = {
   to: '/goals',
   label: 'Цели',
@@ -44,11 +47,11 @@ interface Counts {
 function useCounts(): Counts {
   const today = useToday();
   const { data: knowledge } = useKnowledge();
-  const { data: tasks = [] } = useTasks();
+  const { data: work } = useWork();
   return {
     due: knowledge?.load.queue.length ?? 0,
-    tasks: tasks.filter((t) => isForToday(t, today)).length,
-    inbox: tasks.filter((t) => t.status === 'inbox').length,
+    tasks: work?.inWork.filter((t) => isForToday(t, today)).length ?? 0,
+    inbox: work?.tasks.filter((t) => t.status === 'inbox').length ?? 0,
   };
 }
 
@@ -87,6 +90,7 @@ function Sidebar() {
         {link(TODAY)}
         {link(INBOX, counts.inbox)}
         {link(TASKS, counts.tasks, 'на сегодня')}
+        {link(PROJECTS)}
         {link(GOALS)}
         {link(KNOWLEDGE, counts.due, 'к повторению')}
       </nav>
@@ -149,7 +153,7 @@ function BottomNav() {
   const counts = useCounts();
   const openCapture = useQuickCapture();
   const badges = new Map<NavItem, { count: number; label: string }>([
-    [TASKS, { count: counts.tasks, label: 'на сегодня' }],
+    [TASKS_MOBILE, { count: counts.tasks, label: 'на сегодня' }],
     [KNOWLEDGE, { count: counts.due, label: 'к повторению' }],
   ]);
 
@@ -178,7 +182,7 @@ function BottomNav() {
   return (
     <nav className="bottom-nav" aria-label="Разделы">
       {link(TODAY)}
-      {link(TASKS)}
+      {link(TASKS_MOBILE)}
       <button type="button" className="bottom-nav__link bottom-nav__capture" onClick={openCapture}>
         <span className="bottom-nav__plus">
           <Plus size={22} strokeWidth={2} aria-hidden />

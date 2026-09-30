@@ -2338,13 +2338,13 @@ textarea {
   color: var(--ink-2);
 }
 
-.task-row__meta > span {
+.task-row__meta > * {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
-.task-row__meta > span + span::before {
+.task-row__meta > * + *::before {
   content: '·';
   margin-right: 6px;
   color: var(--ink-3);
@@ -2552,6 +2552,183 @@ textarea {
   margin-bottom: 16px;
 }
 
+.task-row__project {
+  color: var(--ink-2);
+  text-decoration: none;
+}
+
+.task-row__project:hover {
+  color: var(--accent);
+}
+
+.tag--good {
+  color: var(--good);
+  font-weight: 600;
+}
+
+.badge--bad {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+/* Проекты */
+.project-card {
+  display: grid;
+  gap: 12px;
+}
+
+.project-card--quiet {
+  background: var(--paper);
+}
+
+.project-card__next,
+.project-card__stalled {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.project-card__stalled {
+  color: var(--warn);
+}
+
+.project-goal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  text-decoration: none;
+  transition: border-color 0.15s;
+}
+
+.project-goal:hover {
+  border-color: var(--line-strong);
+}
+
+.project-goal > svg {
+  flex: none;
+  color: var(--accent);
+}
+
+.project-goal .spacer {
+  display: grid;
+  flex: 1 1 14rem;
+}
+
+.project-goal__stats {
+  display: grid;
+  justify-items: end;
+  text-align: right;
+}
+
+/* Узко: цифры цели уходят под название, а не сжимают его в столбик. */
+@media (max-width: 640px) {
+  .project-goal__stats {
+    justify-items: start;
+    text-align: left;
+    padding-left: 30px;
+  }
+}
+
+.milestone__add .input {
+  border-style: dashed;
+  background: transparent;
+}
+
+.milestone__add .input:focus {
+  border-style: solid;
+  background: var(--sheet);
+}
+
+.milestone {
+  display: grid;
+  gap: 4px;
+}
+
+.milestone--done {
+  background: color-mix(in srgb, var(--good-soft) 45%, var(--sheet));
+}
+
+.milestone__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.milestone__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.milestone--done .milestone__title svg {
+  color: var(--good);
+}
+
+.milestone__meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--ink-2);
+}
+
+.milestone-inputs {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.milestone-inputs__row {
+  display: grid;
+  grid-template-columns: 1.5em minmax(0, 1fr) 11em auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.goal-projects {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.goal-projects__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.goal-projects__row:first-child {
+  border-top: none;
+}
+
+.goal-projects__row > svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--accent);
+}
+
+.goal-projects__row .spacer {
+  display: grid;
+}
+
+.badge--link {
+  text-decoration: none;
+}
+
+.badge--link:hover {
+  color: var(--accent);
+}
+
 /* «Сегодня»: задачи дня */
 .today-tasks__add {
   display: flex;
@@ -2575,6 +2752,14 @@ textarea {
 @media (max-width: 640px) {
   .matrix {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .milestone-inputs__row {
+    grid-template-columns: 1.5em minmax(0, 1fr) auto;
+  }
+
+  .milestone-inputs__date {
+    grid-column: 2;
   }
 
   .stats--2 {

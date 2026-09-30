@@ -1,4 +1,5 @@
 import type { AreaInput, ExplainAnswer, NoteInput, Rating, TaskInput } from '../domain/types';
+import { taskInput } from '../domain/tasks';
 import { addDays, todayIso } from '../lib/dates';
 import { api } from '.';
 
@@ -64,46 +65,79 @@ export async function seedDemoData(): Promise<void> {
 
 type LogItem = [dayOffset: number, rating: Rating, explain?: ExplainAnswer, taught?: boolean];
 
-/** Пример для пустого трекера: цели, а если знаний и задач ещё нет — и они. */
+/** Пример для пустого трекера: цели, а если знаний, задач и проектов ещё нет — и они. */
 export async function seedAllDemo(): Promise<void> {
   await seedDemoData();
-  const [materials, notes, tasks] = await Promise.all([api.listMaterials(), api.listNotes(), api.listTasks()]);
+  const [materials, notes, tasks, projects] = await Promise.all([api.listMaterials(), api.listNotes(), api.listTasks(), api.listProjects()]);
   if (materials.length === 0 && notes.length === 0) await seedKnowledgeDemo();
-  if (tasks.length === 0) await seedTasksDemo();
+  if (tasks.length === 0 && projects.length === 0) await seedTasksDemo();
 }
 
-/** Пример задач: на сегодня, перенесённая со вчера, срочная, на неделе, без даты, сделанная и «Входящие». */
+/**
+ * Пример задач и проектов: задача на сегодня, перенесённая со вчера, срочная, на неделе, без даты,
+ * сделанная, «Входящие» и два проекта с вехами — один связан с целью по английскому.
+ */
 export async function seedTasksDemo(): Promise<void> {
   const today = todayIso();
   const study = await findOrCreateArea({ name: 'Учёба', color: 'clay', icon: 'study' });
-  const base: TaskInput = { title: '', notes: '', status: 'todo', important: false, deadline: null, plannedDate: null, areaId: null, checklist: [] };
+  const languages = await findOrCreateArea({ name: 'Языки', color: 'slate', icon: 'languages' });
+  const englishGoal = (await api.listGoals()).find((g) => g.areaId === languages && g.status === 'active');
+  const milestone = (title: string, deadline: string | null = null) => ({ id: crypto.randomUUID(), title, deadline });
   const item = (text: string, done = false) => ({ id: crypto.randomUUID(), text, done });
+
+  const [material, slides, rehearsal] = [milestone('Материал', addDays(today, 2)), milestone('Слайды', addDays(today, 5)), milestone('Репетиция', addDays(today, 6))];
+  const seminar = await api.createProject({
+    title: 'Выступить на семинаре по алгоритмам',
+    description: 'Доклад про обход графов: 10 минут и вопросы.',
+    areaId: study,
+    goalId: null,
+    status: 'active',
+    deadline: addDays(today, 7),
+    milestones: [material, slides, rehearsal],
+  });
+  const [diagnostics, writing, speaking] = [milestone('Диагностика'), milestone('Writing', addDays(today, 30)), milestone('Speaking', addDays(today, 60))];
+  const ielts = await api.createProject({
+    title: 'Подготовиться к IELTS',
+    description: '',
+    areaId: languages,
+    goalId: englishGoal?.id ?? null,
+    status: 'active',
+    deadline: addDays(today, 75),
+    milestones: [diagnostics, writing, speaking],
+  });
+  const inSeminar = { projectId: seminar.id, areaId: study };
+  const inIelts = { projectId: ielts.id, areaId: languages };
+
   const tasks: TaskInput[] = [
-    {
-      ...base,
+    taskInput({
+      ...inSeminar,
+      milestoneId: material.id,
       title: 'Законспектировать лекцию 5 по алгоритмам',
       important: true,
       plannedDate: today,
       deadline: addDays(today, 2),
-      areaId: study,
       checklist: [item('Пересмотреть запись', true), item('Выписать определения'), item('Сделать 3 заметки с вопросами')],
-    },
-    { ...base, title: 'Ответить на письмо куратора', plannedDate: addDays(today, -1) },
-    { ...base, title: 'Оплатить интернет', deadline: addDays(today, 1) },
-    {
-      ...base,
+    }),
+    taskInput({
+      ...inSeminar,
+      milestoneId: slides.id,
       title: 'Подготовить презентацию к семинару',
       important: true,
       plannedDate: addDays(today, 3),
       deadline: addDays(today, 5),
-      areaId: study,
       notes: '10 минут, 8–10 слайдов. Показать пример с графами.',
-    },
-    { ...base, title: 'Разобрать фотографии с отпуска' },
-    { ...base, title: 'Записаться к стоматологу', plannedDate: today, status: 'done' },
-    { ...base, title: 'Позвонить в банк про карту', status: 'inbox' },
-    { ...base, title: 'Курс по SQL на Stepik', status: 'inbox' },
-    { ...base, title: 'Купить подарок на день рождения', status: 'inbox' },
+    }),
+    taskInput({ ...inSeminar, milestoneId: rehearsal.id, title: 'Прогнать выступление перед другом' }),
+    taskInput({ ...inIelts, milestoneId: diagnostics.id, title: 'Пройти пробный тест', status: 'done' }),
+    taskInput({ ...inIelts, milestoneId: writing.id, title: 'Написать эссе Task 2 и проверить по критериям', plannedDate: addDays(today, 2) }),
+    taskInput({ ...inIelts, milestoneId: writing.id, title: 'Выучить 20 связок для эссе' }),
+    taskInput({ title: 'Ответить на письмо куратора', plannedDate: addDays(today, -1) }),
+    taskInput({ title: 'Оплатить интернет', deadline: addDays(today, 1) }),
+    taskInput({ title: 'Разобрать фотографии с отпуска' }),
+    taskInput({ title: 'Записаться к стоматологу', plannedDate: today, status: 'done' }),
+    taskInput({ title: 'Позвонить в банк про карту', status: 'inbox' }),
+    taskInput({ title: 'Курс по SQL на Stepik', status: 'inbox' }),
+    taskInput({ title: 'Переехать в новую квартиру', status: 'inbox' }),
   ];
   for (const task of tasks) await api.createTask(task);
 }

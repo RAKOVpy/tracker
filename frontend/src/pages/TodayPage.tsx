@@ -3,7 +3,7 @@ import { Plus, Sparkles, Target } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { seedAllDemo } from '../api/demo';
-import { useAreaMap, useGoalsWithStats, useKnowledge, useNow, useTasks } from '../api/hooks';
+import { useAreaMap, useGoalsWithStats, useKnowledge, useNow, useWork } from '../api/hooks';
 import { GoalCard } from '../components/GoalCard';
 import { DueReviewsCard } from '../components/knowledge/DueReviewsCard';
 import { TodayTasks } from '../components/tasks/TodayTasks';
@@ -142,7 +142,8 @@ export function TodayPage() {
   const areas = useAreaMap();
   const now = useNow();
   const knowledge = useKnowledge();
-  const tasks = useTasks();
+  // Задачи проектов на паузе и завершённых на «Сегодня» не попадают.
+  const work = useWork();
 
   if (isLoading) return <LoadingState />;
   if (error || !data) return <ErrorState error={error} />;
@@ -151,8 +152,8 @@ export function TodayPage() {
   const weekday = formatWeekday(today);
   const sectionProps = { areas, today };
   const day = summarizeDay({
-    tasksLeft: tasks.data?.filter((t) => isForToday(t, today)).length ?? 0,
-    tasksDone: tasks.data?.filter((t) => t.status === 'done' && completedOn(t) === today).length ?? 0,
+    tasksLeft: work.data?.inWork.filter((t) => isForToday(t, today)).length ?? 0,
+    tasksDone: work.data?.inWork.filter((t) => t.status === 'done' && completedOn(t) === today).length ?? 0,
     goalsLeft: groups.todo.length,
     goalsDone: groups.doneToday.length,
     reviewsLeft: knowledge.data?.load.queue.length ?? 0,
@@ -198,7 +199,7 @@ export function TodayPage() {
         </div>
       )}
 
-      {tasks.data && <TodayTasks tasks={tasks.data} today={today} />}
+      {work.data && <TodayTasks tasks={work.data.inWork} today={today} />}
 
       {data.length === 0 ? (
         <EmptyState />

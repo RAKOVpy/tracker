@@ -31,7 +31,7 @@ const v1Data = {
 
 /** Данные в формате v2: как их хранила предыдущая версия приложения. */
 function migrateToV2() {
-  const { materials: _m, notes: _n, reviews: _r, settings: _s, vacations: _v, tasks: _t, ...v2 } = migrate(v1Data, makeCtx());
+  const { materials: _m, notes: _n, reviews: _r, settings: _s, vacations: _v, tasks: _t, projects: _p, ...v2 } = migrate(v1Data, makeCtx());
   return v2;
 }
 
@@ -60,6 +60,14 @@ describe('migrate', () => {
   it('v5 → v6: появляется пустой список задач', () => {
     const v5 = { version: 5, ...migrateToV2(), materials: [], notes: [], reviews: [], settings: {}, vacations: [] };
     expect(migrate(v5, makeCtx()).tasks).toEqual([]);
+  });
+
+  it('v6 → v7: появляются проекты, у задач — пустые проект и веха', () => {
+    const oldTask = { id: 't1', title: 'Т', notes: '', status: 'todo', important: false, deadline: null, plannedDate: null, areaId: null, checklist: [], completedAt: null, createdAt: 'x' };
+    const v6 = { version: 6, ...migrateToV2(), materials: [], notes: [], reviews: [], settings: {}, vacations: [], tasks: [oldTask] };
+    const db = migrate(v6, makeCtx());
+    expect(db.projects).toEqual([]);
+    expect(db.tasks[0]).toMatchObject({ projectId: null, milestoneId: null });
   });
 
   it('v2 → v3: добавляются пустые списки знаний', () => {
@@ -224,6 +232,8 @@ describe('задачи', () => {
     deadline: '2026-10-09',
     plannedDate: null,
     areaId: null,
+    projectId: null,
+    milestoneId: null,
     checklist: [{ id: 'c1', text: 'Собрать цифры', done: true }],
     completedAt: null,
     createdAt: 'x',
@@ -245,6 +255,54 @@ describe('задачи', () => {
     expect(() => validateDb({ ...db, tasks: [task({ deadline: '9 окт' })] })).toThrow('ГГГГ-ММ-ДД');
     expect(() => validateDb({ ...db, tasks: [task({ checklist: [{ id: 'c1', text: '', done: false }] })] })).toThrow('пункт 1');
     expect(() => validateDb({ ...db, tasks: [task(), task()] })).toThrow('повторяется id');
+  });
+});
+
+describe('проекты', () => {
+  const base = () => migrate(v1Data, makeCtx());
+  const project = (overrides: Record<string, unknown> = {}) => ({
+    id: 'p1',
+    title: 'IELTS',
+    description: '',
+    areaId: null,
+    goalId: 'g1',
+    status: 'active',
+    deadline: null,
+    milestones: [{ id: 'm1', title: 'Диагностика', deadline: '2026-10-10' }],
+    completedAt: null,
+    createdAt: 'x',
+    ...overrides,
+  });
+  const task = (overrides: Record<string, unknown> = {}) => ({
+    id: 't1', title: 'Пробный тест', notes: '', status: 'todo', important: false, deadline: null, plannedDate: null,
+    areaId: null, projectId: 'p1', milestoneId: 'm1', checklist: [], completedAt: null, createdAt: 'x', ...overrides,
+  });
+
+  it('проходят проверку без изменений', () => {
+    const db = { ...base(), projects: [project()], tasks: [task()] };
+    expect(validateDb(db)).toEqual(db);
+  });
+
+  it('чинят висячие ссылки: цель, проект задачи и веха', () => {
+    const db = base();
+    expect(validateDb({ ...db, projects: [project({ goalId: 'нет' })] }).projects[0].goalId).toBeNull();
+    const fixed = validateDb({
+      ...db,
+      projects: [project()],
+      tasks: [task({ id: 'a', projectId: 'нет' }), task({ id: 'b', milestoneId: 'нет' }), task({ id: 'c', projectId: null })],
+    });
+    expect(fixed.tasks.map((t) => [t.projectId, t.milestoneId])).toEqual([
+      [null, null],
+      ['p1', null],
+      [null, null],
+    ]);
+  });
+
+  it('отклоняют ошибки', () => {
+    const db = base();
+    expect(() => validateDb({ ...db, projects: [project({ status: 'someday' })] })).toThrow('Проект 1: недопустимое значение поля «status»');
+    expect(() => validateDb({ ...db, projects: [project({ milestones: [{ id: 'm1', title: '', deadline: null }] })] })).toThrow('веха 1');
+    expect(() => validateDb({ ...db, projects: [project(), project()] })).toThrow('повторяется id');
   });
 });
 

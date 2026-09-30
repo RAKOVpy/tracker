@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { checkStart, forecastReviews, planReviews, type ForecastDay, type ReviewLoad, type StartCheck } from '../domain/load';
 import { computeGoalStats, type GoalWithStats } from '../domain/progress';
 import { withState, type NoteWithState } from '../domain/review';
+import { tasksInWork } from '../domain/projects';
 import { applyTaskPatch } from '../domain/tasks';
 import type {
   Area,
@@ -17,6 +18,9 @@ import type {
   MaterialPatch,
   NoteInput,
   NotePatch,
+  Project,
+  ProjectInput,
+  ProjectPatch,
   ReviewInput,
   Settings,
   SettingsPatch,
@@ -41,6 +45,7 @@ const keys = {
   settings: ['settings'] as const,
   vacations: ['vacations'] as const,
   tasks: ['tasks'] as const,
+  projects: ['projects'] as const,
 };
 
 /** Текущее время с точностью до минуты: экран обновится, если приложение открыто через полночь. */
@@ -137,6 +142,7 @@ export function useDeleteGoal() {
       client.removeQueries({ queryKey: keys.goal(id) });
       client.invalidateQueries({ queryKey: keys.goals });
       client.invalidateQueries({ queryKey: keys.entries() });
+      client.invalidateQueries({ queryKey: keys.projects });
     },
   });
 }
@@ -187,12 +193,13 @@ export function useDeleteArea() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.deleteArea(id),
-    // Цели, материалы и задачи удалённой сферы остаются без сферы.
+    // Цели, материалы, задачи и проекты удалённой сферы остаются без сферы.
     onSuccess: () => {
       client.invalidateQueries({ queryKey: keys.areas });
       client.invalidateQueries({ queryKey: keys.goals });
       client.invalidateQueries({ queryKey: keys.materials });
       client.invalidateQueries({ queryKey: keys.tasks });
+      client.invalidateQueries({ queryKey: keys.projects });
     },
   });
 }
@@ -491,6 +498,86 @@ export function useInboxToMaterial() {
     onSuccess: () => {
       client.invalidateQueries({ queryKey: keys.tasks });
       client.invalidateQueries({ queryKey: keys.materials });
+    },
+  });
+}
+
+// ---------- проекты ----------
+
+export function useProjects() {
+  return useQuery({ queryKey: keys.projects, queryFn: () => api.listProjects() });
+}
+
+export function useProjectMap(): Map<string, Project> {
+  const { data } = useProjects();
+  return useMemo(() => new Map((data ?? []).map((project) => [project.id, project])), [data]);
+}
+
+/** Задачи вместе с проектами: `inWork` — без задач проектов на паузе, завершённых и отменённых. */
+export function useWork() {
+  const tasks = useTasks();
+  const projects = useProjects();
+  const data = useMemo(
+    () =>
+      tasks.data && projects.data
+        ? { tasks: tasks.data, projects: projects.data, inWork: tasksInWork(tasks.data, projects.data) }
+        : undefined,
+    [tasks.data, projects.data],
+  );
+  return { data, isLoading: tasks.isLoading || projects.isLoading, error: tasks.error ?? projects.error };
+}
+
+export function useCreateProject() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ProjectInput) => api.createProject(input),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.projects }),
+  });
+}
+
+export function useUpdateProject() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: ProjectPatch }) => api.updateProject(id, patch),
+    // Статус проекта прячет или показывает его задачи, а удалённые вехи снимаются с задач.
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: keys.projects });
+      client.invalidateQueries({ queryKey: keys.tasks });
+    },
+  });
+}
+
+export function useDeleteProject() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteProject(id),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: keys.projects });
+      client.invalidateQueries({ queryKey: keys.tasks });
+    },
+  });
+}
+
+/** Запись из «Входящих» оказалась проектом: «Подготовиться к IELTS» — это много дел, а не одно. */
+export function useInboxToProject() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (task: Task) => {
+      const project = await api.createProject({
+        title: task.title,
+        description: task.notes,
+        areaId: task.areaId,
+        goalId: null,
+        status: 'active',
+        deadline: task.deadline,
+        milestones: [],
+      });
+      await api.deleteTask(task.id);
+      return project;
+    },
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: keys.tasks });
+      client.invalidateQueries({ queryKey: keys.projects });
     },
   });
 }

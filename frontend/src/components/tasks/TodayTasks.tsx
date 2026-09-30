@@ -1,14 +1,15 @@
 import { CalendarArrowUp, Inbox, Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { useAreaMap, useCreateTask, usePlanTasks } from '../../api/hooks';
-import { compareTasks, completedOn, isForToday, postponeCandidates } from '../../domain/tasks';
+import { useAreaMap, useCreateTask, usePlanTasks, useProjectMap } from '../../api/hooks';
+import { compareTasks, completedOn, isForToday, postponeCandidates, taskInput } from '../../domain/tasks';
 import type { Task } from '../../domain/types';
 import { addDays, type IsoDate } from '../../lib/dates';
 import { plural } from '../../lib/format';
 import { TaskRow } from './TaskRow';
 
 interface Props {
+  /** Задачи в работе — без задач проектов на паузе и завершённых. */
   tasks: Task[];
   today: IsoDate;
 }
@@ -18,6 +19,7 @@ const tasksWord = (n: number) => plural(n, ['задачу', 'задачи', 'з�
 /** Задачи дня на «Сегодня»: с прошедшим сроком и на сегодня, сделанные сегодня — зачёркнутыми в конце. */
 export function TodayTasks({ tasks, today }: Props) {
   const areas = useAreaMap();
+  const projects = useProjectMap();
   const create = useCreateTask();
   const plan = usePlanTasks();
   const [title, setTitle] = useState('');
@@ -33,7 +35,7 @@ export function TodayTasks({ tasks, today }: Props) {
     const text = title.trim();
     if (!text) return;
     create.mutate(
-      { title: text, notes: '', status: 'todo', important: false, deadline: null, plannedDate: today, areaId: null, checklist: [] },
+      taskInput({ title: text, plannedDate: today }),
       { onSuccess: () => setTitle('') },
     );
   }
@@ -89,7 +91,13 @@ export function TodayTasks({ tasks, today }: Props) {
         {open.length + doneToday.length > 0 ? (
           <ul className="task-list" style={{ padding: 0 }}>
             {[...open, ...doneToday].map((task) => (
-              <TaskRow key={task.id} task={task} today={today} area={task.areaId ? areas.get(task.areaId) : undefined} />
+              <TaskRow
+                key={task.id}
+                task={task}
+                today={today}
+                area={task.areaId ? areas.get(task.areaId) : undefined}
+                project={task.projectId ? projects.get(task.projectId) : undefined}
+              />
             ))}
           </ul>
         ) : (

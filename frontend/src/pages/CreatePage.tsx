@@ -1,4 +1,4 @@
-import { BookOpen, ListTodo, NotebookPen, Target } from 'lucide-react';
+import { BookOpen, FolderKanban, ListTodo, NotebookPen, Target } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const OPTIONS = [
@@ -7,6 +7,12 @@ const OPTIONS = [
     icon: ListTodo,
     title: 'Задача',
     text: 'Дело со сроком или днём, когда за него сесть: «законспектировать лекцию 5 до пятницы».',
+  },
+  {
+    to: '/projects/new',
+    icon: FolderKanban,
+    title: 'Проект',
+    text: 'Дело из нескольких шагов: «подготовиться к IELTS» — с вехами, задачами и связью с целью.',
   },
   {
     to: '/goals/new',

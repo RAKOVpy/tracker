@@ -13,6 +13,9 @@ import type {
   NoteInput,
   NotePatch,
   ProgressEntry,
+  Project,
+  ProjectInput,
+  ProjectPatch,
   Review,
   ReviewInput,
   Settings,
@@ -35,13 +38,14 @@ export interface TrackerApi {
   listAreas(): Promise<Area[]>;
   createArea(input: AreaInput): Promise<Area>;
   updateArea(id: string, patch: AreaPatch): Promise<Area>;
-  /** Цели удалённой сферы остаются без сферы. */
+  /** Цели, материалы, задачи и проекты удалённой сферы остаются без сферы. */
   deleteArea(id: string): Promise<void>;
 
   listGoals(): Promise<Goal[]>;
   getGoal(id: string): Promise<Goal>;
   createGoal(input: GoalInput): Promise<Goal>;
   updateGoal(id: string, patch: GoalPatch): Promise<Goal>;
+  /** Удаляет цель с записями прогресса; связанные проекты остаются без цели. */
   deleteGoal(id: string): Promise<void>;
 
   /** Без goalId — записи по всем целям (нужно главному экрану). */
@@ -83,6 +87,13 @@ export interface TrackerApi {
   /** При смене статуса на done/cancelled запоминается время, при возврате — сбрасывается. */
   updateTask(id: string, patch: TaskPatch): Promise<Task>;
   deleteTask(id: string): Promise<void>;
+
+  listProjects(): Promise<Project[]>;
+  createProject(input: ProjectInput): Promise<Project>;
+  /** Задачи удалённых вех остаются в проекте без вехи. */
+  updateProject(id: string, patch: ProjectPatch): Promise<Project>;
+  /** Задачи удалённого проекта остаются без проекта. */
+  deleteProject(id: string): Promise<void>;
 
   /** Переносит заметки и материалы из хранилища Obsidian (см. obsidian/sync.ts). */
   syncObsidian(vault: ParsedVault): Promise<SyncReport>;

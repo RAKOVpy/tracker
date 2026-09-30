@@ -1,13 +1,24 @@
-import { Ban, Check, CalendarArrowUp, Flag, ListTodo, Pencil, RotateCcw, Trash2, X } from 'lucide-react';
+import { Ban, Check, CalendarArrowUp, Flag, FolderKanban, ListTodo, Pencil, RotateCcw, Trash2, X } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useAreaMap, useAreas, useCreateTask, useDeleteTask, useEditChecklist, useTasks, useToday, useUpdateTask } from '../../api/hooks';
+import {
+  useAreaMap,
+  useAreas,
+  useCreateTask,
+  useDeleteTask,
+  useEditChecklist,
+  useProjectMap,
+  useProjects,
+  useTasks,
+  useToday,
+  useUpdateTask,
+} from '../../api/hooks';
 import { BackButton } from '../../components/BackButton';
 import { TaskForm, type TaskFields } from '../../components/tasks/TaskForm';
 import { deadlineTag, planTag } from '../../components/tasks/taskText';
 import { useGoBack } from '../../components/useGoBack';
 import { checklistProgress } from '../../domain/tasks';
-import type { ChecklistItem, Task } from '../../domain/types';
+import type { ChecklistItem, Project, Task } from '../../domain/types';
 import { addDays, formatDateTime, formatLong, type IsoDate } from '../../lib/dates';
 import { ErrorState, LoadingState, NotFoundState } from '../states';
 
@@ -79,6 +90,11 @@ function Checklist({ task }: { task: Task }) {
   );
 }
 
+/** Проекты для выбора в форме: не завершённые и не отменённые, плюс текущий проект задачи. */
+function projectOptions(projects: Project[], currentId: string | null): Project[] {
+  return projects.filter((p) => p.status === 'active' || p.status === 'paused' || p.id === currentId);
+}
+
 function describePlan(plannedDate: IsoDate | null, today: IsoDate): string {
   if (!plannedDate) return 'не запланировано';
   return planTag(plannedDate, today) ?? 'сегодня';
@@ -90,6 +106,7 @@ export function TaskPage() {
   const today = useToday();
   const { data: tasks, isLoading, error } = useTasks();
   const areas = useAreaMap();
+  const projects = useProjectMap();
   const update = useUpdateTask();
   const remove = useDeleteTask();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -100,6 +117,8 @@ export function TaskPage() {
   if (!task) return <NotFoundState title="Задача не найдена" back="/tasks" />;
 
   const area = task.areaId ? areas.get(task.areaId) : undefined;
+  const project = task.projectId ? projects.get(task.projectId) : undefined;
+  const milestone = project?.milestones.find((m) => m.id === task.milestoneId);
   const closed = task.status === 'done' || task.status === 'cancelled';
   const tomorrow = addDays(today, 1);
   const deadline = task.deadline ? deadlineTag(task.deadline, today) : null;
@@ -119,6 +138,12 @@ export function TaskPage() {
               </span>
             )}
             {area && <span className={`badge badge--tone tone-${area.color}`}>{area.name}</span>}
+            {project && (
+              <Link className="badge badge--link" to={`/projects/${project.id}`}>
+                <FolderKanban size={12} aria-hidden /> {project.title}
+                {milestone && ` · ${milestone.title}`}
+              </Link>
+            )}
           </div>
         </div>
         <Link className="btn btn--sm" to={`/tasks/${task.id}/edit`}>
@@ -231,11 +256,12 @@ export function NewTaskPage() {
   const navigate = useNavigate();
   const today = useToday();
   const areas = useAreas();
+  const projects = useProjects();
   const create = useCreateTask();
   const goBack = useGoBack('/tasks');
 
-  if (areas.isLoading) return <LoadingState />;
-  if (areas.error || !areas.data) return <ErrorState error={areas.error} />;
+  if (areas.isLoading || projects.isLoading) return <LoadingState />;
+  if (areas.error || projects.error || !areas.data || !projects.data) return <ErrorState error={areas.error ?? projects.error} />;
 
   return (
     <>
@@ -244,6 +270,7 @@ export function NewTaskPage() {
       </div>
       <TaskForm
         areas={areas.data}
+        projects={projectOptions(projects.data, null)}
         today={today}
         submitLabel="Добавить задачу"
         isSubmitting={create.isPending}
@@ -261,15 +288,18 @@ export function EditTaskPage() {
   const today = useToday();
   const tasks = useTasks();
   const areas = useAreas();
+  const projects = useProjects();
   const update = useUpdateTask();
   const goBack = useGoBack(`/tasks/${id}`);
 
-  if (tasks.isLoading || areas.isLoading) return <LoadingState />;
-  if (tasks.error || areas.error || !tasks.data || !areas.data) return <ErrorState error={tasks.error ?? areas.error} />;
+  if (tasks.isLoading || areas.isLoading || projects.isLoading) return <LoadingState />;
+  if (tasks.error || areas.error || projects.error || !tasks.data || !areas.data || !projects.data) {
+    return <ErrorState error={tasks.error ?? areas.error ?? projects.error} />;
+  }
   const task = tasks.data.find((t) => t.id === id);
   if (!task) return <NotFoundState title="Задача не найдена" back="/tasks" />;
 
-  const { title, notes, important, deadline, plannedDate, areaId, checklist } = task;
+  const { title, notes, important, deadline, plannedDate, areaId, projectId, milestoneId, checklist } = task;
   return (
     <>
       <div className="page-head">
@@ -280,8 +310,9 @@ export function EditTaskPage() {
       </div>
       <TaskForm
         areas={areas.data}
+        projects={projectOptions(projects.data, task.projectId)}
         today={today}
-        initial={{ title, notes, important, deadline, plannedDate, areaId, checklist }}
+        initial={{ title, notes, important, deadline, plannedDate, areaId, projectId, milestoneId, checklist }}
         submitLabel="Сохранить"
         isSubmitting={update.isPending}
         onSubmit={(fields) => update.mutate({ id, patch: fields }, { onSuccess: goBack })}

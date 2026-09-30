@@ -1,42 +1,59 @@
-import { BookOpen, Check, Flag, Inbox, ListTodo, Plus, Trash2 } from 'lucide-react';
+import { BookOpen, Check, Flag, FolderPlus, Inbox, ListTodo, Plus, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { useAreas, useCreateTask, useDeleteTask, useInboxToMaterial, useTasks, useToday, useUpdateTask } from '../../api/hooks';
+import {
+  useAreas,
+  useCreateTask,
+  useDeleteTask,
+  useInboxToMaterial,
+  useInboxToProject,
+  useProjects,
+  useTasks,
+  useToday,
+  useUpdateTask,
+} from '../../api/hooks';
 import { AREA_ICON_COMPONENTS } from '../../components/areaIcons';
+import { ProjectPicker } from '../../components/projects/ProjectPicker';
 import { useQuickCapture } from '../../components/quickCapture';
-import type { Area, Task } from '../../domain/types';
+import type { Area, Project, Task } from '../../domain/types';
 import { addDays, formatRelative, todayIso, type IsoDate } from '../../lib/dates';
 import { ErrorState, LoadingState } from '../states';
 
 /** Что сделали с записью — чтобы показать и дать вернуть. */
 type Done =
-  | { kind: 'task'; task: Task }
+  /** `before` — запись до разбора: «Вернуть» восстанавливает её целиком. */
+  | { kind: 'task'; task: Task; before: Task }
   | { kind: 'done'; task: Task }
   | { kind: 'material'; title: string; materialId: string }
+  | { kind: 'project'; title: string; projectId: string }
   | { kind: 'deleted'; task: Task };
 
 interface ProcessProps {
   task: Task;
   areas: Area[];
+  /** Проекты в работе и на паузе — туда можно положить задачу. */
+  projects: Project[];
   today: IsoDate;
   onSaved: (task: Task) => void;
   onCancel: () => void;
 }
 
-/** «В задачи»: когда делать, к какому сроку, важно ли и к какой сфере. */
-function ProcessForm({ task, areas, today, onSaved, onCancel }: ProcessProps) {
+/** «В задачи»: когда делать, к какому сроку, важно ли, к какой сфере и проекту. */
+function ProcessForm({ task, areas, projects, today, onSaved, onCancel }: ProcessProps) {
   const update = useUpdateTask();
   const [title, setTitle] = useState(task.title);
   const [plannedDate, setPlannedDate] = useState<IsoDate | null>(null);
   const [deadline, setDeadline] = useState<IsoDate | null>(null);
   const [important, setImportant] = useState(false);
   const [areaId, setAreaId] = useState<string | null>(task.areaId);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [milestoneId, setMilestoneId] = useState<string | null>(null);
 
   function submit(event: FormEvent) {
     event.preventDefault();
     const text = title.trim();
     if (!text) return;
-    const patch = { title: text, status: 'todo' as const, plannedDate, deadline, important, areaId };
+    const patch = { title: text, status: 'todo' as const, plannedDate, deadline, important, areaId, projectId, milestoneId };
     update.mutate({ id: task.id, patch }, { onSuccess: (saved) => onSaved(saved) });
   }
 
@@ -90,6 +107,19 @@ function ProcessForm({ task, areas, today, onSaved, onCancel }: ProcessProps) {
           </div>
         </div>
       </div>
+      {projects.length > 0 && (
+        <ProjectPicker
+          idPrefix={`process-${task.id}`}
+          projects={projects}
+          projectId={projectId}
+          milestoneId={milestoneId}
+          onChange={(value) => {
+            setProjectId(value.projectId);
+            setMilestoneId(value.milestoneId);
+            if (value.project?.areaId && areaId === null) setAreaId(value.project.areaId);
+          }}
+        />
+      )}
       <div className="segmented" role="group" aria-label="Сфера">
         {areas.map((area) => {
           const Icon = AREA_ICON_COMPONENTS[area.icon];
@@ -122,11 +152,13 @@ export function InboxPage() {
   const today = useToday();
   const { data: tasks, isLoading, error } = useTasks();
   const { data: areas = [] } = useAreas();
+  const { data: projects = [] } = useProjects();
   const openCapture = useQuickCapture();
   const update = useUpdateTask();
   const remove = useDeleteTask();
   const create = useCreateTask();
   const toMaterial = useInboxToMaterial();
+  const toProject = useInboxToProject();
   const [processing, setProcessing] = useState<string | null>(null);
   const [last, setLast] = useState<Done | null>(null);
 
@@ -135,15 +167,19 @@ export function InboxPage() {
 
   // Старые записи первыми: разбирать по порядку.
   const inbox = tasks.filter((t) => t.status === 'inbox').sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  const busy = update.isPending || remove.isPending || toMaterial.isPending;
+  const busy = update.isPending || remove.isPending || toMaterial.isPending || toProject.isPending;
+  const openProjects = projects.filter((p) => p.status === 'active' || p.status === 'paused');
 
   function undo() {
     if (!last) return;
-    if (last.kind === 'task' || last.kind === 'done') {
+    if (last.kind === 'task') {
+      const { title, status, important, deadline, plannedDate, areaId, projectId, milestoneId } = last.before;
+      update.mutate({ id: last.task.id, patch: { title, status, important, deadline, plannedDate, areaId, projectId, milestoneId } });
+    } else if (last.kind === 'done') {
       update.mutate({ id: last.task.id, patch: { status: 'inbox' } });
     } else if (last.kind === 'deleted') {
-      const { title, notes, important, deadline, plannedDate, areaId, checklist } = last.task;
-      create.mutate({ title, notes, status: 'inbox', important, deadline, plannedDate, areaId, checklist });
+      const { id: _id, completedAt: _completedAt, createdAt: _createdAt, ...fields } = last.task;
+      create.mutate({ ...fields, status: 'inbox' });
     }
     setLast(null);
   }
@@ -171,8 +207,13 @@ export function InboxPage() {
                 «{last.title}» — в «Хочу изучить». <Link to={`/knowledge/materials/${last.materialId}`}>Открыть материал</Link>
               </>
             )}
+            {last.kind === 'project' && (
+              <>
+                «{last.title}» — теперь проект. <Link to={`/projects/${last.projectId}`}>Разбить на шаги</Link>
+              </>
+            )}
           </span>
-          {last.kind !== 'material' && (
+          {last.kind !== 'material' && last.kind !== 'project' && (
             <button className="btn btn--sm btn--ghost" type="button" onClick={undo}>
               Вернуть
             </button>
@@ -197,8 +238,8 @@ export function InboxPage() {
       ) : (
         <>
           <p className="muted small section__hint">
-            Для каждой записи решите: сделать задачей, отложить в «Хочу изучить», отметить сделанным, если это заняло
-            минуту, или удалить.
+            Для каждой записи решите: сделать задачей (можно сразу в проект), отложить в «Хочу изучить», превратить
+            в проект, если это много шагов, отметить сделанным, если это заняло минуту, или удалить.
           </p>
           <ul className="card inbox-list">
             {inbox.map((task) => (
@@ -226,6 +267,19 @@ export function InboxPage() {
                         }
                       >
                         <BookOpen size={15} aria-hidden /> Хочу изучить
+                      </button>
+                      <button
+                        className="btn btn--sm"
+                        type="button"
+                        disabled={busy}
+                        title="Это не одно дело, а несколько шагов"
+                        onClick={() =>
+                          toProject.mutate(task, {
+                            onSuccess: (project) => setLast({ kind: 'project', title: project.title, projectId: project.id }),
+                          })
+                        }
+                      >
+                        <FolderPlus size={15} aria-hidden /> Это проект
                       </button>
                       <button
                         className="icon-btn"
@@ -256,10 +310,11 @@ export function InboxPage() {
                   <ProcessForm
                     task={task}
                     areas={areas}
+                    projects={openProjects}
                     today={today}
                     onSaved={(saved) => {
                       setProcessing(null);
-                      setLast({ kind: 'task', task: saved });
+                      setLast({ kind: 'task', task: saved, before: task });
                     }}
                     onCancel={() => setProcessing(null)}
                   />

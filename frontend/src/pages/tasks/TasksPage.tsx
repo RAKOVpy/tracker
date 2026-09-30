@@ -1,9 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Inbox, Plus, Sparkles } from 'lucide-react';
+import { FolderKanban, Inbox, Plus, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { seedTasksDemo } from '../../api/demo';
-import { useAreaMap, useTasks, useToday } from '../../api/hooks';
+import { useAreaMap, useProjectMap, useToday, useWork } from '../../api/hooks';
 import { useQuickCapture } from '../../components/quickCapture';
 import { TaskRow } from '../../components/tasks/TaskRow';
 import {
@@ -62,21 +62,32 @@ function EmptyTasks() {
 
 export function TasksPage() {
   const today = useToday();
-  const { data: tasks, isLoading, error } = useTasks();
+  const { data: work, isLoading, error } = useWork();
   const areas = useAreaMap();
+  const projects = useProjectMap();
   const [params, setParams] = useSearchParams();
   const view = params.get('view') === 'matrix' ? 'matrix' : 'dates';
 
   if (isLoading) return <LoadingState />;
-  if (error || !tasks) return <ErrorState error={error} />;
+  if (error || !work) return <ErrorState error={error} />;
 
-  const open = tasks.filter((t) => t.status === 'todo').sort((a, b) => compareTasks(a, b, today));
+  const { tasks, inWork } = work;
+  const open = inWork.filter((t) => t.status === 'todo').sort((a, b) => compareTasks(a, b, today));
+  // Задачи проектов на паузе и завершённых ждут в своих проектах.
+  const hidden = tasks.filter((t) => t.status === 'todo').length - open.length;
   const inboxCount = tasks.filter((t) => t.status === 'inbox').length;
   const closed = tasks
     .filter((t) => t.status === 'done' || t.status === 'cancelled')
     .sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''));
   const row = (task: Task, showPlan: boolean) => (
-    <TaskRow key={task.id} task={task} today={today} area={task.areaId ? areas.get(task.areaId) : undefined} showPlan={showPlan} />
+    <TaskRow
+      key={task.id}
+      task={task}
+      today={today}
+      area={task.areaId ? areas.get(task.areaId) : undefined}
+      project={task.projectId ? projects.get(task.projectId) : undefined}
+      showPlan={showPlan}
+    />
   );
 
   const byBucket = new Map<TaskBucket, Task[]>();
@@ -93,6 +104,9 @@ export function TasksPage() {
           <h1>Задачи</h1>
         </div>
         <div className="row">
+          <Link className="btn btn--sm" to="/projects">
+            <FolderKanban size={15} aria-hidden /> Проекты
+          </Link>
           {inboxCount > 0 && (
             <Link className="btn btn--sm" to="/inbox">
               <Inbox size={15} aria-hidden /> Входящие · {inboxCount}
@@ -104,7 +118,7 @@ export function TasksPage() {
         </div>
       </div>
 
-      {open.length === 0 && closed.length === 0 ? (
+      {open.length === 0 && closed.length === 0 && hidden === 0 ? (
         inboxCount > 0 ? (
           <p className="muted">
             Открытых задач нет. Во «Входящих» ждут разбора {inboxCount} {plural(inboxCount, ['запись', 'записи', 'записей'])}:{' '}
@@ -158,6 +172,13 @@ export function TasksPage() {
                 Важность задаётся вручную, срочность — по дедлайну: срочно, если до него 2 дня или меньше.
               </p>
             </div>
+          )}
+
+          {hidden > 0 && (
+            <p className="muted small section">
+              Ещё {hidden} {plural(hidden, ['задача', 'задачи', 'задач'])} в проектах на паузе и завершённых —{' '}
+              <Link to="/projects">в проектах</Link>.
+            </p>
           )}
 
           {closed.length > 0 && (

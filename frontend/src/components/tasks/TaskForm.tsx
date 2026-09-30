@@ -1,13 +1,17 @@
 import { Flag, Plus, X } from 'lucide-react';
 import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
-import type { Area, ChecklistItem, TaskInput } from '../../domain/types';
+import { taskInput } from '../../domain/tasks';
+import type { Area, ChecklistItem, Project, TaskInput } from '../../domain/types';
 import { addDays, type IsoDate } from '../../lib/dates';
 import { AREA_ICON_COMPONENTS } from '../areaIcons';
+import { ProjectPicker } from '../projects/ProjectPicker';
 
 export type TaskFields = Omit<TaskInput, 'status'>;
 
 interface Props {
   areas: Area[];
+  /** Проекты, в которые можно положить задачу. */
+  projects: Project[];
   today: IsoDate;
   initial?: TaskFields;
   submitLabel: string;
@@ -16,11 +20,11 @@ interface Props {
   onCancel: () => void;
 }
 
-const EMPTY: TaskFields = { title: '', notes: '', important: false, deadline: null, plannedDate: null, areaId: null, checklist: [] };
+const { status: _status, ...EMPTY }: TaskInput = taskInput({ title: '' });
 
 const newItem = (text = ''): ChecklistItem => ({ id: crypto.randomUUID(), text, done: false });
 
-export function TaskForm({ areas, today, initial = EMPTY, submitLabel, isSubmitting, onSubmit, onCancel }: Props) {
+export function TaskForm({ areas, projects, today, initial = EMPTY, submitLabel, isSubmitting, onSubmit, onCancel }: Props) {
   const [values, setValues] = useState<TaskFields>(initial);
   const [checklist, setChecklist] = useState<ChecklistItem[]>(initial.checklist.length ? initial.checklist : [newItem()]);
   const [submitted, setSubmitted] = useState(false);
@@ -123,6 +127,17 @@ export function TaskForm({ areas, today, initial = EMPTY, submitLabel, isSubmitt
       {planAfterDeadline && (
         <p className="notice notice--warn">План позже дедлайна — к этому дню срок уже пройдёт.</p>
       )}
+
+      <ProjectPicker
+        idPrefix="task"
+        projects={projects}
+        projectId={values.projectId}
+        milestoneId={values.milestoneId}
+        onChange={({ projectId, milestoneId, project }) =>
+          // Задача нового проекта без сферы берёт сферу проекта.
+          setValues((prev) => ({ ...prev, projectId, milestoneId, areaId: prev.areaId ?? project?.areaId ?? null }))
+        }
+      />
 
       <div className="field">
         <span className="field__label" id="task-area-label">

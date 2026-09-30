@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronUp, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { useAreas, useCreateArea, useDeleteArea, useGoalsWithStats, useKnowledge, useUpdateArea } from '../api/hooks';
+import { useAreas, useCreateArea, useDeleteArea, useGoalsWithStats, useKnowledge, useUpdateArea, useWork } from '../api/hooks';
 import { AREA_COLORS } from '../domain/meta';
 import type { Area, AreaInput } from '../domain/types';
 import { plural } from '../lib/format';
@@ -18,6 +18,7 @@ export function AreaSettings() {
   const { data: areas, isLoading, error } = useAreas();
   const { data: goals } = useGoalsWithStats();
   const { data: knowledge } = useKnowledge();
+  const { data: work } = useWork();
   const createArea = useCreateArea();
   const updateArea = useUpdateArea();
   const deleteArea = useDeleteArea();
@@ -30,15 +31,17 @@ export function AreaSettings() {
   const goalCount = (areaId: string) => goals?.filter((g) => g.goal.areaId === areaId).length ?? 0;
   const materialCount = (areaId: string) => knowledge?.materials.filter((m) => m.areaId === areaId).length ?? 0;
 
-  /** «2 цели и 1 материал» — что лежит в сфере. */
+  /** «2 цели, 3 задачи и 1 материал» — что лежит в сфере. */
   function describeContents(areaId: string): string | null {
-    const g = goalCount(areaId);
-    const m = materialCount(areaId);
-    const parts = [
-      g > 0 ? `${g} ${plural(g, ['цель', 'цели', 'целей'])}` : null,
-      m > 0 ? `${m} ${plural(m, ['материал', 'материала', 'материалов'])}` : null,
-    ].filter(Boolean);
-    return parts.length ? parts.join(' и ') : null;
+    const counts: [number, [string, string, string]][] = [
+      [goalCount(areaId), ['цель', 'цели', 'целей']],
+      [work?.projects.filter((p) => p.areaId === areaId).length ?? 0, ['проект', 'проекта', 'проектов']],
+      [work?.tasks.filter((t) => t.areaId === areaId).length ?? 0, ['задача', 'задачи', 'задач']],
+      [materialCount(areaId), ['материал', 'материала', 'материалов']],
+    ];
+    const parts = counts.filter(([n]) => n > 0).map(([n, forms]) => `${n} ${plural(n, forms)}`);
+    if (parts.length === 0) return null;
+    return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} и ${parts.at(-1)}` : parts[0];
   }
 
   /** Меняет местами соседние сферы. */
@@ -80,7 +83,7 @@ export function AreaSettings() {
                   <p>
                     Удалить сферу «{area.name}»?{' '}
                     {contents
-                      ? `${contents} останутся без сферы, сами они не удалятся.`
+                      ? `Без сферы останутся: ${contents}. Сами они не удалятся.`
                       : 'В ней ничего нет.'}
                   </p>
                   <div className="row">

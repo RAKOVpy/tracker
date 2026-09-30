@@ -11,6 +11,8 @@ import type {
   Note,
   Priority,
   ProgressEntry,
+  Project,
+  ProjectStatus,
   Rating,
   Review,
   Settings,
@@ -24,7 +26,7 @@ import { sortVacations } from '../domain/vacation';
  * Схема данных в хранилище и в файлах резервных копий.
  * При изменении модели: увеличить SCHEMA_VERSION и добавить шаг в MIGRATIONS.
  */
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 export interface Db {
   areas: Area[];
@@ -36,6 +38,7 @@ export interface Db {
   settings: Settings;
   vacations: Vacation[];
   tasks: Task[];
+  projects: Project[];
 }
 
 export interface Backup extends Db {
@@ -72,6 +75,7 @@ export function createEmptyDb(ctx: Ctx): Db {
     settings: { ...DEFAULT_SETTINGS },
     vacations: [],
     tasks: [],
+    projects: [],
   };
 }
 
@@ -122,12 +126,19 @@ function v5ToV6(raw: Raw): Raw {
   return { ...raw, tasks: [] };
 }
 
+/** v6 → v7: проекты; у задач появляются проект и веха. */
+function v6ToV7(raw: Raw): Raw {
+  const tasks = asArray(raw.tasks, 'tasks').map((item) => ({ ...asObject(item, 'task'), projectId: null, milestoneId: null }));
+  return { ...raw, tasks, projects: [] };
+}
+
 const MIGRATIONS: Record<number, (raw: Raw, ctx: Ctx) => Raw> = {
   1: v1ToV2,
   2: v2ToV3,
   3: v3ToV4,
   4: v4ToV5,
   5: v5ToV6,
+  6: v6ToV7,
 };
 
 /** Приводит данные любой известной версии к текущей схеме и проверяет их. */
@@ -178,6 +189,7 @@ const NOTE_STATUSES: Note['status'][] = ['active', 'paused'];
 const RATINGS: Rating[] = ['again', 'hard', 'good', 'easy'];
 const EXPLAIN_ANSWERS: ExplainAnswer[] = ['no', 'hints', 'yes'];
 const TASK_STATUSES: TaskStatus[] = ['inbox', 'todo', 'done', 'cancelled'];
+const PROJECT_STATUSES: ProjectStatus[] = ['active', 'paused', 'done', 'dropped'];
 
 function isObject(value: unknown): value is Raw {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -266,7 +278,8 @@ function uniqueIds(items: { id: string }[], what: string): void {
 
 /**
  * Проверяет данные и возвращает чистую копию только с известными полями.
- * Висячие ссылки чинятся: цель, материал или задача удалённой сферы остаются без сферы, заметка удалённого
+ * Висячие ссылки чинятся: цель, материал, задача или проект удалённой сферы остаются без сферы, проект
+ * удалённой цели — без цели, задача удалённого проекта или вехи — без них, заметка удалённого
  * материала — без материала, записи и повторения удалённых целей и заметок отбрасываются.
  */
 export function validateDb(raw: unknown): Db {
@@ -414,6 +427,31 @@ export function validateDb(raw: unknown): Db {
     }
   });
 
+  const projects: Project[] = asArray(data.projects, 'projects').map((item, i) => {
+    const p = asObject(item, `Проект ${i + 1}`);
+    const where = `Проект ${i + 1}`;
+    const milestones = asArray(p.milestones, `${where}: milestones`).map((raw, j) => {
+      const m = asObject(raw, `${where}, веха ${j + 1}`);
+      const at = `${where}, веха ${j + 1}`;
+      return { id: str(m, 'id', at), title: str(m, 'title', at), deadline: optionalDate(m, 'deadline', at) };
+    });
+    uniqueIds(milestones, `${where}: вехи`);
+    return {
+      id: str(p, 'id', where),
+      title: str(p, 'title', where),
+      description: str(p, 'description', where, { allowEmpty: true }),
+      areaId: typeof p.areaId === 'string' && areaIds.has(p.areaId) ? p.areaId : null,
+      goalId: typeof p.goalId === 'string' && goalIds.has(p.goalId) ? p.goalId : null,
+      status: oneOf(p, 'status', PROJECT_STATUSES, where),
+      deadline: optionalDate(p, 'deadline', where),
+      milestones,
+      completedAt: optionalStr(p, 'completedAt', where),
+      createdAt: str(p, 'createdAt', where),
+    };
+  });
+  uniqueIds(projects, 'Проекты');
+  const milestonesByProject = new Map(projects.map((p) => [p.id, new Set(p.milestones.map((m) => m.id))]));
+
   const tasks: Task[] = asArray(data.tasks, 'tasks').map((item, i) => {
     const t = asObject(item, `Задача ${i + 1}`);
     const where = `Задача ${i + 1}`;
@@ -423,6 +461,10 @@ export function validateDb(raw: unknown): Db {
       return { id: str(c, 'id', at), text: str(c, 'text', at), done: bool(c, 'done', at) };
     });
     uniqueIds(checklist, `${where}: пункты`);
+    const projectId = typeof t.projectId === 'string' && milestonesByProject.has(t.projectId) ? t.projectId : null;
+    // Веха бывает только у задачи проекта и только из вех этого проекта.
+    const milestoneId =
+      projectId && typeof t.milestoneId === 'string' && milestonesByProject.get(projectId)?.has(t.milestoneId) ? t.milestoneId : null;
     return {
       id: str(t, 'id', where),
       title: str(t, 'title', where),
@@ -432,6 +474,8 @@ export function validateDb(raw: unknown): Db {
       deadline: optionalDate(t, 'deadline', where),
       plannedDate: optionalDate(t, 'plannedDate', where),
       areaId: typeof t.areaId === 'string' && areaIds.has(t.areaId) ? t.areaId : null,
+      projectId,
+      milestoneId,
       checklist,
       completedAt: optionalStr(t, 'completedAt', where),
       createdAt: str(t, 'createdAt', where),
@@ -439,7 +483,7 @@ export function validateDb(raw: unknown): Db {
   });
   uniqueIds(tasks, 'Задачи');
 
-  return { areas, goals, entries, materials, notes, reviews, settings, vacations, tasks };
+  return { areas, goals, entries, materials, notes, reviews, settings, vacations, tasks, projects };
 }
 
 /**

@@ -1,9 +1,9 @@
-import { Check, Flag, ListChecks } from 'lucide-react';
+import { Check, Flag, FolderKanban, ListChecks } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useUpdateTask } from '../../api/hooks';
 import { carriedFrom, checklistProgress } from '../../domain/tasks';
-import type { Area, Task } from '../../domain/types';
+import type { Area, Project, Task } from '../../domain/types';
 import type { IsoDate } from '../../lib/dates';
 import { deadlineTag, planTag } from './taskText';
 
@@ -11,6 +11,8 @@ interface Props {
   task: Task;
   today: IsoDate;
   area?: Area;
+  /** Проект задачи — на странице самого проекта не нужен. */
+  project?: Project;
   /** Показывать дату «когда делаю» (в списке задач; на «Сегодня» она и так сегодня). */
   showPlan?: boolean;
   /** Кнопки справа, например «На завтра». */
@@ -36,7 +38,7 @@ export function TaskCheck({ task }: { task: Task }) {
   );
 }
 
-export function TaskRow({ task, today, area, showPlan = false, actions }: Props) {
+export function TaskRow({ task, today, area, project, showPlan = false, actions }: Props) {
   const closed = task.status === 'done' || task.status === 'cancelled';
   const deadline = task.deadline && !closed ? deadlineTag(task.deadline, today) : null;
   const plan = task.plannedDate && !closed ? planTag(task.plannedDate, today) : null;
@@ -63,6 +65,11 @@ export function TaskRow({ task, today, area, showPlan = false, actions }: Props)
             <span className="num">
               <ListChecks size={13} aria-hidden /> {done}/{total}
             </span>
+          )}
+          {project && (
+            <Link to={`/projects/${project.id}`} className="task-row__project">
+              <FolderKanban size={12} aria-hidden /> {project.title}
+            </Link>
           )}
           {area && (
             <span className={`task-row__area tone-${area.color}`}>

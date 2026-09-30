@@ -105,13 +105,41 @@ export function checklistProgress(task: Pick<Task, 'checklist'>): { done: number
 
 const isClosed = (status: Task['status']) => status === 'done' || status === 'cancelled';
 
-export function createTask(input: TaskInput, ctx: { id: string; now: string }): Task {
-  return { ...input, id: ctx.id, completedAt: isClosed(input.status) ? ctx.now : null, createdAt: ctx.now };
+/** Новая задача: всё, что не указано, — по умолчанию (открытая, без дат, сферы и проекта). */
+export function taskInput(fields: Partial<TaskInput> & Pick<TaskInput, 'title'>): TaskInput {
+  return {
+    notes: '',
+    status: 'todo',
+    important: false,
+    deadline: null,
+    plannedDate: null,
+    areaId: null,
+    projectId: null,
+    milestoneId: null,
+    checklist: [],
+    ...fields,
+  };
 }
 
-/** Изменение задачи: при закрытии запоминается время, при возврате в работу — сбрасывается. */
+export function createTask(input: TaskInput, ctx: { id: string; now: string }): Task {
+  return {
+    ...input,
+    milestoneId: input.projectId === null ? null : input.milestoneId,
+    id: ctx.id,
+    completedAt: isClosed(input.status) ? ctx.now : null,
+    createdAt: ctx.now,
+  };
+}
+
+/**
+ * Изменение задачи: при закрытии запоминается время, при возврате в работу — сбрасывается.
+ * Задача, перенесённая в другой проект или убранная из проекта, теряет веху старого проекта.
+ */
 export function applyTaskPatch(task: Task, patch: TaskPatch, now: string): Task {
   const next: Task = { ...task, ...patch };
+  if (next.projectId === null || (patch.projectId !== undefined && patch.projectId !== task.projectId && patch.milestoneId === undefined)) {
+    next.milestoneId = null;
+  }
   if (patch.status !== undefined && isClosed(patch.status) !== isClosed(task.status)) {
     next.completedAt = isClosed(patch.status) ? now : null;
   }
