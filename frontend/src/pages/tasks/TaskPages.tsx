@@ -32,6 +32,7 @@ import { BackButton } from '../../components/BackButton';
 import { TaskForm, type TaskFields } from '../../components/tasks/TaskForm';
 import { deadlineTag, planTag } from '../../components/tasks/taskText';
 import { useGoBack } from '../../components/useGoBack';
+import { workTask } from '../../domain/projects';
 import { describeRecurrence, previousRepeats } from '../../domain/recurrence';
 import { checklistProgress, completedOn } from '../../domain/tasks';
 import type { ChecklistItem, Project, Task } from '../../domain/types';
@@ -168,7 +169,9 @@ export function TaskPage() {
   // Закрыли повторяющуюся задачу — появился следующий повтор.
   const next = closed ? tasks.find((t) => t.repeatOf === task.id) : undefined;
   const tomorrow = addDays(today, 1);
-  const deadline = task.deadline ? deadlineTag(task.deadline, today) : null;
+  // Своего срока нет — действует срок вехи или проекта.
+  const due = workTask(task, project);
+  const deadline = due.deadline ? deadlineTag(due.deadline, today, due.deadlineFrom) : null;
   const setStatus = (status: Task['status']) => update.mutate({ id: task.id, patch: { status } });
 
   return (
@@ -217,7 +220,7 @@ export function TaskPage() {
               <div className={deadline?.tone && !closed ? `stat__value tag--${deadline.tone}` : 'stat__value'}>
                 {deadline ? deadline.text : 'нет'}
               </div>
-              {task.deadline && <div className="stat__sub">{formatLong(task.deadline)}</div>}
+              {due.deadline && <div className="stat__sub">{formatLong(due.deadline)}</div>}
             </div>
           </div>
 

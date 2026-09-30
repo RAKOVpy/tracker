@@ -2,6 +2,7 @@ import { BookOpen, Check, Flag, FolderKanban, ListChecks, Repeat } from 'lucide-
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useUpdateTask } from '../../api/hooks';
+import type { DeadlineSource } from '../../domain/projects';
 import { describeRecurrence } from '../../domain/recurrence';
 import { carriedFrom, checklistProgress } from '../../domain/tasks';
 import type { Area, Material, Project, Task } from '../../domain/types';
@@ -9,7 +10,8 @@ import type { IsoDate } from '../../lib/dates';
 import { deadlineTag, planTag } from './taskText';
 
 interface Props {
-  task: Task;
+  /** Задача из списков «в работе» знает, чей у неё срок: свой, вехи или проекта. */
+  task: Task & { deadlineFrom?: DeadlineSource | null };
   today: IsoDate;
   area?: Area;
   /** Проект задачи — на странице самого проекта не нужен. */
@@ -43,7 +45,7 @@ export function TaskCheck({ task }: { task: Task }) {
 
 export function TaskRow({ task, today, area, project, material, showPlan = false, actions }: Props) {
   const closed = task.status === 'done' || task.status === 'cancelled';
-  const deadline = task.deadline && !closed ? deadlineTag(task.deadline, today) : null;
+  const deadline = task.deadline && !closed ? deadlineTag(task.deadline, today, task.deadlineFrom) : null;
   const plan = task.plannedDate && !closed ? planTag(task.plannedDate, today) : null;
   const carried = carriedFrom(task, today) !== null;
   const { done, total } = checklistProgress(task);

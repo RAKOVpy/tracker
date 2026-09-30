@@ -1,3 +1,4 @@
+import type { DeadlineSource } from '../../domain/projects';
 import { URGENT_DAYS } from '../../domain/tasks';
 import { diffDays, formatShort, formatWeekday, type IsoDate } from '../../lib/dates';
 
@@ -6,13 +7,21 @@ export interface DateTag {
   tone?: 'bad' | 'warn';
 }
 
+/** Срок, взятый у вехи или проекта, подписан, чей он: «срок вехи сегодня», «проект до 16 окт». */
+const WORDS: Record<DeadlineSource | 'own', { term: string; until: string }> = {
+  own: { term: 'срок', until: 'до' },
+  milestone: { term: 'срок вехи', until: 'веха до' },
+  project: { term: 'срок проекта', until: 'проект до' },
+};
+
 /** «срок прошёл 2 окт», «срок сегодня», «срок завтра», «до пт», «до 16 окт». */
-export function deadlineTag(deadline: IsoDate, today: IsoDate): DateTag {
+export function deadlineTag(deadline: IsoDate, today: IsoDate, from: DeadlineSource | null = null): DateTag {
+  const { term, until } = WORDS[from ?? 'own'];
   const days = diffDays(today, deadline);
-  if (days < 0) return { text: `срок прошёл ${formatShort(deadline)}`, tone: 'bad' };
-  if (days === 0) return { text: 'срок сегодня', tone: 'warn' };
-  if (days === 1) return { text: 'срок завтра', tone: 'warn' };
-  const text = days < 7 ? `до ${formatWeekday(deadline)}` : `до ${formatShort(deadline)}`;
+  if (days < 0) return { text: `${term} прошёл ${formatShort(deadline)}`, tone: 'bad' };
+  if (days === 0) return { text: `${term} сегодня`, tone: 'warn' };
+  if (days === 1) return { text: `${term} завтра`, tone: 'warn' };
+  const text = days < 7 ? `${until} ${formatWeekday(deadline)}` : `${until} ${formatShort(deadline)}`;
   return days <= URGENT_DAYS ? { text, tone: 'warn' } : { text };
 }
 

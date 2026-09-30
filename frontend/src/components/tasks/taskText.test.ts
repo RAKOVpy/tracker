@@ -14,6 +14,16 @@ describe('deadlineTag', () => {
   ])('%s → %s', (deadline, text, tone) => {
     expect(deadlineTag(deadline, TODAY)).toEqual(tone ? { text, tone } : { text });
   });
+
+  it.each([
+    ['2026-10-02', 'milestone', 'срок вехи прошёл 2 окт'],
+    ['2026-10-07', 'milestone', 'срок вехи сегодня'],
+    ['2026-10-08', 'project', 'срок проекта завтра'],
+    ['2026-10-09', 'milestone', 'веха до пт'],
+    ['2026-10-16', 'project', 'проект до 16 окт'],
+  ] as const)('срок чужой: %s, %s → %s', (deadline, from, text) => {
+    expect(deadlineTag(deadline, TODAY, from).text).toBe(text);
+  });
 });
 
 describe('planTag', () => {

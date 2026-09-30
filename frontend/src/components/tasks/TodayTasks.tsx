@@ -2,8 +2,8 @@ import { CalendarArrowUp, Inbox, Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useAreaMap, useCreateTask, useMaterialMap, usePlanTasks, useProjectMap } from '../../api/hooks';
+import { workTask, type WorkTask } from '../../domain/projects';
 import { compareTasks, completedOn, isForToday, postponeCandidates, taskBucket, taskInput } from '../../domain/tasks';
-import type { Task } from '../../domain/types';
 import { addDays, type IsoDate } from '../../lib/dates';
 import { plural } from '../../lib/format';
 import { ParsedChips } from './ParsedChips';
@@ -12,8 +12,8 @@ import { deadlineTag, planTag } from './taskText';
 import { useTaskParser } from './useTaskParser';
 
 interface Props {
-  /** Задачи в работе — без задач проектов на паузе и завершённых. */
-  tasks: Task[];
+  /** Задачи в работе — без задач проектов на паузе и завершённых, со сроками вех и проектов. */
+  tasks: WorkTask[];
   today: IsoDate;
 }
 
@@ -29,7 +29,7 @@ export function TodayTasks({ tasks, today }: Props) {
   const [title, setTitle] = useState('');
   const [confirmingPostpone, setConfirmingPostpone] = useState(false);
   // Задача, добавленная отсюда, но не на сегодня: «до пт» или «каждое вс» — покажем, куда она ушла.
-  const [elsewhere, setElsewhere] = useState<Task | null>(null);
+  const [elsewhere, setElsewhere] = useState<WorkTask | null>(null);
   const { parsed, dismiss, reset } = useTaskParser(title);
 
   const open = tasks.filter((t) => isForToday(t, today)).sort((a, b) => compareTasks(a, b, today));
@@ -53,9 +53,10 @@ export function TodayTasks({ tasks, today }: Props) {
         projectId: parsed.projectId,
       }),
       {
-        onSuccess: (task) => {
+        onSuccess: (created) => {
           setTitle('');
           reset();
+          const task = workTask(created, project);
           setElsewhere(isForToday(task, today) ? null : task);
         },
       },
@@ -63,9 +64,9 @@ export function TodayTasks({ tasks, today }: Props) {
   }
 
   /** «завтра», «до пт» — куда ушла задача, добавленная не на сегодня. */
-  function whenText(task: Task): string {
+  function whenText(task: WorkTask): string {
     if (task.plannedDate) return planTag(task.plannedDate, today) ?? 'сегодня';
-    if (task.deadline) return deadlineTag(task.deadline, today).text;
+    if (task.deadline) return deadlineTag(task.deadline, today, task.deadlineFrom).text;
     return taskBucket(task, today) === 'someday' ? 'без даты' : '';
   }
 

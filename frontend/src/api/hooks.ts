@@ -641,7 +641,7 @@ export function useProjectMap(): Map<string, Project> {
   return useMemo(() => new Map((data ?? []).map((project) => [project.id, project])), [data]);
 }
 
-/** Задачи вместе с проектами: `inWork` — без задач проектов на паузе, завершённых и отменённых. */
+/** Задачи вместе с проектами: `inWork` — без задач проектов на паузе, завершённых и отменённых, со сроками вех и проектов. */
 export function useWork() {
   const tasks = useTasks();
   const projects = useProjects();
