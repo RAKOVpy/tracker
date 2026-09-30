@@ -92,6 +92,7 @@ describe('applyVault', () => {
       url: '',
       areaId: null,
       status: 'active',
+      parts: [],
       obsidianPath: null,
       createdAt: 'x',
     };
@@ -190,7 +191,7 @@ describe('applyVault', () => {
     expect(result.notes[0].materialId).toBe(result.materials[0].id);
   });
 
-  it('материал по ссылке без страницы создаётся; статус материала из трекера не перезаписывается', () => {
+  it('материал по ссылке без страницы создаётся; статус и части материала из трекера не перезаписываются', () => {
     const existing: Material = {
       id: 'm1',
       title: 'Алгоритмы',
@@ -199,6 +200,7 @@ describe('applyVault', () => {
       url: '',
       areaId: null,
       status: 'done',
+      parts: [{ id: 'p1', title: 'Лекция 1', status: 'summarized' }],
       obsidianPath: 'Материалы/Алгоритмы.md',
       createdAt: 'x',
     };
@@ -208,7 +210,8 @@ describe('applyVault', () => {
       vault([parsedNote({ materialRef: 'English Grammar in Use' })], [page]),
       ctx(),
     );
-    expect(result.materials.find((m) => m.id === 'm1')).toMatchObject({ status: 'done', author: 'Кормен' });
+    expect(result.materials.find((m) => m.id === 'm1')).toMatchObject({ status: 'done', author: 'Кормен', parts: existing.parts });
+    expect(result.materials.find((m) => m.title === 'English Grammar in Use')?.parts).toEqual([]);
     expect(result.report.materialsUpdated).toEqual(['Алгоритмы']);
     expect(result.report.materialsCreated).toEqual(['English Grammar in Use']);
     expect(result.materials.find((m) => m.title === 'English Grammar in Use')).toMatchObject({ type: 'other', status: 'active' });

@@ -1,9 +1,10 @@
-import { Check, Flag, FolderKanban, ListChecks } from 'lucide-react';
+import { BookOpen, Check, Flag, FolderKanban, ListChecks, Repeat } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useUpdateTask } from '../../api/hooks';
+import { describeRecurrence } from '../../domain/recurrence';
 import { carriedFrom, checklistProgress } from '../../domain/tasks';
-import type { Area, Project, Task } from '../../domain/types';
+import type { Area, Material, Project, Task } from '../../domain/types';
 import type { IsoDate } from '../../lib/dates';
 import { deadlineTag, planTag } from './taskText';
 
@@ -13,6 +14,8 @@ interface Props {
   area?: Area;
   /** Проект задачи — на странице самого проекта не нужен. */
   project?: Project;
+  /** Материал задачи — на странице самого материала не нужен. */
+  material?: Material;
   /** Показывать дату «когда делаю» (в списке задач; на «Сегодня» она и так сегодня). */
   showPlan?: boolean;
   /** Кнопки справа, например «На завтра». */
@@ -38,7 +41,7 @@ export function TaskCheck({ task }: { task: Task }) {
   );
 }
 
-export function TaskRow({ task, today, area, project, showPlan = false, actions }: Props) {
+export function TaskRow({ task, today, area, project, material, showPlan = false, actions }: Props) {
   const closed = task.status === 'done' || task.status === 'cancelled';
   const deadline = task.deadline && !closed ? deadlineTag(task.deadline, today) : null;
   const plan = task.plannedDate && !closed ? planTag(task.plannedDate, today) : null;
@@ -61,6 +64,11 @@ export function TaskRow({ task, today, area, project, showPlan = false, actions 
           )}
           {deadline && <span className={deadline.tone ? `tag tag--${deadline.tone}` : undefined}>{deadline.text}</span>}
           {plan && (showPlan || carried) && <span>{plan}</span>}
+          {task.recurrence && !closed && (
+            <span>
+              <Repeat size={12} aria-hidden /> {describeRecurrence(task.recurrence)}
+            </span>
+          )}
           {total > 0 && (
             <span className="num">
               <ListChecks size={13} aria-hidden /> {done}/{total}
@@ -69,6 +77,11 @@ export function TaskRow({ task, today, area, project, showPlan = false, actions 
           {project && (
             <Link to={`/projects/${project.id}`} className="task-row__project">
               <FolderKanban size={12} aria-hidden /> {project.title}
+            </Link>
+          )}
+          {material && (
+            <Link to={`/knowledge/materials/${material.id}`} className="task-row__project">
+              <BookOpen size={12} aria-hidden /> {material.title}
             </Link>
           )}
           {area && (

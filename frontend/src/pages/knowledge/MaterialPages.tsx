@@ -1,6 +1,6 @@
 import { ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   startCheckFor,
   useAreaMap,
@@ -8,6 +8,7 @@ import {
   useCreateMaterial,
   useDeleteMaterial,
   useKnowledge,
+  useTasks,
   useUpdateMaterial,
 } from '../../api/hooks';
 import { BackButton } from '../../components/BackButton';
@@ -15,6 +16,7 @@ import { useGoBack } from '../../components/useGoBack';
 import { MATERIAL_ICONS } from '../../components/knowledge/format';
 import { MaterialForm } from '../../components/knowledge/MaterialForm';
 import { NoteRow } from '../../components/knowledge/parts';
+import { PartsSection } from '../../components/knowledge/PartsSection';
 import { StartMaterialConfirm } from '../../components/knowledge/StartMaterial';
 import { MATERIAL_STATUSES, MATERIAL_STATUS_ORDER, MATERIAL_TYPES } from '../../domain/meta';
 import type { MaterialInput, MaterialStatus } from '../../domain/types';
@@ -25,16 +27,18 @@ export function MaterialPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const { data, today, isLoading, error } = useKnowledge();
+  const tasks = useTasks();
   const areas = useAreaMap();
   const updateMaterial = useUpdateMaterial();
   const deleteMaterial = useDeleteMaterial();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [confirmingStart, setConfirmingStart] = useState(false);
 
-  if (isLoading) return <LoadingState />;
-  if (error || !data) return <ErrorState error={error} />;
+  if (isLoading || tasks.isLoading) return <LoadingState />;
+  if (error || tasks.error || !data || !tasks.data) return <ErrorState error={error ?? tasks.error} />;
   const material = data.materials.find((m) => m.id === id);
   if (!material) return <NotFoundState title="Материал не найден" back="/knowledge" />;
+  const materialTasks = tasks.data.filter((t) => t.materialId === material.id);
 
   const startCheck = startCheckFor(data, material.id);
   const setStatus = (status: MaterialStatus) =>
@@ -111,6 +115,8 @@ export function MaterialPage() {
           )}
         </div>
 
+        <PartsSection material={material} tasks={tasks.data} today={today} />
+
         <section className="card stack">
           <div className="panel-head">
             <h2 className="section__title" style={{ margin: 0 }}>
@@ -140,6 +146,8 @@ export function MaterialPage() {
               {notes.length > 0
                 ? `${notes.length} ${plural(notes.length, ['заметка останется', 'заметки останутся', 'заметок останутся'])} без материала, повторения не пропадут.`
                 : 'Заметок у него нет.'}
+              {materialTasks.length > 0 &&
+                ` ${materialTasks.length} ${plural(materialTasks.length, ['задача останется', 'задачи останутся', 'задач останутся'])} без материала.`}
             </p>
             <div className="row">
               <button
@@ -187,6 +195,7 @@ export function NewMaterialPage() {
     areaId: null,
     // Если лимит заполнен или есть долг, новый материал по умолчанию ждёт в очереди.
     status: startCheck.blockers.length > 0 ? 'queued' : 'active',
+    parts: [],
   };
 
   return (
@@ -211,14 +220,22 @@ export function NewMaterialPage() {
 
 export function EditMaterialPage() {
   const { id = '' } = useParams();
+  const { hash } = useLocation();
   const knowledge = useKnowledge();
   const areas = useAreas();
+  const tasks = useTasks();
   const updateMaterial = useUpdateMaterial();
   const goBack = useGoBack(`/knowledge/materials/${id}`);
+  const ready = Boolean(knowledge.data && areas.data && tasks.data);
 
-  if (knowledge.isLoading || areas.isLoading) return <LoadingState />;
-  if (knowledge.error || areas.error || !knowledge.data || !areas.data) {
-    return <ErrorState error={knowledge.error ?? areas.error} />;
+  // «Изменить» у частей ведёт сразу к ним: /edit#parts.
+  useEffect(() => {
+    if (ready && hash) document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
+  }, [ready, hash]);
+
+  if (knowledge.isLoading || areas.isLoading || tasks.isLoading) return <LoadingState />;
+  if (knowledge.error || areas.error || tasks.error || !knowledge.data || !areas.data || !tasks.data) {
+    return <ErrorState error={knowledge.error ?? areas.error ?? tasks.error} />;
   }
   const material = knowledge.data.materials.find((m) => m.id === id);
   if (!material) return <NotFoundState title="Материал не найден" back="/knowledge" />;
@@ -230,7 +247,12 @@ export function EditMaterialPage() {
     url: material.url,
     areaId: material.areaId,
     status: material.status,
+    parts: material.parts,
   };
+  const partTasks = new Map<string, number>();
+  for (const task of tasks.data) {
+    if (task.materialId === material.id && task.partId) partTasks.set(task.partId, (partTasks.get(task.partId) ?? 0) + 1);
+  }
 
   return (
     <>
@@ -250,6 +272,7 @@ export function EditMaterialPage() {
         areas={areas.data}
         initial={initial}
         startCheck={material.status === 'active' ? undefined : startCheckFor(knowledge.data, material.id)}
+        partTasks={partTasks}
         submitLabel="Сохранить"
         isSubmitting={updateMaterial.isPending}
         onSubmit={(patch) => updateMaterial.mutate({ id, patch }, { onSuccess: goBack })}

@@ -3,7 +3,7 @@ import { Brain, NotebookPen, Plus, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { seedKnowledgeDemo } from '../../api/demo';
-import { useAreaMap, useKnowledge } from '../../api/hooks';
+import { useAreaMap, useKnowledge, useTasks } from '../../api/hooks';
 import { DueReviewsCard } from '../../components/knowledge/DueReviewsCard';
 import { LoadForecast } from '../../components/knowledge/LoadForecast';
 import { MaterialCard } from '../../components/knowledge/MaterialCard';
@@ -55,6 +55,7 @@ function EmptyKnowledge() {
 
 export function KnowledgePage() {
   const { data, today, isLoading, error } = useKnowledge();
+  const tasks = useTasks();
   const areas = useAreaMap();
   const obsidian = useObsidian();
 
@@ -116,6 +117,8 @@ export function KnowledgePage() {
               material={m}
               area={m.areaId ? areas.get(m.areaId) : undefined}
               notes={notesByMaterial.get(m.id) ?? []}
+              tasks={tasks.data ?? []}
+              today={today}
             />
           ))}
         </div>

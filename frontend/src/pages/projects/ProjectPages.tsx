@@ -16,8 +16,10 @@ import { BackButton } from '../../components/BackButton';
 import { describePace } from '../../components/pace';
 import { ProgressBar } from '../../components/ProgressBar';
 import { ProjectForm, type ProjectFields } from '../../components/projects/ProjectForm';
+import { ParsedChips } from '../../components/tasks/ParsedChips';
 import { TaskRow } from '../../components/tasks/TaskRow';
 import { deadlineTag } from '../../components/tasks/taskText';
+import { useTaskParser } from '../../components/tasks/useTaskParser';
 import { useGoBack } from '../../components/useGoBack';
 import {
   compareProjectTasks,
@@ -38,28 +40,46 @@ import { ErrorState, LoadingState, NotFoundState } from '../states';
 const tasksWord = (n: number) => plural(n, ['задача', 'задачи', 'задач']);
 
 /** Добавить задачу прямо в веху (или в проект без вехи). */
-function AddTask({ project, milestone }: { project: Project; milestone: Milestone | null }) {
+function AddTask({ project, milestone, today }: { project: Project; milestone: Milestone | null; today: IsoDate }) {
   const create = useCreateTask();
   const [title, setTitle] = useState('');
+  // Проект уже выбран — «#» ищет только сферы.
+  const { parsed, dismiss, reset } = useTaskParser(title, { projects: false });
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    const text = title.trim();
-    if (!text) return;
+    if (!parsed.title) return;
     create.mutate(
-      taskInput({ title: text, projectId: project.id, milestoneId: milestone?.id ?? null, areaId: project.areaId }),
-      { onSuccess: () => setTitle('') },
+      taskInput({
+        title: parsed.title,
+        plannedDate: parsed.plannedDate,
+        deadline: parsed.deadline,
+        recurrence: parsed.recurrence,
+        important: parsed.important,
+        projectId: project.id,
+        milestoneId: milestone?.id ?? null,
+        areaId: parsed.areaId ?? project.areaId,
+      }),
+      {
+        onSuccess: () => {
+          setTitle('');
+          reset();
+        },
+      },
     );
   }
 
   const label = milestone ? `Новая задача в «${milestone.title}»` : 'Новая задача проекта';
   return (
-    <form className="today-tasks__add milestone__add" onSubmit={submit}>
-      <input className="input" placeholder="Добавить задачу" aria-label={label} value={title} onChange={(e) => setTitle(e.target.value)} />
-      <button className="btn btn--sm" type="submit" disabled={!title.trim() || create.isPending} aria-label="Добавить">
-        <Plus size={15} aria-hidden />
-      </button>
-    </form>
+    <>
+      <form className="today-tasks__add milestone__add" onSubmit={submit}>
+        <input className="input" placeholder="Добавить задачу" aria-label={label} value={title} onChange={(e) => setTitle(e.target.value)} />
+        <button className="btn btn--sm" type="submit" disabled={!parsed.title || create.isPending} aria-label="Добавить">
+          <Plus size={15} aria-hidden />
+        </button>
+      </form>
+      <ParsedChips parsed={parsed} today={today} onDismiss={dismiss} />
+    </>
   );
 }
 
@@ -113,7 +133,7 @@ function TaskSection({ project, milestone, tasks, today, areas, title }: Section
           ))}
         </ul>
       )}
-      <AddTask project={project} milestone={milestone} />
+      <AddTask project={project} milestone={milestone} today={today} />
     </section>
   );
 }

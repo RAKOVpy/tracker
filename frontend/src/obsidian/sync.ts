@@ -122,7 +122,7 @@ export function applyVault(
         report.materialsUpdated.push(parsed.title);
       }
     } else {
-      materials.push({ ...fields, id: ctx.newId(), areaId, status: newMaterialStatus(parsed.title), createdAt: ctx.now });
+      materials.push({ ...fields, id: ctx.newId(), areaId, status: newMaterialStatus(parsed.title), parts: [], createdAt: ctx.now });
       report.materialsCreated.push(parsed.title);
     }
   }
@@ -138,6 +138,7 @@ export function applyVault(
       url: '',
       areaId: null,
       status: newMaterialStatus(ref),
+      parts: [],
       obsidianPath: null,
       createdAt: ctx.now,
     };

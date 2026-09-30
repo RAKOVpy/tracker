@@ -3,7 +3,7 @@ import { FolderKanban, Inbox, Plus, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { seedTasksDemo } from '../../api/demo';
-import { useAreaMap, useProjectMap, useToday, useWork } from '../../api/hooks';
+import { useAreaMap, useMaterialMap, useProjectMap, useToday, useWork } from '../../api/hooks';
 import { useQuickCapture } from '../../components/quickCapture';
 import { TaskRow } from '../../components/tasks/TaskRow';
 import {
@@ -65,6 +65,7 @@ export function TasksPage() {
   const { data: work, isLoading, error } = useWork();
   const areas = useAreaMap();
   const projects = useProjectMap();
+  const materials = useMaterialMap();
   const [params, setParams] = useSearchParams();
   const view = params.get('view') === 'matrix' ? 'matrix' : 'dates';
 
@@ -86,6 +87,7 @@ export function TasksPage() {
       today={today}
       area={task.areaId ? areas.get(task.areaId) : undefined}
       project={task.projectId ? projects.get(task.projectId) : undefined}
+      material={task.materialId ? materials.get(task.materialId) : undefined}
       showPlan={showPlan}
     />
   );

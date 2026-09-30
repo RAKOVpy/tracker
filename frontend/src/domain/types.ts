@@ -68,6 +68,20 @@ export type MaterialType = 'book' | 'course' | 'lecture' | 'article' | 'video' |
 /** queued — «хочу изучить», active — изучаю сейчас, done — изучено, dropped — бросил. */
 export type MaterialStatus = 'queued' | 'active' | 'done' | 'dropped';
 
+/** Часть материала: todo — не начата; studied — прочитана (просмотрена, пройдена); summarized — законспектирована. */
+export type PartStatus = 'todo' | 'studied' | 'summarized';
+
+/**
+ * Часть материала: глава, лекция, урок. Конспект части — задача, связанная с частью:
+ * когда она сделана, часть считается законспектированной (см. domain/parts.ts).
+ */
+export interface MaterialPart {
+  id: string;
+  title: string;
+  /** Отметка вручную. */
+  status: PartStatus;
+}
+
 /** Источник знаний: книга, курс, лекция. Заметки обычно относятся к материалу. */
 export interface Material {
   id: string;
@@ -77,6 +91,8 @@ export interface Material {
   url: string;
   areaId: string | null;
   status: MaterialStatus;
+  /** Части по порядку; ведутся в трекере, синхронизация с Obsidian их не трогает. */
+  parts: MaterialPart[];
   /** Путь к странице материала в хранилище Obsidian; null — создан в трекере. */
   obsidianPath: string | null;
   createdAt: string;
@@ -160,6 +176,22 @@ export interface Vacation {
 /** inbox — записано во «Входящие» и ещё не разобрано; todo — задача; done — сделана; cancelled — не буду делать. */
 export type TaskStatus = 'inbox' | 'todo' | 'done' | 'cancelled';
 
+export type RepeatUnit = 'day' | 'week' | 'month' | 'year';
+
+/**
+ * Повтор задачи: «каждое вс», «каждые 2 недели по пн и чт», «каждый месяц 10-го».
+ * Когда задачу закрывают, появляется следующая — с датами на следующий повтор (см. domain/recurrence.ts).
+ */
+export interface Recurrence {
+  unit: RepeatUnit;
+  /** Каждые сколько единиц: 1 — каждый день (неделю, месяц), 2 — через один. */
+  interval: number;
+  /** Дни недели для недельного повтора, 0 — пн … 6 — вс; у остальных единиц — пусто. */
+  weekdays: number[];
+  /** Начало отсчёта: от него считаются недели «через одну», число месяца и день года. */
+  start: IsoDate;
+}
+
 export interface ChecklistItem {
   id: string;
   text: string;
@@ -185,8 +217,15 @@ export interface Task {
   /** Проект, к которому относится задача, и его веха. Веха бывает только у задачи проекта. */
   projectId: string | null;
   milestoneId: string | null;
+  /** Материал и его часть: «Законспектировать главу 5». Часть бывает только вместе с материалом. */
+  materialId: string | null;
+  partId: string | null;
   /** Подзадачи — чек-лист. */
   checklist: ChecklistItem[];
+  /** Повтор; null — задача разовая. */
+  recurrence: Recurrence | null;
+  /** Из какой задачи появился этот повтор; null — не повтор. */
+  repeatOf: string | null;
   /** Когда задачу сделали или отменили. */
   completedAt: string | null;
   createdAt: string;
@@ -194,7 +233,19 @@ export interface Task {
 
 export type TaskInput = Pick<
   Task,
-  'title' | 'notes' | 'status' | 'important' | 'deadline' | 'plannedDate' | 'areaId' | 'projectId' | 'milestoneId' | 'checklist'
+  | 'title'
+  | 'notes'
+  | 'status'
+  | 'important'
+  | 'deadline'
+  | 'plannedDate'
+  | 'areaId'
+  | 'projectId'
+  | 'milestoneId'
+  | 'materialId'
+  | 'partId'
+  | 'checklist'
+  | 'recurrence'
 >;
 export type TaskPatch = Partial<TaskInput>;
 

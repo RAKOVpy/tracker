@@ -35,6 +35,18 @@ export function addMonths(date: IsoDate, months: number): IsoDate {
   return fromUtcMs(target.getTime());
 }
 
+/** Число месяцев между датами по календарю, без учёта дней: с 31 янв по 1 фев — 1. */
+export function monthsBetween(from: IsoDate, to: IsoDate): number {
+  const [y1, m1] = from.split('-').map(Number);
+  const [y2, m2] = to.split('-').map(Number);
+  return (y2 - y1) * 12 + (m2 - m1);
+}
+
+/** День недели: 0 — понедельник … 6 — воскресенье (как weekday() в Python). */
+export function weekdayIndex(date: IsoDate): number {
+  return (new Date(toUtcMs(date)).getUTCDay() + 6) % 7;
+}
+
 /** Количество дней от `from` до `to` (to - from). */
 export function diffDays(from: IsoDate, to: IsoDate): number {
   return Math.round((toUtcMs(to) - toUtcMs(from)) / DAY_MS);

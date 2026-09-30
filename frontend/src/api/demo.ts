@@ -1,4 +1,5 @@
-import type { AreaInput, ExplainAnswer, NoteInput, Rating, TaskInput } from '../domain/types';
+import type { AreaInput, ExplainAnswer, MaterialPart, NoteInput, Rating, TaskInput } from '../domain/types';
+import { anchorRecurrence } from '../domain/recurrence';
 import { taskInput } from '../domain/tasks';
 import { addDays, todayIso } from '../lib/dates';
 import { api } from '.';
@@ -75,7 +76,7 @@ export async function seedAllDemo(): Promise<void> {
 
 /**
  * Пример задач и проектов: задача на сегодня, перенесённая со вчера, срочная, на неделе, без даты,
- * сделанная, «Входящие» и два проекта с вехами — один связан с целью по английскому.
+ * сделанная, повторяющиеся, «Входящие» и два проекта с вехами — один связан с целью по английскому.
  */
 export async function seedTasksDemo(): Promise<void> {
   const today = todayIso();
@@ -112,11 +113,11 @@ export async function seedTasksDemo(): Promise<void> {
     taskInput({
       ...inSeminar,
       milestoneId: material.id,
-      title: 'Законспектировать лекцию 5 по алгоритмам',
+      title: 'Собрать материал про обход графов',
       important: true,
       plannedDate: today,
       deadline: addDays(today, 2),
-      checklist: [item('Пересмотреть запись', true), item('Выписать определения'), item('Сделать 3 заметки с вопросами')],
+      checklist: [item('Пересмотреть лекцию про графы', true), item('Выписать определения'), item('Подобрать пример для слайда')],
     }),
     taskInput({
       ...inSeminar,
@@ -132,7 +133,17 @@ export async function seedTasksDemo(): Promise<void> {
     taskInput({ ...inIelts, milestoneId: writing.id, title: 'Написать эссе Task 2 и проверить по критериям', plannedDate: addDays(today, 2) }),
     taskInput({ ...inIelts, milestoneId: writing.id, title: 'Выучить 20 связок для эссе' }),
     taskInput({ title: 'Ответить на письмо куратора', plannedDate: addDays(today, -1) }),
-    taskInput({ title: 'Оплатить интернет', deadline: addDays(today, 1) }),
+    taskInput({
+      title: 'Оплатить интернет',
+      ...anchorRecurrence({ unit: 'month', interval: 1, weekdays: [], start: today }, { plannedDate: null, deadline: addDays(today, 1) }, today),
+    }),
+    taskInput({
+      title: 'Разбор недели',
+      notes: 'Что получилось, что мешало, фокус на следующую неделю.',
+      checklist: [item('Разобрать входящие'), item('Посмотреть цели, где отстаю'), item('Выбрать 3 главных дела')],
+      // Ближайшее воскресенье, дальше — каждое.
+      ...anchorRecurrence({ unit: 'week', interval: 1, weekdays: [6], start: today }, { plannedDate: null, deadline: null }, today),
+    }),
     taskInput({ title: 'Разобрать фотографии с отпуска' }),
     taskInput({ title: 'Записаться к стоматологу', plannedDate: today, status: 'done' }),
     taskInput({ title: 'Позвонить в банк про карту', status: 'inbox' }),
@@ -148,14 +159,27 @@ export async function seedKnowledgeDemo(): Promise<void> {
   // Пример не должен сразу нарушать лимит «Изучаю» из настроек.
   const { activeMaterialsLimit } = await api.getSettings();
 
+  // Лекции 1–2 законспектированы, по 3-й конспект сделан задачей, 4-я прочитана и конспект на сегодня.
+  const lectures: MaterialPart[] = Array.from({ length: 8 }, (_, i) => ({
+    id: crypto.randomUUID(),
+    title: `Лекция ${i + 1}`,
+    status: i < 2 ? 'summarized' : i < 4 ? 'studied' : 'todo',
+  }));
+  const study = await findOrCreateArea({ name: 'Учёба', color: 'clay', icon: 'study' });
   const algorithms = await api.createMaterial({
     title: 'Алгоритмы и структуры данных',
     type: 'course',
     author: '',
     url: '',
-    areaId: await findOrCreateArea({ name: 'Учёба', color: 'clay', icon: 'study' }),
+    areaId: study,
     status: 'active',
+    parts: lectures,
   });
+  const summary = { materialId: algorithms.id, areaId: study };
+  await api.createTask(taskInput({ ...summary, partId: lectures[2].id, title: 'Законспектировать: Лекция 3', status: 'done' }));
+  await api.createTask(
+    taskInput({ ...summary, partId: lectures[3].id, title: 'Законспектировать: Лекция 4', plannedDate: today, deadline: addDays(today, 2) }),
+  );
   const grammar = await api.createMaterial({
     title: 'English Grammar in Use',
     type: 'book',
@@ -163,6 +187,7 @@ export async function seedKnowledgeDemo(): Promise<void> {
     url: '',
     areaId: await findOrCreateArea({ name: 'Языки', color: 'slate', icon: 'languages' }),
     status: activeMaterialsLimit >= 2 ? 'active' : 'queued',
+    parts: [],
   });
   await api.createMaterial({
     title: 'Думай медленно… решай быстро',
@@ -171,6 +196,7 @@ export async function seedKnowledgeDemo(): Promise<void> {
     url: '',
     areaId: await findOrCreateArea({ name: 'Чтение', color: 'ochre', icon: 'book' }),
     status: 'queued',
+    parts: [],
   });
 
   async function note(input: NoteInput, addedOffset: number, log: LogItem[]) {

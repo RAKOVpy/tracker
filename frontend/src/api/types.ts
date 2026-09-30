@@ -55,8 +55,9 @@ export interface TrackerApi {
 
   listMaterials(): Promise<Material[]>;
   createMaterial(input: MaterialInput): Promise<Material>;
+  /** Задачи удалённых частей остаются у материала без части. */
   updateMaterial(id: string, patch: MaterialPatch): Promise<Material>;
-  /** Заметки удалённого материала остаются без материала. */
+  /** Заметки и задачи удалённого материала остаются без материала. */
   deleteMaterial(id: string): Promise<void>;
 
   listNotes(): Promise<Note[]>;
@@ -84,8 +85,13 @@ export interface TrackerApi {
   /** Задачи вместе со «Входящими» (статус inbox). */
   listTasks(): Promise<Task[]>;
   createTask(input: TaskInput): Promise<Task>;
-  /** При смене статуса на done/cancelled запоминается время, при возврате — сбрасывается. */
+  /**
+   * При смене статуса на done/cancelled запоминается время, при возврате — сбрасывается.
+   * Закрытая повторяющаяся задача порождает следующий повтор, возврат в работу его убирает
+   * (см. applyTaskUpdate в domain/tasks.ts).
+   */
   updateTask(id: string, patch: TaskPatch): Promise<Task>;
+  /** Следующий повтор удалённой задачи остаётся, но уже без ссылки на неё. */
   deleteTask(id: string): Promise<void>;
 
   listProjects(): Promise<Project[]>;

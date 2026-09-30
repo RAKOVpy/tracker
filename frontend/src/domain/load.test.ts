@@ -99,6 +99,7 @@ describe('checkStart', () => {
     id,
     title: id,
     type: 'book',
+    parts: [],
     author: '',
     url: '',
     areaId: null,

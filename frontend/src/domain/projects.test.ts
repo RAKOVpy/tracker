@@ -35,7 +35,7 @@ function project(overrides: Partial<Project> = {}): Project {
 }
 
 function task(id: string, fields: Partial<Task> = {}): Task {
-  return { ...taskInput({ title: id, projectId: 'p1' }), id, completedAt: null, createdAt: `2026-10-01T00:00:0${id.length}Z`, ...fields };
+  return { ...taskInput({ title: id, projectId: 'p1' }), id, repeatOf: null, completedAt: null, createdAt: `2026-10-01T00:00:0${id.length}Z`, ...fields };
 }
 
 describe('tasksInWork', () => {

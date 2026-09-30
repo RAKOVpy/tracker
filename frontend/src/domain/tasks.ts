@@ -1,4 +1,5 @@
 import { diffDays, todayIso, type IsoDate } from '../lib/dates';
+import { nextInstance } from './recurrence';
 import type { Task, TaskInput, TaskPatch } from './types';
 
 /**
@@ -103,9 +104,9 @@ export function checklistProgress(task: Pick<Task, 'checklist'>): { done: number
   return { done: task.checklist.filter((item) => item.done).length, total: task.checklist.length };
 }
 
-const isClosed = (status: Task['status']) => status === 'done' || status === 'cancelled';
+export const isClosed = (status: Task['status']) => status === 'done' || status === 'cancelled';
 
-/** Новая задача: всё, что не указано, — по умолчанию (открытая, без дат, сферы и проекта). */
+/** Новая задача: всё, что не указано, — по умолчанию (открытая, разовая, без дат, сферы, проекта и материала). */
 export function taskInput(fields: Partial<TaskInput> & Pick<TaskInput, 'title'>): TaskInput {
   return {
     notes: '',
@@ -116,7 +117,10 @@ export function taskInput(fields: Partial<TaskInput> & Pick<TaskInput, 'title'>)
     areaId: null,
     projectId: null,
     milestoneId: null,
+    materialId: null,
+    partId: null,
     checklist: [],
+    recurrence: null,
     ...fields,
   };
 }
@@ -125,25 +129,67 @@ export function createTask(input: TaskInput, ctx: { id: string; now: string }): 
   return {
     ...input,
     milestoneId: input.projectId === null ? null : input.milestoneId,
+    partId: input.materialId === null ? null : input.partId,
+    repeatOf: null,
     id: ctx.id,
     completedAt: isClosed(input.status) ? ctx.now : null,
     createdAt: ctx.now,
   };
 }
 
+/** Сменили родителя (проект, материал) и не указали новую вложенную ссылку — старая к нему не относится. */
+function parentChanged<K extends keyof TaskPatch>(task: Task, patch: TaskPatch, parent: K, child: keyof TaskPatch): boolean {
+  return patch[parent] !== undefined && patch[parent] !== task[parent] && patch[child] === undefined;
+}
+
 /**
  * Изменение задачи: при закрытии запоминается время, при возврате в работу — сбрасывается.
- * Задача, перенесённая в другой проект или убранная из проекта, теряет веху старого проекта.
+ * Задача, перенесённая в другой проект или убранная из проекта, теряет веху старого проекта;
+ * так же с материалом и его частью.
  */
 export function applyTaskPatch(task: Task, patch: TaskPatch, now: string): Task {
   const next: Task = { ...task, ...patch };
-  if (next.projectId === null || (patch.projectId !== undefined && patch.projectId !== task.projectId && patch.milestoneId === undefined)) {
-    next.milestoneId = null;
-  }
+  if (next.projectId === null || parentChanged(task, patch, 'projectId', 'milestoneId')) next.milestoneId = null;
+  if (next.materialId === null || parentChanged(task, patch, 'materialId', 'partId')) next.partId = null;
   if (patch.status !== undefined && isClosed(patch.status) !== isClosed(task.status)) {
     next.completedAt = isClosed(patch.status) ? now : null;
   }
   return next;
+}
+
+/** Следующий повтор не трогали: открыт, те же название и заметки, подзадачи не отмечены. */
+function untouchedRepeat(next: Task, task: Task): boolean {
+  return (
+    next.status === 'todo' && next.title === task.title && next.notes === task.notes && next.checklist.every((item) => !item.done)
+  );
+}
+
+/**
+ * Изменение задачи вместе с её повторами:
+ * - закрыли повторяющуюся задачу (сделали или пропустили) — появляется следующий повтор;
+ * - вернули в работу — следующий повтор убирается, если его ещё не трогали, и серия продолжается
+ *   этой задачей; если трогали, серию продолжает он, а эта задача становится разовой.
+ */
+export function applyTaskUpdate(
+  tasks: Task[],
+  id: string,
+  patch: TaskPatch,
+  ctx: { now: string; today: IsoDate; newId: () => string },
+): Task[] {
+  const before = tasks.find((t) => t.id === id);
+  if (!before) return tasks;
+  const task = applyTaskPatch(before, patch, ctx.now);
+  let result = tasks.map((t) => (t.id === id ? task : t));
+  const next = result.find((t) => t.repeatOf === id);
+
+  if (task.recurrence && isClosed(task.status) && !isClosed(before.status) && !next) {
+    result.push(nextInstance(task, ctx.today, { id: ctx.newId(), now: ctx.now }));
+  } else if (task.recurrence && !isClosed(task.status) && isClosed(before.status) && next) {
+    result = untouchedRepeat(next, task)
+      ? result.filter((t) => t.id !== next.id)
+      : result.map((t) => (t.id === id ? { ...t, recurrence: null } : t));
+  }
+  return result;
 }
 
 /**

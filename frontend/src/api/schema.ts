@@ -6,27 +6,32 @@ import type {
   Goal,
   GoalStatus,
   Material,
+  MaterialPart,
   MaterialStatus,
   MaterialType,
   Note,
+  PartStatus,
   Priority,
   ProgressEntry,
   Project,
   ProjectStatus,
   Rating,
+  Recurrence,
+  RepeatUnit,
   Review,
   Settings,
   Task,
   TaskStatus,
   Vacation,
 } from '../domain/types';
+import { REPEAT_INTERVAL_MAX } from '../domain/recurrence';
 import { sortVacations } from '../domain/vacation';
 
 /**
  * Схема данных в хранилище и в файлах резервных копий.
  * При изменении модели: увеличить SCHEMA_VERSION и добавить шаг в MIGRATIONS.
  */
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 export interface Db {
   areas: Area[];
@@ -132,6 +137,19 @@ function v6ToV7(raw: Raw): Raw {
   return { ...raw, tasks, projects: [] };
 }
 
+/** v7 → v8: части материалов; у задач — повтор, материал и часть. */
+function v7ToV8(raw: Raw): Raw {
+  const tasks = asArray(raw.tasks, 'tasks').map((item) => ({
+    ...asObject(item, 'task'),
+    materialId: null,
+    partId: null,
+    recurrence: null,
+    repeatOf: null,
+  }));
+  const materials = asArray(raw.materials, 'materials').map((item) => ({ ...asObject(item, 'material'), parts: [] }));
+  return { ...raw, tasks, materials };
+}
+
 const MIGRATIONS: Record<number, (raw: Raw, ctx: Ctx) => Raw> = {
   1: v1ToV2,
   2: v2ToV3,
@@ -139,6 +157,7 @@ const MIGRATIONS: Record<number, (raw: Raw, ctx: Ctx) => Raw> = {
   4: v4ToV5,
   5: v5ToV6,
   6: v6ToV7,
+  7: v7ToV8,
 };
 
 /** Приводит данные любой известной версии к текущей схеме и проверяет их. */
@@ -190,6 +209,8 @@ const RATINGS: Rating[] = ['again', 'hard', 'good', 'easy'];
 const EXPLAIN_ANSWERS: ExplainAnswer[] = ['no', 'hints', 'yes'];
 const TASK_STATUSES: TaskStatus[] = ['inbox', 'todo', 'done', 'cancelled'];
 const PROJECT_STATUSES: ProjectStatus[] = ['active', 'paused', 'done', 'dropped'];
+const PART_STATUSES: PartStatus[] = ['todo', 'studied', 'summarized'];
+const REPEAT_UNITS: RepeatUnit[] = ['day', 'week', 'month', 'year'];
 
 function isObject(value: unknown): value is Raw {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -279,8 +300,9 @@ function uniqueIds(items: { id: string }[], what: string): void {
 /**
  * Проверяет данные и возвращает чистую копию только с известными полями.
  * Висячие ссылки чинятся: цель, материал, задача или проект удалённой сферы остаются без сферы, проект
- * удалённой цели — без цели, задача удалённого проекта или вехи — без них, заметка удалённого
- * материала — без материала, записи и повторения удалённых целей и заметок отбрасываются.
+ * удалённой цели — без цели, задача удалённого проекта или вехи, материала или части — без них, повтор
+ * удалённой задачи — без ссылки на неё, заметка удалённого материала — без материала, записи
+ * и повторения удалённых целей и заметок отбрасываются.
  */
 export function validateDb(raw: unknown): Db {
   const data = asObject(raw, 'data');
@@ -345,6 +367,12 @@ export function validateDb(raw: unknown): Db {
   const materials: Material[] = asArray(data.materials, 'materials').map((item, i) => {
     const m = asObject(item, `Материал ${i + 1}`);
     const where = `Материал ${i + 1}`;
+    const parts: MaterialPart[] = asArray(m.parts, `${where}: parts`).map((raw, j) => {
+      const at = `${where}, часть ${j + 1}`;
+      const part = asObject(raw, at);
+      return { id: str(part, 'id', at), title: str(part, 'title', at), status: oneOf(part, 'status', PART_STATUSES, at) };
+    });
+    uniqueIds(parts, `${where}: части`);
     return {
       id: str(m, 'id', where),
       title: str(m, 'title', where),
@@ -353,12 +381,14 @@ export function validateDb(raw: unknown): Db {
       url: str(m, 'url', where, { allowEmpty: true }),
       areaId: typeof m.areaId === 'string' && areaIds.has(m.areaId) ? m.areaId : null,
       status: oneOf(m, 'status', MATERIAL_STATUSES, where),
+      parts,
       obsidianPath: optionalStr(m, 'obsidianPath', where),
       createdAt: str(m, 'createdAt', where),
     };
   });
   uniqueIds(materials, 'Материалы');
   const materialIds = new Set(materials.map((m) => m.id));
+  const partsByMaterial = new Map(materials.map((m) => [m.id, new Set(m.parts.map((p) => p.id))]));
 
   const notes: Note[] = asArray(data.notes, 'notes').map((item, i) => {
     const n = asObject(item, `Заметка ${i + 1}`);
@@ -465,6 +495,9 @@ export function validateDb(raw: unknown): Db {
     // Веха бывает только у задачи проекта и только из вех этого проекта.
     const milestoneId =
       projectId && typeof t.milestoneId === 'string' && milestonesByProject.get(projectId)?.has(t.milestoneId) ? t.milestoneId : null;
+    // Так же часть — только из частей материала задачи.
+    const materialId = typeof t.materialId === 'string' && partsByMaterial.has(t.materialId) ? t.materialId : null;
+    const partId = materialId && typeof t.partId === 'string' && partsByMaterial.get(materialId)?.has(t.partId) ? t.partId : null;
     return {
       id: str(t, 'id', where),
       title: str(t, 'title', where),
@@ -476,14 +509,38 @@ export function validateDb(raw: unknown): Db {
       areaId: typeof t.areaId === 'string' && areaIds.has(t.areaId) ? t.areaId : null,
       projectId,
       milestoneId,
+      materialId,
+      partId,
       checklist,
+      recurrence: t.recurrence === null ? null : recurrence(asObject(t.recurrence, `${where}: повтор`), `${where}, повтор`),
+      repeatOf: typeof t.repeatOf === 'string' ? t.repeatOf : null,
       completedAt: optionalStr(t, 'completedAt', where),
       createdAt: str(t, 'createdAt', where),
     };
   });
   uniqueIds(tasks, 'Задачи');
+  // Повтор удалённой задачи просто перестаёт ссылаться на неё.
+  const taskIds = new Set(tasks.map((t) => t.id));
+  for (const task of tasks) {
+    if (task.repeatOf !== null && (!taskIds.has(task.repeatOf) || task.repeatOf === task.id)) task.repeatOf = null;
+  }
 
   return { areas, goals, entries, materials, notes, reviews, settings, vacations, tasks, projects };
+}
+
+function recurrence(r: Raw, where: string): Recurrence {
+  const unit = oneOf(r, 'unit', REPEAT_UNITS, where);
+  const interval = num(r, 'interval', where);
+  if (!Number.isInteger(interval) || interval < 1 || interval > REPEAT_INTERVAL_MAX) {
+    throw new DataError(`${where}: шаг повтора должен быть целым числом от 1 до ${REPEAT_INTERVAL_MAX}`);
+  }
+  const weekdays = asArray(r.weekdays, `${where}: weekdays`);
+  if (weekdays.some((d) => typeof d !== 'number' || !Number.isInteger(d) || d < 0 || d > 6)) {
+    throw new DataError(`${where}: дни недели — числа от 0 до 6`);
+  }
+  const days = [...new Set(weekdays as number[])].sort((a, b) => a - b);
+  if (unit === 'week' && days.length === 0) throw new DataError(`${where}: у недельного повтора не выбраны дни`);
+  return { unit, interval, weekdays: unit === 'week' ? days : [], start: date(r, 'start', where) };
 }
 
 /**

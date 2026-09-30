@@ -70,6 +70,18 @@ describe('migrate', () => {
     expect(db.tasks[0]).toMatchObject({ projectId: null, milestoneId: null });
   });
 
+  it('v7 → v8: у материалов появляются части, у задач — повтор, материал и часть', () => {
+    const oldTask = {
+      id: 't1', title: 'Т', notes: '', status: 'todo', important: false, deadline: null, plannedDate: null,
+      areaId: null, projectId: null, milestoneId: null, checklist: [], completedAt: null, createdAt: 'x',
+    };
+    const oldMaterial = { id: 'm1', title: 'М', type: 'book', author: '', url: '', areaId: null, status: 'active', obsidianPath: null, createdAt: 'x' };
+    const v7 = { version: 7, ...migrateToV2(), materials: [oldMaterial], notes: [], reviews: [], settings: {}, vacations: [], tasks: [oldTask], projects: [] };
+    const db = migrate(v7, makeCtx());
+    expect(db.materials[0].parts).toEqual([]);
+    expect(db.tasks[0]).toMatchObject({ materialId: null, partId: null, recurrence: null, repeatOf: null });
+  });
+
   it('v2 → v3: добавляются пустые списки знаний', () => {
     const v2 = { version: 2, ...migrateToV2() };
     const db = migrate(v2, makeCtx());
@@ -141,6 +153,7 @@ describe('знания', () => {
           url: '',
           areaId: db.areas[3].id,
           status: 'active',
+          parts: [],
           obsidianPath: null,
           createdAt: '2026-09-01T08:00:00.000Z',
         },
@@ -234,15 +247,38 @@ describe('задачи', () => {
     areaId: null,
     projectId: null,
     milestoneId: null,
+    materialId: null,
+    partId: null,
     checklist: [{ id: 'c1', text: 'Собрать цифры', done: true }],
+    recurrence: null,
+    repeatOf: null,
     completedAt: null,
     createdAt: 'x',
     ...overrides,
   });
+  const weekly = { unit: 'week', interval: 2, weekdays: [3, 0], start: '2026-10-05' };
 
   it('проходят проверку без изменений', () => {
     const db = { ...base(), tasks: [task()] };
     expect(validateDb(db)).toEqual(db);
+  });
+
+  it('повтор проверяется и приводится к каноническому виду', () => {
+    const db = base();
+    const checked = validateDb({ ...db, tasks: [task({ recurrence: weekly })] }).tasks[0].recurrence;
+    expect(checked).toEqual({ unit: 'week', interval: 2, weekdays: [0, 3], start: '2026-10-05' });
+    const monthly = validateDb({ ...db, tasks: [task({ recurrence: { ...weekly, unit: 'month' } })] }).tasks[0].recurrence;
+    expect(monthly?.weekdays).toEqual([]);
+    expect(() => validateDb({ ...db, tasks: [task({ recurrence: { ...weekly, weekdays: [] } })] })).toThrow('не выбраны дни');
+    expect(() => validateDb({ ...db, tasks: [task({ recurrence: { ...weekly, interval: 0 } })] })).toThrow('шаг повтора');
+    expect(() => validateDb({ ...db, tasks: [task({ recurrence: { ...weekly, weekdays: [7] } })] })).toThrow('дни недели');
+    expect(() => validateDb({ ...db, tasks: [task({ recurrence: { ...weekly, unit: 'hour' } })] })).toThrow('«unit»');
+  });
+
+  it('повтор удалённой задачи теряет ссылку на неё', () => {
+    const db = base();
+    const fixed = validateDb({ ...db, tasks: [task({ id: 'a' }), task({ id: 'b', repeatOf: 'a' }), task({ id: 'c', repeatOf: 'нет' })] });
+    expect(fixed.tasks.map((t) => t.repeatOf)).toEqual([null, 'a', null]);
   });
 
   it('задача удалённой сферы остаётся без сферы', () => {
@@ -275,7 +311,8 @@ describe('проекты', () => {
   });
   const task = (overrides: Record<string, unknown> = {}) => ({
     id: 't1', title: 'Пробный тест', notes: '', status: 'todo', important: false, deadline: null, plannedDate: null,
-    areaId: null, projectId: 'p1', milestoneId: 'm1', checklist: [], completedAt: null, createdAt: 'x', ...overrides,
+    areaId: null, projectId: 'p1', milestoneId: 'm1', materialId: null, partId: null, checklist: [], recurrence: null,
+    repeatOf: null, completedAt: null, createdAt: 'x', ...overrides,
   });
 
   it('проходят проверку без изменений', () => {
@@ -303,6 +340,47 @@ describe('проекты', () => {
     expect(() => validateDb({ ...db, projects: [project({ status: 'someday' })] })).toThrow('Проект 1: недопустимое значение поля «status»');
     expect(() => validateDb({ ...db, projects: [project({ milestones: [{ id: 'm1', title: '', deadline: null }] })] })).toThrow('веха 1');
     expect(() => validateDb({ ...db, projects: [project(), project()] })).toThrow('повторяется id');
+  });
+});
+
+describe('части материалов', () => {
+  const base = () => migrate(v1Data, makeCtx());
+  const material = (overrides: Record<string, unknown> = {}) => ({
+    id: 'm1', title: 'Чистый код', type: 'book', author: '', url: '', areaId: null, status: 'active',
+    parts: [{ id: 'p1', title: 'Глава 1', status: 'studied' }, { id: 'p2', title: 'Глава 2', status: 'todo' }],
+    obsidianPath: null, createdAt: 'x', ...overrides,
+  });
+  const task = (overrides: Record<string, unknown> = {}) => ({
+    id: 't1', title: 'Законспектировать: Глава 1', notes: '', status: 'todo', important: false, deadline: null, plannedDate: null,
+    areaId: null, projectId: null, milestoneId: null, materialId: 'm1', partId: 'p1', checklist: [], recurrence: null,
+    repeatOf: null, completedAt: null, createdAt: 'x', ...overrides,
+  });
+
+  it('проходят проверку без изменений', () => {
+    const db = { ...base(), materials: [material()], tasks: [task()] };
+    expect(validateDb(db)).toEqual(db);
+  });
+
+  it('чинят висячие ссылки: материал и часть задачи', () => {
+    const fixed = validateDb({
+      ...base(),
+      materials: [material()],
+      tasks: [task({ id: 'a', materialId: 'нет' }), task({ id: 'b', partId: 'нет' }), task({ id: 'c', materialId: null })],
+    });
+    expect(fixed.tasks.map((t) => [t.materialId, t.partId])).toEqual([
+      [null, null],
+      ['m1', null],
+      [null, null],
+    ]);
+  });
+
+  it('отклоняют ошибки', () => {
+    const db = base();
+    expect(() => validateDb({ ...db, materials: [material({ parts: [{ id: 'p1', title: 'Г', status: 'read' }] })] })).toThrow('часть 1');
+    expect(() => validateDb({ ...db, materials: [material({ parts: [{ id: 'p1', title: '', status: 'todo' }] })] })).toThrow('часть 1');
+    expect(() =>
+      validateDb({ ...db, materials: [material({ parts: [{ id: 'p1', title: 'А', status: 'todo' }, { id: 'p1', title: 'Б', status: 'todo' }] })] }),
+    ).toThrow('повторяется id');
   });
 });
 

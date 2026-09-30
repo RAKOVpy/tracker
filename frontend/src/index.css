@@ -2861,3 +2861,300 @@ textarea {
     transition: none !important;
   }
 }
+
+/* Повтор задачи: дни недели и шаг. */
+.repeat {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.repeat__day {
+  min-width: 42px;
+  justify-content: center;
+  padding-inline: 8px;
+}
+
+.repeat__interval {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.repeat .field__hint {
+  margin: 0;
+}
+
+.repeat-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+
+.repeat-line svg {
+  flex: none;
+  color: var(--accent);
+}
+
+.repeat-history {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.repeat-history li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.repeat-history li:last-child {
+  border-bottom: 0;
+}
+
+/* Распознанное в тексте задачи: «до пт», «важно», «Учёба». */
+.parsed {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.parsed__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 0 4px 0 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.parsed__chip--area .nav__dot {
+  width: 7px;
+  height: 7px;
+}
+
+.parsed__dismiss {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.parsed__dismiss:hover,
+.parsed__dismiss:focus-visible {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  opacity: 1;
+}
+
+.capture__hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin: 0;
+  color: var(--ink-2);
+}
+
+.capture__hint kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+}
+
+/* Подсказки под строкой быстрого добавления. */
+.today-tasks__add + .parsed {
+  margin: -4px 0 12px;
+}
+
+.today-tasks__elsewhere {
+  margin: -4px 0 12px;
+  color: var(--ink-2);
+}
+
+/* Части материала. */
+.parts-inputs__row {
+  grid-template-columns: 1.5em minmax(0, 1fr) auto;
+}
+
+.parts-generator {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-2);
+}
+
+.parts-generator__prefix {
+  width: 9em;
+}
+
+.part-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.part-row {
+  display: grid;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.part-row:last-child {
+  border-bottom: 0;
+}
+
+/* Статус | название | конспект; на телефоне статус уходит под название. */
+.part-row__main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'status title action';
+  align-items: center;
+  gap: 6px 12px;
+}
+
+.part-row__main > .part-status {
+  grid-area: status;
+  justify-self: start;
+}
+
+.part-row__title {
+  display: flex;
+  flex-wrap: wrap;
+  grid-area: title;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.part-row__task,
+.part-row__plan {
+  grid-area: action;
+  justify-self: end;
+}
+
+@media (max-width: 560px) {
+  .part-row__main {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'title action'
+      'status status';
+  }
+}
+
+.part-row--summarized .part-row__title {
+  color: var(--ink-2);
+}
+
+.part-row--summarized .part-row__title svg {
+  flex: none;
+  color: var(--good);
+}
+
+.part-row__next {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.part-row__task {
+  display: inline-flex;
+  text-align: right;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink-2);
+}
+
+.part-row__task:hover {
+  color: var(--accent);
+}
+
+/* Статус части — компактный выпадающий список в виде метки. */
+.part-status {
+  appearance: none;
+  height: 28px;
+  padding: 0 26px 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--sheet)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' stroke='%239a9385' stroke-width='1.6'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E")
+    no-repeat right 10px center;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.part-status--studied {
+  border-color: color-mix(in srgb, var(--warn) 45%, var(--line));
+  background-color: var(--warn-soft);
+  color: var(--warn);
+}
+
+.part-status--summarized {
+  border-color: color-mix(in srgb, var(--good) 45%, var(--line));
+  background-color: var(--good-soft);
+  color: var(--good);
+}
+
+.part-status:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.part-plan {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.material-card__parts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.material-card__parts .progress {
+  width: 72px;
+  height: 6px;
+  flex: none;
+}

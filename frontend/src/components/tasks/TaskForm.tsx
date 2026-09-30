@@ -1,10 +1,12 @@
 import { Flag, Plus, X } from 'lucide-react';
 import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { anchorRecurrence, sameRule } from '../../domain/recurrence';
 import { taskInput } from '../../domain/tasks';
 import type { Area, ChecklistItem, Project, TaskInput } from '../../domain/types';
 import { addDays, type IsoDate } from '../../lib/dates';
 import { AREA_ICON_COMPONENTS } from '../areaIcons';
 import { ProjectPicker } from '../projects/ProjectPicker';
+import { RepeatField } from './RepeatField';
 
 export type TaskFields = Omit<TaskInput, 'status'>;
 
@@ -54,8 +56,18 @@ export function TaskForm({ areas, projects, today, initial = EMPTY, submitLabel,
     event.preventDefault();
     setSubmitted(true);
     if (titleError) return;
+    let { plannedDate, deadline, recurrence } = values;
+    if (recurrence) {
+      // Правило и даты не меняли — отсчёт прежний: иначе правка названия сдвинула бы «через неделю».
+      const unchanged = sameRule(recurrence, initial.recurrence) && plannedDate === initial.plannedDate && deadline === initial.deadline;
+      if (unchanged && initial.recurrence) recurrence = initial.recurrence;
+      else ({ recurrence, plannedDate, deadline } = anchorRecurrence(recurrence, { plannedDate, deadline }, today));
+    }
     onSubmit({
       ...values,
+      plannedDate,
+      deadline,
+      recurrence,
       title: values.title.trim(),
       notes: values.notes.trim(),
       checklist: checklist.map((item) => ({ ...item, text: item.text.trim() })).filter((item) => item.text),
@@ -127,6 +139,14 @@ export function TaskForm({ areas, projects, today, initial = EMPTY, submitLabel,
       {planAfterDeadline && (
         <p className="notice notice--warn">План позже дедлайна — к этому дню срок уже пройдёт.</p>
       )}
+
+      <RepeatField
+        value={values.recurrence}
+        plannedDate={values.plannedDate}
+        deadline={values.deadline}
+        today={today}
+        onChange={(recurrence) => set('recurrence', recurrence)}
+      />
 
       <ProjectPicker
         idPrefix="task"

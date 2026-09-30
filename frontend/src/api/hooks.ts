@@ -15,6 +15,7 @@ import type {
   GoalPatch,
   Material,
   MaterialInput,
+  MaterialPart,
   MaterialPatch,
   NoteInput,
   NotePatch,
@@ -346,12 +347,37 @@ export function useCreateMaterial() {
   });
 }
 
+export function useMaterialMap(): Map<string, Material> {
+  const { data } = useQuery({ queryKey: keys.materials, queryFn: () => api.listMaterials() });
+  return useMemo(() => new Map((data ?? []).map((material) => [material.id, material])), [data]);
+}
+
 export function useUpdateMaterial() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: MaterialPatch }) => api.updateMaterial(id, patch),
-    onSuccess: () => client.invalidateQueries({ queryKey: keys.materials }),
+    // Удалённые части снимаются с задач. При ошибке кэш тоже перечитывается — после правки частей наперёд.
+    onSettled: () => {
+      client.invalidateQueries({ queryKey: keys.materials });
+      client.invalidateQueries({ queryKey: keys.tasks });
+    },
   });
+}
+
+/**
+ * Правка частей от самой свежей версии материала в кэше — как с подзадачами:
+ * две быстрые правки подряд не затрут друг друга.
+ */
+export function useEditParts() {
+  const client = useQueryClient();
+  const update = useUpdateMaterial();
+  const edit = (material: Material, change: (parts: MaterialPart[]) => MaterialPart[], options?: { onSuccess?: () => void }) => {
+    const latest = client.getQueryData<Material[]>(keys.materials)?.find((m) => m.id === material.id) ?? material;
+    const parts = change(latest.parts);
+    client.setQueryData<Material[]>(keys.materials, (list) => list?.map((m) => (m.id === material.id ? { ...m, parts } : m)));
+    update.mutate({ id: material.id, patch: { parts } }, options);
+  };
+  return { edit, isPending: update.isPending };
 }
 
 export function useDeleteMaterial() {
@@ -361,6 +387,7 @@ export function useDeleteMaterial() {
     onSuccess: () => {
       client.invalidateQueries({ queryKey: keys.materials });
       client.invalidateQueries({ queryKey: keys.notes });
+      client.invalidateQueries({ queryKey: keys.tasks });
     },
   });
 }
@@ -491,6 +518,7 @@ export function useInboxToMaterial() {
         url: '',
         areaId: task.areaId,
         status: 'queued',
+        parts: [],
       });
       await api.deleteTask(task.id);
       return material;

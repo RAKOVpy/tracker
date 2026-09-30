@@ -4,6 +4,7 @@ import { MATERIAL_STATUSES, MATERIAL_STATUS_ORDER, MATERIAL_TYPES, MATERIAL_TYPE
 import type { Area, MaterialInput } from '../../domain/types';
 import { AREA_ICON_COMPONENTS } from '../areaIcons';
 import { MATERIAL_ICONS } from './format';
+import { PartsEditor } from './PartsEditor';
 import { StartMaterialNotice } from './StartMaterial';
 
 interface Props {
@@ -13,13 +14,15 @@ interface Props {
   isSubmitting?: boolean;
   /** Проверка лимитов для материала, который ещё не изучается; нет — проверять нечего. */
   startCheck?: StartCheck;
+  /** Сколько задач у каждой части — чтобы предупредить при удалении части. */
+  partTasks?: Map<string, number>;
   onSubmit: (input: MaterialInput) => void;
   onCancel: () => void;
 }
 
-const EMPTY: MaterialInput = { title: '', type: 'book', author: '', url: '', areaId: null, status: 'active' };
+const EMPTY: MaterialInput = { title: '', type: 'book', author: '', url: '', areaId: null, status: 'active', parts: [] };
 
-export function MaterialForm({ areas, initial = EMPTY, submitLabel, isSubmitting, startCheck, onSubmit, onCancel }: Props) {
+export function MaterialForm({ areas, initial = EMPTY, submitLabel, isSubmitting, startCheck, partTasks, onSubmit, onCancel }: Props) {
   const [values, setValues] = useState<MaterialInput>(initial);
   const [submitted, setSubmitted] = useState(false);
 
@@ -41,7 +44,13 @@ export function MaterialForm({ areas, initial = EMPTY, submitLabel, isSubmitting
     event.preventDefault();
     setSubmitted(true);
     if (!isValid) return;
-    onSubmit({ ...values, title: values.title.trim(), author: values.author.trim(), url });
+    onSubmit({
+      ...values,
+      title: values.title.trim(),
+      author: values.author.trim(),
+      url,
+      parts: values.parts.map((p) => ({ ...p, title: p.title.trim() })).filter((p) => p.title),
+    });
   }
 
   return (
@@ -153,6 +162,14 @@ export function MaterialForm({ areas, initial = EMPTY, submitLabel, isSubmitting
           </button>
         </div>
       </div>
+
+      <PartsEditor
+        type={values.type}
+        parts={values.parts}
+        initial={initial.parts}
+        partTasks={partTasks}
+        onChange={(parts) => set('parts', parts)}
+      />
 
       <div className="row">
         <button className="btn btn--primary" type="submit" disabled={isSubmitting}>

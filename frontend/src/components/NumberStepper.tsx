@@ -12,7 +12,10 @@ interface Props {
   onChange: (value: number) => void;
 }
 
-/** Целое число с кнопками − и +. Введённое вручную применяется при уходе из поля или по Enter. */
+/**
+ * Целое число с кнопками − и +. Введённое вручную применяется при уходе из поля или по Enter;
+ * Enter внутри формы её не отправляет — иначе форма ушла бы со старым числом.
+ */
 export function NumberStepper({ id, value, min, max, label, disabled, onChange }: Props) {
   const [draft, setDraft] = useState<string | null>(null);
 
@@ -44,7 +47,10 @@ export function NumberStepper({ id, value, min, max, label, disabled, onChange }
         onChange={(e) => setDraft(e.target.value)}
         onBlur={(e) => commit(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') commit(e.currentTarget.value);
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            commit(e.currentTarget.value);
+          }
           if (e.key === 'Escape') setDraft(null);
         }}
       />

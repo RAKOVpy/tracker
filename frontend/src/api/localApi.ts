@@ -1,5 +1,6 @@
+import { detachRemovedParts } from '../domain/parts';
 import { applyProjectPatch, createProject, detachRemovedMilestones } from '../domain/projects';
-import { applyTaskPatch, createTask } from '../domain/tasks';
+import { applyTaskUpdate, createTask } from '../domain/tasks';
 import type { Area, Goal, Material, Note, ProgressEntry, Review, Vacation } from '../domain/types';
 import { sortVacations, vacationError } from '../domain/vacation';
 import { todayIso } from '../lib/dates';
@@ -147,6 +148,7 @@ export const localApi: TrackerApi = {
     const db = load();
     const index = findIndex(db.materials, id, 'Материал');
     db.materials[index] = { ...db.materials[index], ...patch };
+    db.tasks = detachRemovedParts(db.tasks, db.materials[index]);
     save(db);
     return db.materials[index];
   },
@@ -155,6 +157,7 @@ export const localApi: TrackerApi = {
     const db = load();
     db.materials = db.materials.filter((m) => m.id !== id);
     db.notes = db.notes.map((n) => (n.materialId === id ? { ...n, materialId: null } : n));
+    db.tasks = db.tasks.map((t) => (t.materialId === id ? { ...t, materialId: null, partId: null } : t));
     save(db);
   },
 
@@ -268,15 +271,20 @@ export const localApi: TrackerApi = {
 
   async updateTask(id, patch) {
     const db = load();
-    const index = findIndex(db.tasks, id, 'Задача');
-    db.tasks[index] = applyTaskPatch(db.tasks[index], patch, new Date().toISOString());
+    findIndex(db.tasks, id, 'Задача');
+    const now = new Date();
+    db.tasks = applyTaskUpdate(db.tasks, id, patch, {
+      now: now.toISOString(),
+      today: todayIso(now),
+      newId: () => crypto.randomUUID(),
+    });
     save(db);
-    return db.tasks[index];
+    return db.tasks.find((t) => t.id === id)!;
   },
 
   async deleteTask(id) {
     const db = load();
-    db.tasks = db.tasks.filter((t) => t.id !== id);
+    db.tasks = db.tasks.filter((t) => t.id !== id).map((t) => (t.repeatOf === id ? { ...t, repeatOf: null } : t));
     save(db);
   },
 

@@ -1,4 +1,18 @@
-import { Ban, Check, CalendarArrowUp, Flag, FolderKanban, ListTodo, Pencil, RotateCcw, Trash2, X } from 'lucide-react';
+import {
+  Ban,
+  BookOpen,
+  Check,
+  CalendarArrowUp,
+  Flag,
+  FolderKanban,
+  ListTodo,
+  Pencil,
+  Repeat,
+  RotateCcw,
+  SkipForward,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
@@ -7,6 +21,7 @@ import {
   useCreateTask,
   useDeleteTask,
   useEditChecklist,
+  useMaterialMap,
   useProjectMap,
   useProjects,
   useTasks,
@@ -17,7 +32,8 @@ import { BackButton } from '../../components/BackButton';
 import { TaskForm, type TaskFields } from '../../components/tasks/TaskForm';
 import { deadlineTag, planTag } from '../../components/tasks/taskText';
 import { useGoBack } from '../../components/useGoBack';
-import { checklistProgress } from '../../domain/tasks';
+import { describeRecurrence, previousRepeats } from '../../domain/recurrence';
+import { checklistProgress, completedOn } from '../../domain/tasks';
 import type { ChecklistItem, Project, Task } from '../../domain/types';
 import { addDays, formatDateTime, formatLong, type IsoDate } from '../../lib/dates';
 import { ErrorState, LoadingState, NotFoundState } from '../states';
@@ -95,6 +111,31 @@ function projectOptions(projects: Project[], currentId: string | null): Project[
   return projects.filter((p) => p.status === 'active' || p.status === 'paused' || p.id === currentId);
 }
 
+/** Прошлые повторы: когда сделан или пропущен. */
+function RepeatHistory({ task, tasks }: { task: Task; tasks: Task[] }) {
+  const previous = previousRepeats(task, tasks, 6);
+  if (previous.length === 0) return null;
+  return (
+    <section className="card stack">
+      <h2 className="section__title" style={{ margin: 0 }}>
+        Прошлые разы
+      </h2>
+      <ul className="repeat-history">
+        {previous.map((t) => {
+          const day = completedOn(t) ?? t.plannedDate ?? t.deadline;
+          const label = t.status === 'done' ? 'сделано' : t.status === 'cancelled' ? 'пропущено' : 'не закрыто';
+          return (
+            <li key={t.id}>
+              <Link to={`/tasks/${t.id}`}>{day ? formatLong(day) : 'без даты'}</Link>
+              <span className={t.status === 'done' ? 'tag--good' : 'muted'}>{label}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 function describePlan(plannedDate: IsoDate | null, today: IsoDate): string {
   if (!plannedDate) return 'не запланировано';
   return planTag(plannedDate, today) ?? 'сегодня';
@@ -107,6 +148,7 @@ export function TaskPage() {
   const { data: tasks, isLoading, error } = useTasks();
   const areas = useAreaMap();
   const projects = useProjectMap();
+  const materials = useMaterialMap();
   const update = useUpdateTask();
   const remove = useDeleteTask();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -119,7 +161,12 @@ export function TaskPage() {
   const area = task.areaId ? areas.get(task.areaId) : undefined;
   const project = task.projectId ? projects.get(task.projectId) : undefined;
   const milestone = project?.milestones.find((m) => m.id === task.milestoneId);
+  const material = task.materialId ? materials.get(task.materialId) : undefined;
+  const part = material?.parts.find((p) => p.id === task.partId);
   const closed = task.status === 'done' || task.status === 'cancelled';
+  const repeating = task.recurrence !== null && !closed;
+  // Закрыли повторяющуюся задачу — появился следующий повтор.
+  const next = closed ? tasks.find((t) => t.repeatOf === task.id) : undefined;
   const tomorrow = addDays(today, 1);
   const deadline = task.deadline ? deadlineTag(task.deadline, today) : null;
   const setStatus = (status: Task['status']) => update.mutate({ id: task.id, patch: { status } });
@@ -142,6 +189,12 @@ export function TaskPage() {
               <Link className="badge badge--link" to={`/projects/${project.id}`}>
                 <FolderKanban size={12} aria-hidden /> {project.title}
                 {milestone && ` · ${milestone.title}`}
+              </Link>
+            )}
+            {material && (
+              <Link className="badge badge--link" to={`/knowledge/materials/${material.id}`}>
+                <BookOpen size={12} aria-hidden /> {material.title}
+                {part && ` · ${part.title}`}
               </Link>
             )}
           </div>
@@ -167,6 +220,18 @@ export function TaskPage() {
               {task.deadline && <div className="stat__sub">{formatLong(task.deadline)}</div>}
             </div>
           </div>
+
+          {repeating && (
+            <p className="repeat-line">
+              <Repeat size={15} aria-hidden /> Повторяется {describeRecurrence(task.recurrence!)}: когда отметите, появится следующий раз.
+            </p>
+          )}
+          {next && (
+            <p className="repeat-line">
+              <Repeat size={15} aria-hidden /> Следующий раз —{' '}
+              <Link to={`/tasks/${next.id}`}>{next.plannedDate || next.deadline ? formatLong((next.plannedDate ?? next.deadline)!) : 'без даты'}</Link>
+            </p>
+          )}
 
           {task.status === 'done' && task.completedAt && <p className="muted small">Сделано {formatDateTime(task.completedAt)}.</p>}
           {task.status === 'cancelled' && task.completedAt && (
@@ -218,9 +283,16 @@ export function TaskPage() {
 
         <Checklist task={task} />
 
+        <RepeatHistory task={task} tasks={tasks} />
+
         {confirmingDelete ? (
           <div className="confirm">
-            <p>Удалить задачу «{task.title}»? Отменить это нельзя. Если задача просто больше не нужна, её можно отменить.</p>
+            <p>
+              Удалить задачу «{task.title}»? Отменить это нельзя.{' '}
+              {repeating
+                ? 'Повторы прекратятся. Если нужно пропустить только этот раз, нажмите «Пропустить раз».'
+                : 'Если задача просто больше не нужна, её можно отменить.'}
+            </p>
             <div className="row">
               <button
                 className="btn btn--sm btn--danger-solid"
@@ -237,7 +309,22 @@ export function TaskPage() {
           </div>
         ) : (
           <div className="row">
-            {!closed && (
+            {repeating && (
+              <>
+                <button className="btn btn--sm" type="button" disabled={update.isPending} onClick={() => setStatus('cancelled')}>
+                  <SkipForward size={14} aria-hidden /> Пропустить раз
+                </button>
+                <button
+                  className="btn btn--sm"
+                  type="button"
+                  disabled={update.isPending}
+                  onClick={() => update.mutate({ id: task.id, patch: { recurrence: null } })}
+                >
+                  <Ban size={14} aria-hidden /> Больше не повторять
+                </button>
+              </>
+            )}
+            {!closed && !repeating && (
               <button className="btn btn--sm" type="button" disabled={update.isPending} onClick={() => setStatus('cancelled')}>
                 <Ban size={14} aria-hidden /> Не буду делать
               </button>
@@ -299,7 +386,7 @@ export function EditTaskPage() {
   const task = tasks.data.find((t) => t.id === id);
   if (!task) return <NotFoundState title="Задача не найдена" back="/tasks" />;
 
-  const { title, notes, important, deadline, plannedDate, areaId, projectId, milestoneId, checklist } = task;
+  const { title, notes, important, deadline, plannedDate, areaId, projectId, milestoneId, materialId, partId, checklist, recurrence } = task;
   return (
     <>
       <div className="page-head">
@@ -312,7 +399,7 @@ export function EditTaskPage() {
         areas={areas.data}
         projects={projectOptions(projects.data, task.projectId)}
         today={today}
-        initial={{ title, notes, important, deadline, plannedDate, areaId, projectId, milestoneId, checklist }}
+        initial={{ title, notes, important, deadline, plannedDate, areaId, projectId, milestoneId, materialId, partId, checklist, recurrence }}
         submitLabel="Сохранить"
         isSubmitting={update.isPending}
         onSubmit={(fields) => update.mutate({ id, patch: fields }, { onSuccess: goBack })}
