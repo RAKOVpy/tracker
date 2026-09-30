@@ -1,0 +1,95 @@
+/**
+ * Календарные даты храним строками 'YYYY-MM-DD' (как DateField в DRF).
+ * Все вычисления — через UTC, чтобы переход на летнее время не сдвигал дни.
+ */
+export type IsoDate = string;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function toUtcMs(date: IsoDate): number {
+  const [y, m, d] = date.split('-').map(Number);
+  return Date.UTC(y, m - 1, d);
+}
+
+function fromUtcMs(ms: number): IsoDate {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+/** Сегодняшняя дата в часовом поясе пользователя. */
+export function todayIso(now: Date = new Date()): IsoDate {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+export function addDays(date: IsoDate, days: number): IsoDate {
+  return fromUtcMs(toUtcMs(date) + days * DAY_MS);
+}
+
+export function addMonths(date: IsoDate, months: number): IsoDate {
+  const [y, m, d] = date.split('-').map(Number);
+  const target = new Date(Date.UTC(y, m - 1 + months, 1));
+  const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  target.setUTCDate(Math.min(d, lastDay));
+  return fromUtcMs(target.getTime());
+}
+
+/** Число месяцев между датами по календарю, без учёта дней: с 31 янв по 1 фев — 1. */
+export function monthsBetween(from: IsoDate, to: IsoDate): number {
+  const [y1, m1] = from.split('-').map(Number);
+  const [y2, m2] = to.split('-').map(Number);
+  return (y2 - y1) * 12 + (m2 - m1);
+}
+
+/** День недели: 0 — понедельник … 6 — воскресенье (как weekday() в Python). */
+export function weekdayIndex(date: IsoDate): number {
+  return (new Date(toUtcMs(date)).getUTCDay() + 6) % 7;
+}
+
+/** Количество дней от `from` до `to` (to - from). */
+export function diffDays(from: IsoDate, to: IsoDate): number {
+  return Math.round((toUtcMs(to) - toUtcMs(from)) / DAY_MS);
+}
+
+const shortFormatter = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const longFormatter = new Intl.DateTimeFormat('ru-RU', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+const weekdayFormatter = new Intl.DateTimeFormat('ru-RU', { weekday: 'short', timeZone: 'UTC' });
+const dayMonthFormatter = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+
+export function formatShort(date: IsoDate): string {
+  return shortFormatter.format(toUtcMs(date)).replace('.', '');
+}
+
+export function formatLong(date: IsoDate): string {
+  return longFormatter.format(toUtcMs(date));
+}
+
+/** «14 октября» — без года. */
+export function formatDayMonth(date: IsoDate): string {
+  return dayMonthFormatter.format(toUtcMs(date));
+}
+
+export function formatWeekday(date: IsoDate): string {
+  return weekdayFormatter.format(toUtcMs(date));
+}
+
+/** «сегодня», «вчера» или короткая дата. */
+export function formatRelative(date: IsoDate, today: IsoDate = todayIso()): string {
+  const diff = diffDays(date, today);
+  if (diff === 0) return 'сегодня';
+  if (diff === 1) return 'вчера';
+  return formatShort(date);
+}
+
+const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+/** «29 сент., 19:40» — время по часовому поясу пользователя. */
+export function formatDateTime(isoDateTime: string): string {
+  return dateTimeFormatter.format(new Date(isoDateTime));
+}

@@ -1,0 +1,560 @@
+import { DEFAULT_SETTINGS, SETTINGS_RANGES } from '../domain/load';
+import { AREA_COLORS, AREA_ICONS, DEFAULT_AREAS } from '../domain/meta';
+import type {
+  Area,
+  ExplainAnswer,
+  Goal,
+  GoalStatus,
+  Material,
+  MaterialPart,
+  MaterialStatus,
+  MaterialType,
+  Note,
+  PartStatus,
+  Priority,
+  ProgressEntry,
+  Project,
+  ProjectStatus,
+  Rating,
+  Recurrence,
+  RepeatUnit,
+  Review,
+  Settings,
+  Task,
+  TaskStatus,
+  Vacation,
+} from '../domain/types';
+import { REPEAT_INTERVAL_MAX } from '../domain/recurrence';
+import { sortVacations } from '../domain/vacation';
+
+/**
+ * Схема данных в хранилище и в файлах резервных копий.
+ * При изменении модели: увеличить SCHEMA_VERSION и добавить шаг в MIGRATIONS.
+ */
+export const SCHEMA_VERSION = 8;
+
+export interface Db {
+  areas: Area[];
+  goals: Goal[];
+  entries: ProgressEntry[];
+  materials: Material[];
+  notes: Note[];
+  reviews: Review[];
+  settings: Settings;
+  vacations: Vacation[];
+  tasks: Task[];
+  projects: Project[];
+}
+
+export interface Backup extends Db {
+  app: 'tracker';
+  version: number;
+  exportedAt: string;
+}
+
+/** Источник id и текущего времени — подменяется в тестах. */
+export interface Ctx {
+  now: string;
+  newId: () => string;
+}
+
+export function systemCtx(): Ctx {
+  return { now: new Date().toISOString(), newId: () => crypto.randomUUID() };
+}
+
+export class DataError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DataError';
+  }
+}
+
+export function createEmptyDb(ctx: Ctx): Db {
+  return {
+    areas: createDefaultAreas(ctx),
+    goals: [],
+    entries: [],
+    materials: [],
+    notes: [],
+    reviews: [],
+    settings: { ...DEFAULT_SETTINGS },
+    vacations: [],
+    tasks: [],
+    projects: [],
+  };
+}
+
+function createDefaultAreas(ctx: Ctx): Area[] {
+  return DEFAULT_AREAS.map((area, order) => ({ ...area, id: ctx.newId(), order, createdAt: ctx.now }));
+}
+
+// ---------- миграции ----------
+
+type Raw = Record<string, unknown>;
+
+/** v1 → v2: жёсткие категории цели заменены сферами, которые пользователь может менять. */
+function v1ToV2(raw: Raw, ctx: Ctx): Raw {
+  const areas = createDefaultAreas(ctx);
+  const byCategory: Record<string, string | null> = {
+    reading: areas[0].id,
+    language: areas[1].id,
+    sport: areas[2].id,
+    study: areas[3].id,
+    other: null,
+  };
+  const goals = asArray(raw.goals, 'goals').map((goal) => {
+    const { category, ...rest } = asObject(goal, 'goal');
+    return { ...rest, areaId: typeof category === 'string' ? (byCategory[category] ?? null) : null };
+  });
+  return { ...raw, areas, goals };
+}
+
+/** v2 → v3: появились знания — материалы, заметки и журнал повторений. */
+function v2ToV3(raw: Raw): Raw {
+  return { ...raw, materials: [], notes: [], reviews: [] };
+}
+
+/** v3 → v4: заметки и материалы помнят путь к файлу в Obsidian. */
+function v3ToV4(raw: Raw): Raw {
+  const withPath = (items: unknown, what: string) =>
+    asArray(items, what).map((item) => ({ ...asObject(item, what), obsidianPath: null }));
+  return { ...raw, materials: withPath(raw.materials, 'materials'), notes: withPath(raw.notes, 'notes') };
+}
+
+/** v4 → v5: мягкие лимиты нагрузки и отпуска. */
+function v4ToV5(raw: Raw): Raw {
+  return { ...raw, settings: { ...DEFAULT_SETTINGS }, vacations: [] };
+}
+
+/** v5 → v6: задачи и «Входящие». */
+function v5ToV6(raw: Raw): Raw {
+  return { ...raw, tasks: [] };
+}
+
+/** v6 → v7: проекты; у задач появляются проект и веха. */
+function v6ToV7(raw: Raw): Raw {
+  const tasks = asArray(raw.tasks, 'tasks').map((item) => ({ ...asObject(item, 'task'), projectId: null, milestoneId: null }));
+  return { ...raw, tasks, projects: [] };
+}
+
+/** v7 → v8: части материалов; у задач — повтор, материал и часть. */
+function v7ToV8(raw: Raw): Raw {
+  const tasks = asArray(raw.tasks, 'tasks').map((item) => ({
+    ...asObject(item, 'task'),
+    materialId: null,
+    partId: null,
+    recurrence: null,
+    repeatOf: null,
+  }));
+  const materials = asArray(raw.materials, 'materials').map((item) => ({ ...asObject(item, 'material'), parts: [] }));
+  return { ...raw, tasks, materials };
+}
+
+const MIGRATIONS: Record<number, (raw: Raw, ctx: Ctx) => Raw> = {
+  1: v1ToV2,
+  2: v2ToV3,
+  3: v3ToV4,
+  4: v4ToV5,
+  5: v5ToV6,
+  6: v6ToV7,
+  7: v7ToV8,
+};
+
+/** Приводит данные любой известной версии к текущей схеме и проверяет их. */
+export function migrate(raw: unknown, ctx: Ctx): Db {
+  let data = asObject(raw, 'data');
+  let version = data.version === undefined ? 1 : data.version;
+  if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
+    throw new DataError('Неизвестная версия данных');
+  }
+  if (version > SCHEMA_VERSION) {
+    throw new DataError('Данные созданы более новой версией приложения. Обновите страницу.');
+  }
+  while (version < SCHEMA_VERSION) {
+    data = MIGRATIONS[version](data, ctx);
+    version += 1;
+  }
+  return validateDb(data);
+}
+
+// ---------- резервные копии ----------
+
+export function toBackup(db: Db, exportedAt: string): Backup {
+  return { app: 'tracker', version: SCHEMA_VERSION, exportedAt, ...db };
+}
+
+export function parseBackup(text: string, ctx: Ctx): Db {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    throw new DataError('Файл не похож на резервную копию: это не JSON.');
+  }
+  if (!isObject(raw) || raw.app !== 'tracker') {
+    throw new DataError('Это не резервная копия трекера.');
+  }
+  const { app: _app, exportedAt: _exportedAt, ...data } = raw;
+  return migrate(data, ctx);
+}
+
+// ---------- проверка ----------
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const PRIORITIES: Priority[] = ['low', 'medium', 'high'];
+const STATUSES: GoalStatus[] = ['active', 'archived'];
+const MATERIAL_TYPES: MaterialType[] = ['book', 'course', 'lecture', 'article', 'video', 'other'];
+const MATERIAL_STATUSES: MaterialStatus[] = ['queued', 'active', 'done', 'dropped'];
+const NOTE_STATUSES: Note['status'][] = ['active', 'paused'];
+const RATINGS: Rating[] = ['again', 'hard', 'good', 'easy'];
+const EXPLAIN_ANSWERS: ExplainAnswer[] = ['no', 'hints', 'yes'];
+const TASK_STATUSES: TaskStatus[] = ['inbox', 'todo', 'done', 'cancelled'];
+const PROJECT_STATUSES: ProjectStatus[] = ['active', 'paused', 'done', 'dropped'];
+const PART_STATUSES: PartStatus[] = ['todo', 'studied', 'summarized'];
+const REPEAT_UNITS: RepeatUnit[] = ['day', 'week', 'month', 'year'];
+
+function isObject(value: unknown): value is Raw {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function asObject(value: unknown, what: string): Raw {
+  if (!isObject(value)) throw new DataError(`Ожидался объект: ${what}`);
+  return value;
+}
+
+function asArray(value: unknown, what: string): unknown[] {
+  if (!Array.isArray(value)) throw new DataError(`Ожидался список: ${what}`);
+  return value;
+}
+
+function str(obj: Raw, key: string, where: string, { allowEmpty = false } = {}): string {
+  const value = obj[key];
+  if (typeof value !== 'string' || (!allowEmpty && value.trim() === '')) {
+    throw new DataError(`${where}: поле «${key}» должно быть непустой строкой`);
+  }
+  return value;
+}
+
+function num(obj: Raw, key: string, where: string): number {
+  const value = obj[key];
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new DataError(`${where}: поле «${key}» должно быть числом`);
+  }
+  return value;
+}
+
+/** Настоящая дата календаря: «2026-02-30» подходит под шаблон, но такого дня нет. */
+function isCalendarDate(value: string): boolean {
+  if (!ISO_DATE.test(value)) return false;
+  const [y, m, d] = value.split('-').map(Number);
+  const parsed = new Date(Date.UTC(y, m - 1, d));
+  return parsed.getUTCFullYear() === y && parsed.getUTCMonth() === m - 1 && parsed.getUTCDate() === d;
+}
+
+function date(obj: Raw, key: string, where: string): string {
+  const value = str(obj, key, where);
+  if (!isCalendarDate(value)) throw new DataError(`${where}: поле «${key}» должно быть датой ГГГГ-ММ-ДД`);
+  return value;
+}
+
+function oneOf<T extends string>(obj: Raw, key: string, allowed: readonly T[], where: string): T {
+  const value = obj[key];
+  if (!allowed.includes(value as T)) throw new DataError(`${where}: недопустимое значение поля «${key}»`);
+  return value as T;
+}
+
+function optionalStr(obj: Raw, key: string, where: string): string | null {
+  const value = obj[key];
+  if (value === null) return null;
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new DataError(`${where}: поле «${key}» должно быть строкой или null`);
+  }
+  return value;
+}
+
+function optionalDate(obj: Raw, key: string, where: string): string | null {
+  return obj[key] === null ? null : date(obj, key, where);
+}
+
+function bool(obj: Raw, key: string, where: string): boolean {
+  const value = obj[key];
+  if (typeof value !== 'boolean') throw new DataError(`${where}: поле «${key}» должно быть true или false`);
+  return value;
+}
+
+function strings(obj: Raw, key: string, where: string): string[] {
+  const value = obj[key];
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
+    throw new DataError(`${where}: поле «${key}» должно быть списком строк`);
+  }
+  return value as string[];
+}
+
+function uniqueIds(items: { id: string }[], what: string): void {
+  const seen = new Set<string>();
+  for (const item of items) {
+    if (seen.has(item.id)) throw new DataError(`${what}: повторяется id ${item.id}`);
+    seen.add(item.id);
+  }
+}
+
+/**
+ * Проверяет данные и возвращает чистую копию только с известными полями.
+ * Висячие ссылки чинятся: цель, материал, задача или проект удалённой сферы остаются без сферы, проект
+ * удалённой цели — без цели, задача удалённого проекта или вехи, материала или части — без них, повтор
+ * удалённой задачи — без ссылки на неё, заметка удалённого материала — без материала, записи
+ * и повторения удалённых целей и заметок отбрасываются.
+ */
+export function validateDb(raw: unknown): Db {
+  const data = asObject(raw, 'data');
+
+  const areas: Area[] = asArray(data.areas, 'areas').map((item, i) => {
+    const a = asObject(item, `Сфера ${i + 1}`);
+    const where = `Сфера ${i + 1}`;
+    return {
+      id: str(a, 'id', where),
+      name: str(a, 'name', where),
+      color: oneOf(a, 'color', AREA_COLORS, where),
+      icon: oneOf(a, 'icon', AREA_ICONS, where),
+      order: num(a, 'order', where),
+      createdAt: str(a, 'createdAt', where),
+    };
+  });
+  uniqueIds(areas, 'Сферы');
+  const areaIds = new Set(areas.map((a) => a.id));
+
+  const goals: Goal[] = asArray(data.goals, 'goals').map((item, i) => {
+    const g = asObject(item, `Цель ${i + 1}`);
+    const where = `Цель ${i + 1}`;
+    const areaId = typeof g.areaId === 'string' && areaIds.has(g.areaId) ? g.areaId : null;
+    const goal: Goal = {
+      id: str(g, 'id', where),
+      title: str(g, 'title', where),
+      description: str(g, 'description', where, { allowEmpty: true }),
+      areaId,
+      unit: str(g, 'unit', where),
+      targetValue: num(g, 'targetValue', where),
+      startDate: date(g, 'startDate', where),
+      deadline: date(g, 'deadline', where),
+      priority: oneOf(g, 'priority', PRIORITIES, where),
+      status: oneOf(g, 'status', STATUSES, where),
+      createdAt: str(g, 'createdAt', where),
+    };
+    if (goal.targetValue <= 0) throw new DataError(`${where}: цель должна быть больше нуля`);
+    if (goal.deadline < goal.startDate) throw new DataError(`${where}: дедлайн раньше даты старта`);
+    return goal;
+  });
+  uniqueIds(goals, 'Цели');
+  const goalIds = new Set(goals.map((g) => g.id));
+
+  const entries: ProgressEntry[] = asArray(data.entries, 'entries')
+    .map((item, i) => {
+      const e = asObject(item, `Запись ${i + 1}`);
+      const where = `Запись ${i + 1}`;
+      const entry: ProgressEntry = {
+        id: str(e, 'id', where),
+        goalId: str(e, 'goalId', where),
+        date: date(e, 'date', where),
+        value: num(e, 'value', where),
+        note: str(e, 'note', where, { allowEmpty: true }),
+        createdAt: str(e, 'createdAt', where),
+      };
+      if (entry.value <= 0) throw new DataError(`${where}: значение должно быть больше нуля`);
+      return entry;
+    })
+    .filter((entry) => goalIds.has(entry.goalId));
+  uniqueIds(entries, 'Записи');
+
+  const materials: Material[] = asArray(data.materials, 'materials').map((item, i) => {
+    const m = asObject(item, `Материал ${i + 1}`);
+    const where = `Материал ${i + 1}`;
+    const parts: MaterialPart[] = asArray(m.parts, `${where}: parts`).map((raw, j) => {
+      const at = `${where}, часть ${j + 1}`;
+      const part = asObject(raw, at);
+      return { id: str(part, 'id', at), title: str(part, 'title', at), status: oneOf(part, 'status', PART_STATUSES, at) };
+    });
+    uniqueIds(parts, `${where}: части`);
+    return {
+      id: str(m, 'id', where),
+      title: str(m, 'title', where),
+      type: oneOf(m, 'type', MATERIAL_TYPES, where),
+      author: str(m, 'author', where, { allowEmpty: true }),
+      url: str(m, 'url', where, { allowEmpty: true }),
+      areaId: typeof m.areaId === 'string' && areaIds.has(m.areaId) ? m.areaId : null,
+      status: oneOf(m, 'status', MATERIAL_STATUSES, where),
+      parts,
+      obsidianPath: optionalStr(m, 'obsidianPath', where),
+      createdAt: str(m, 'createdAt', where),
+    };
+  });
+  uniqueIds(materials, 'Материалы');
+  const materialIds = new Set(materials.map((m) => m.id));
+  const partsByMaterial = new Map(materials.map((m) => [m.id, new Set(m.parts.map((p) => p.id))]));
+
+  const notes: Note[] = asArray(data.notes, 'notes').map((item, i) => {
+    const n = asObject(item, `Заметка ${i + 1}`);
+    const where = `Заметка ${i + 1}`;
+    const note: Note = {
+      id: str(n, 'id', where),
+      title: str(n, 'title', where),
+      materialId: typeof n.materialId === 'string' && materialIds.has(n.materialId) ? n.materialId : null,
+      questions: strings(n, 'questions', where),
+      summary: str(n, 'summary', where, { allowEmpty: true }),
+      obsidianUri: str(n, 'obsidianUri', where, { allowEmpty: true }),
+      status: oneOf(n, 'status', NOTE_STATUSES, where),
+      addedOn: date(n, 'addedOn', where),
+      obsidianPath: optionalStr(n, 'obsidianPath', where),
+      createdAt: str(n, 'createdAt', where),
+    };
+    if (note.obsidianUri && !note.obsidianUri.startsWith('obsidian://')) {
+      throw new DataError(`${where}: ссылка на Obsidian должна начинаться с obsidian://`);
+    }
+    return note;
+  });
+  uniqueIds(notes, 'Заметки');
+  const noteIds = new Set(notes.map((n) => n.id));
+
+  const reviews: Review[] = asArray(data.reviews, 'reviews')
+    .map((item, i) => {
+      const r = asObject(item, `Повторение ${i + 1}`);
+      const where = `Повторение ${i + 1}`;
+      return {
+        id: str(r, 'id', where),
+        noteId: str(r, 'noteId', where),
+        date: date(r, 'date', where),
+        rating: oneOf(r, 'rating', RATINGS, where),
+        explain: r.explain === null ? null : oneOf(r, 'explain', EXPLAIN_ANSWERS, where),
+        taught: bool(r, 'taught', where),
+        createdAt: str(r, 'createdAt', where),
+      };
+    })
+    .filter((review) => noteIds.has(review.noteId));
+  uniqueIds(reviews, 'Повторения');
+
+  const settings = validateSettings(asObject(data.settings, 'settings'));
+
+  const vacations: Vacation[] = sortVacations(
+    asArray(data.vacations, 'vacations').map((item, i) => {
+      const v = asObject(item, `Отпуск ${i + 1}`);
+      const where = `Отпуск ${i + 1}`;
+      const vacation: Vacation = {
+        id: str(v, 'id', where),
+        start: date(v, 'start', where),
+        end: v.end === null ? null : date(v, 'end', where),
+        createdAt: str(v, 'createdAt', where),
+      };
+      if (vacation.end !== null && vacation.end < vacation.start) {
+        throw new DataError(`${where}: отпуск заканчивается раньше, чем начинается`);
+      }
+      return vacation;
+    }),
+  );
+  uniqueIds(vacations, 'Отпуска');
+  // Пересечения удвоили бы сдвиг расписания; отпуск без даты окончания может быть только последним.
+  vacations.forEach((vacation, i) => {
+    const next = vacations[i + 1];
+    if (next && (vacation.end === null || vacation.end >= next.start)) {
+      throw new DataError('Отпуска пересекаются');
+    }
+  });
+
+  const projects: Project[] = asArray(data.projects, 'projects').map((item, i) => {
+    const p = asObject(item, `Проект ${i + 1}`);
+    const where = `Проект ${i + 1}`;
+    const milestones = asArray(p.milestones, `${where}: milestones`).map((raw, j) => {
+      const m = asObject(raw, `${where}, веха ${j + 1}`);
+      const at = `${where}, веха ${j + 1}`;
+      return { id: str(m, 'id', at), title: str(m, 'title', at), deadline: optionalDate(m, 'deadline', at) };
+    });
+    uniqueIds(milestones, `${where}: вехи`);
+    return {
+      id: str(p, 'id', where),
+      title: str(p, 'title', where),
+      description: str(p, 'description', where, { allowEmpty: true }),
+      areaId: typeof p.areaId === 'string' && areaIds.has(p.areaId) ? p.areaId : null,
+      goalId: typeof p.goalId === 'string' && goalIds.has(p.goalId) ? p.goalId : null,
+      status: oneOf(p, 'status', PROJECT_STATUSES, where),
+      deadline: optionalDate(p, 'deadline', where),
+      milestones,
+      completedAt: optionalStr(p, 'completedAt', where),
+      createdAt: str(p, 'createdAt', where),
+    };
+  });
+  uniqueIds(projects, 'Проекты');
+  const milestonesByProject = new Map(projects.map((p) => [p.id, new Set(p.milestones.map((m) => m.id))]));
+
+  const tasks: Task[] = asArray(data.tasks, 'tasks').map((item, i) => {
+    const t = asObject(item, `Задача ${i + 1}`);
+    const where = `Задача ${i + 1}`;
+    const checklist = asArray(t.checklist, `${where}: checklist`).map((raw, j) => {
+      const c = asObject(raw, `${where}, пункт ${j + 1}`);
+      const at = `${where}, пункт ${j + 1}`;
+      return { id: str(c, 'id', at), text: str(c, 'text', at), done: bool(c, 'done', at) };
+    });
+    uniqueIds(checklist, `${where}: пункты`);
+    const projectId = typeof t.projectId === 'string' && milestonesByProject.has(t.projectId) ? t.projectId : null;
+    // Веха бывает только у задачи проекта и только из вех этого проекта.
+    const milestoneId =
+      projectId && typeof t.milestoneId === 'string' && milestonesByProject.get(projectId)?.has(t.milestoneId) ? t.milestoneId : null;
+    // Так же часть — только из частей материала задачи.
+    const materialId = typeof t.materialId === 'string' && partsByMaterial.has(t.materialId) ? t.materialId : null;
+    const partId = materialId && typeof t.partId === 'string' && partsByMaterial.get(materialId)?.has(t.partId) ? t.partId : null;
+    return {
+      id: str(t, 'id', where),
+      title: str(t, 'title', where),
+      notes: str(t, 'notes', where, { allowEmpty: true }),
+      status: oneOf(t, 'status', TASK_STATUSES, where),
+      important: bool(t, 'important', where),
+      deadline: optionalDate(t, 'deadline', where),
+      plannedDate: optionalDate(t, 'plannedDate', where),
+      areaId: typeof t.areaId === 'string' && areaIds.has(t.areaId) ? t.areaId : null,
+      projectId,
+      milestoneId,
+      materialId,
+      partId,
+      checklist,
+      recurrence: t.recurrence === null ? null : recurrence(asObject(t.recurrence, `${where}: повтор`), `${where}, повтор`),
+      repeatOf: typeof t.repeatOf === 'string' ? t.repeatOf : null,
+      completedAt: optionalStr(t, 'completedAt', where),
+      createdAt: str(t, 'createdAt', where),
+    };
+  });
+  uniqueIds(tasks, 'Задачи');
+  // Повтор удалённой задачи просто перестаёт ссылаться на неё.
+  const taskIds = new Set(tasks.map((t) => t.id));
+  for (const task of tasks) {
+    if (task.repeatOf !== null && (!taskIds.has(task.repeatOf) || task.repeatOf === task.id)) task.repeatOf = null;
+  }
+
+  return { areas, goals, entries, materials, notes, reviews, settings, vacations, tasks, projects };
+}
+
+function recurrence(r: Raw, where: string): Recurrence {
+  const unit = oneOf(r, 'unit', REPEAT_UNITS, where);
+  const interval = num(r, 'interval', where);
+  if (!Number.isInteger(interval) || interval < 1 || interval > REPEAT_INTERVAL_MAX) {
+    throw new DataError(`${where}: шаг повтора должен быть целым числом от 1 до ${REPEAT_INTERVAL_MAX}`);
+  }
+  const weekdays = asArray(r.weekdays, `${where}: weekdays`);
+  if (weekdays.some((d) => typeof d !== 'number' || !Number.isInteger(d) || d < 0 || d > 6)) {
+    throw new DataError(`${where}: дни недели — числа от 0 до 6`);
+  }
+  const days = [...new Set(weekdays as number[])].sort((a, b) => a - b);
+  if (unit === 'week' && days.length === 0) throw new DataError(`${where}: у недельного повтора не выбраны дни`);
+  return { unit, interval, weekdays: unit === 'week' ? days : [], start: date(r, 'start', where) };
+}
+
+/**
+ * Настройки не критичны, поэтому значение вне допустимого диапазона приводится к ближайшему,
+ * а недопустимое заменяется значением по умолчанию — вместо того чтобы отказываться открывать данные.
+ */
+function validateSettings(raw: Raw): Settings {
+  const settings: Settings = { ...DEFAULT_SETTINGS };
+  for (const [key, range] of Object.entries(SETTINGS_RANGES) as [keyof typeof SETTINGS_RANGES, { min: number; max: number }][]) {
+    const value = raw[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      settings[key] = Math.min(range.max, Math.max(range.min, Math.round(value)));
+    }
+  }
+  if (typeof raw.strictMode === 'boolean') settings.strictMode = raw.strictMode;
+  return settings;
+}
