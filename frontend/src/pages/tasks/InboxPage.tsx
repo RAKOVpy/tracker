@@ -148,7 +148,8 @@ function ProcessForm({ task, areas, projects, today, onSaved, onCancel }: Proces
   );
 }
 
-export function InboxPage() {
+/** `embedded` — внутри обзора недели: без шапки страницы, пустые «Входящие» — одной строкой. */
+export function InboxPage({ embedded = false }: { embedded?: boolean }) {
   const today = useToday();
   const { data: tasks, isLoading, error } = useTasks();
   const { data: areas = [] } = useAreas();
@@ -186,15 +187,17 @@ export function InboxPage() {
 
   return (
     <>
-      <div className="page-head">
-        <div>
-          <p className="page-head__eyebrow">Записать сейчас, решить потом</p>
-          <h1>Входящие</h1>
+      {!embedded && (
+        <div className="page-head">
+          <div>
+            <p className="page-head__eyebrow">Записать сейчас, решить потом</p>
+            <h1>Входящие</h1>
+          </div>
+          <button className="btn btn--primary btn--sm" type="button" onClick={openCapture}>
+            <Plus size={15} aria-hidden /> Записать
+          </button>
         </div>
-        <button className="btn btn--primary btn--sm" type="button" onClick={openCapture}>
-          <Plus size={15} aria-hidden /> Записать
-        </button>
-      </div>
+      )}
 
       {last && (
         <p className="notice notice--good inbox-last" role="status">
@@ -221,7 +224,9 @@ export function InboxPage() {
         </p>
       )}
 
-      {inbox.length === 0 ? (
+      {inbox.length === 0 && embedded ? (
+        <p className="notice notice--good">Во «Входящих» пусто — всё разобрано.</p>
+      ) : inbox.length === 0 ? (
         <div className="card empty">
           <span className="empty__icon">
             <Inbox size={26} strokeWidth={1.8} aria-hidden />

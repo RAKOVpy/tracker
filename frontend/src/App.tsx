@@ -40,6 +40,7 @@ const EditNotePage = page(notes, 'EditNotePage');
 const ReviewPage = page(() => import('./pages/knowledge/ReviewPage'), 'ReviewPage');
 const CreatePage = page(() => import('./pages/CreatePage'), 'CreatePage');
 const SettingsPage = page(() => import('./pages/SettingsPage'), 'SettingsPage');
+const WeekPage = page(() => import('./pages/WeekPage'), 'WeekPage');
 
 export default function App() {
   return (
@@ -67,6 +68,7 @@ export default function App() {
         <Route path="knowledge/notes/:id" element={<NotePage />} />
         <Route path="knowledge/notes/:id/edit" element={<EditNotePage />} />
         <Route path="review" element={<ReviewPage />} />
+        <Route path="week" element={<WeekPage />} />
         <Route path="new" element={<CreatePage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<TodayPage />} />

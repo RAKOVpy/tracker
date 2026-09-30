@@ -31,25 +31,48 @@ export interface Area {
   createdAt: string;
 }
 
-/**
- * Измеримая цель: «прочитать 320 страниц к 31 октября».
- * Достигнута ли цель — не хранится, а вычисляется из записей прогресса.
- */
-export interface Goal {
+/** target — цель к сроку: «480 страниц к 19 октября»; habit — привычка: «английский 20 минут каждый день». */
+export type GoalKind = 'target' | 'habit';
+
+interface GoalBase {
   id: string;
   title: string;
   description: string;
   /** null — цель без сферы. */
   areaId: string | null;
-  /** Единица измерения в свободной форме: «стр.», «минут», «км», «тренировок». */
+  /** Единица измерения в свободной форме: «стр.», «минут», «км», «раз». */
   unit: string;
+  /** У цели — сколько всего к сроку; у привычки — сколько за день (одна отметка записывает столько). */
   targetValue: number;
+  /** У цели — день старта; у привычки — с какого дня она считается. */
   startDate: IsoDate;
-  deadline: IsoDate;
   priority: Priority;
   status: GoalStatus;
   createdAt: string;
 }
+
+/**
+ * Измеримая цель: «прочитать 320 страниц к 31 октября».
+ * Достигнута ли цель — не хранится, а вычисляется из записей прогресса.
+ */
+export interface TargetGoal extends GoalBase {
+  kind: 'target';
+  deadline: IsoDate;
+  daysPerWeek: null;
+}
+
+/**
+ * Привычка: «английский 20 минут каждый день», «зал 3 раза в неделю». Срока нет; выполнение за неделю
+ * и серия вычисляются из записей прогресса (см. domain/habits.ts).
+ */
+export interface HabitGoal extends GoalBase {
+  kind: 'habit';
+  deadline: null;
+  /** Сколько дней в неделю: 7 — каждый день, 3 — «3 раза в неделю» в любые дни. */
+  daysPerWeek: number;
+}
+
+export type Goal = TargetGoal | HabitGoal;
 
 /** Запись прогресса: «12 октября прочитал 25 страниц». В один день записей может быть несколько. */
 export interface ProgressEntry {
@@ -283,6 +306,25 @@ export interface Project {
 export type ProjectInput = Pick<Project, 'title' | 'description' | 'areaId' | 'goalId' | 'status' | 'deadline' | 'milestones'>;
 export type ProjectPatch = Partial<ProjectInput>;
 
+// ---------- обзор недели ----------
+
+/**
+ * Обзор недели: итоги недели и фокус на следующую. `weekStart` — понедельник недели, которую подводили;
+ * фокус относится к неделе после неё.
+ */
+export interface WeeklyReview {
+  id: string;
+  weekStart: IsoDate;
+  /** До трёх главных дел на следующую неделю; их можно отмечать сделанными. */
+  focus: ChecklistItem[];
+  /** «Что получилось, что мешало». */
+  reflection: string;
+  createdAt: string;
+}
+
+export type WeeklyReviewInput = Pick<WeeklyReview, 'weekStart' | 'focus' | 'reflection'>;
+export type WeeklyReviewPatch = Partial<Pick<WeeklyReview, 'focus' | 'reflection'>>;
+
 export type SettingsPatch = Partial<Settings>;
 export type VacationInput = Pick<Vacation, 'start' | 'end'>;
 
@@ -294,6 +336,9 @@ export type ReviewInput = Omit<Review, 'id' | 'createdAt'>;
 
 export type AreaInput = Pick<Area, 'name' | 'color' | 'icon'>;
 export type AreaPatch = Partial<AreaInput & Pick<Area, 'order'>>;
-export type GoalInput = Omit<Goal, 'id' | 'createdAt' | 'status'>;
-export type GoalPatch = Partial<GoalInput & Pick<Goal, 'status'>>;
+/** Omit по каждому варианту объединения: обычный Omit склеил бы цель и привычку в одно. */
+type OmitEach<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+export type GoalInput = OmitEach<Goal, 'id' | 'createdAt' | 'status'>;
+/** Вид цели после создания не меняется; поля другого вида игнорируются (см. applyGoalPatch). */
+export type GoalPatch = Partial<Omit<GoalBase, 'id' | 'createdAt'> & { deadline: IsoDate | null; daysPerWeek: number | null }>;
 export type EntryInput = Omit<ProgressEntry, 'id' | 'createdAt'>;

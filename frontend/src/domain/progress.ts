@@ -1,6 +1,6 @@
 import { addDays, diffDays, type IsoDate } from '../lib/dates';
 import { LONG_TERM_DAYS, PRIORITIES } from './meta';
-import type { Goal, ProgressEntry, Vacation } from './types';
+import type { ProgressEntry, TargetGoal, Vacation } from './types';
 import { isVacationDay } from './vacation';
 
 /**
@@ -76,7 +76,7 @@ function countStreak(totals: Map<IsoDate, number>, today: IsoDate, vacations: Va
   return streak;
 }
 
-export function computeGoalStats(goal: Goal, entries: ProgressEntry[], today: IsoDate, vacations: Vacation[] = []): GoalStats {
+export function computeGoalStats(goal: TargetGoal, entries: ProgressEntry[], today: IsoDate, vacations: Vacation[] = []): GoalStats {
   const { targetValue: target, startDate, deadline } = goal;
   const dailyTotals = sumByDate(entries);
 
@@ -138,8 +138,9 @@ export function computeGoalStats(goal: Goal, entries: ProgressEntry[], today: Is
   };
 }
 
+/** Цель к сроку со статистикой; привычки — HabitWithStats в domain/habits.ts. */
 export interface GoalWithStats {
-  goal: Goal;
+  goal: TargetGoal;
   entries: ProgressEntry[];
   stats: GoalStats;
 }

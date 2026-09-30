@@ -1,10 +1,11 @@
-import { Brain, FolderKanban, Inbox, ListTodo, Plus, Settings, Sun, Target, type LucideIcon } from 'lucide-react';
+import { Brain, CalendarCheck, FolderKanban, Inbox, ListTodo, Plus, Settings, Sun, Target, type LucideIcon } from 'lucide-react';
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAreas, useKnowledge, useToday, useWork } from '../api/hooks';
 import { isForToday } from '../domain/tasks';
 import { isTyping } from '../lib/keyboard';
 import { LoadingState } from '../pages/states';
+import { OfflineNotice } from './OfflineNotice';
 import { QuickCaptureContext, useQuickCapture } from './quickCapture';
 import { QuickCapture } from './tasks/QuickCapture';
 
@@ -33,6 +34,7 @@ const KNOWLEDGE: NavItem = {
   icon: Brain,
   isActive: (p) => p.startsWith('/knowledge') || p === '/review',
 };
+const WEEK: NavItem = { to: '/week', label: 'Неделя', icon: CalendarCheck, isActive: (p) => p === '/week' };
 const SETTINGS: NavItem = { to: '/settings', label: 'Настройки', icon: Settings, isActive: (p) => p === '/settings' };
 
 interface Counts {
@@ -93,6 +95,7 @@ function Sidebar() {
         {link(PROJECTS)}
         {link(GOALS)}
         {link(KNOWLEDGE, counts.due, 'к повторению')}
+        {link(WEEK)}
       </nav>
 
       {areas && areas.length > 0 && (
@@ -126,8 +129,8 @@ function MobileTop() {
       <Link to="/" className="brand">
         <Target size={20} strokeWidth={2} aria-hidden /> Трекер
       </Link>
-      <nav className="mobile-top__links" aria-label="Входящие и настройки">
-        {[INBOX, SETTINGS].map((item) => (
+      <nav className="mobile-top__links" aria-label="Неделя, входящие и настройки">
+        {[WEEK, INBOX, SETTINGS].map((item) => (
           <Link
             key={item.to}
             to={item.to}
@@ -217,6 +220,7 @@ export function Layout() {
         <div className="content">
           <MobileTop />
           <main className="container">
+            <OfflineNotice />
             <Suspense fallback={<LoadingState />}>
               <Outlet />
             </Suspense>

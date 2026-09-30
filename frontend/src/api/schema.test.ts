@@ -31,8 +31,11 @@ const v1Data = {
 
 /** Данные в формате v2: как их хранила предыдущая версия приложения. */
 function migrateToV2() {
-  const { materials: _m, notes: _n, reviews: _r, settings: _s, vacations: _v, tasks: _t, projects: _p, ...v2 } = migrate(v1Data, makeCtx());
-  return v2;
+  const { materials: _m, notes: _n, reviews: _r, settings: _s, vacations: _v, tasks: _t, projects: _p, weeklyReviews: _w, ...v2 } = migrate(
+    v1Data,
+    makeCtx(),
+  );
+  return { ...v2, goals: v2.goals.map(({ kind: _kind, daysPerWeek: _days, ...goal }) => goal) };
 }
 
 describe('migrate', () => {
@@ -80,6 +83,18 @@ describe('migrate', () => {
     const db = migrate(v7, makeCtx());
     expect(db.materials[0].parts).toEqual([]);
     expect(db.tasks[0]).toMatchObject({ materialId: null, partId: null, recurrence: null, repeatOf: null });
+  });
+
+  it('v8 → v9: все прежние цели — цели к сроку, обзоров недели пока нет', () => {
+    const v8 = { version: 8, ...migrateToV2(), materials: [], notes: [], reviews: [], settings: {}, vacations: [], tasks: [], projects: [] };
+    const db = migrate(v8, makeCtx());
+    expect(db.goals.map((g) => [g.kind, g.daysPerWeek])).toEqual([
+      ['target', null],
+      ['target', null],
+      ['target', null],
+    ]);
+    expect(db.goals[0].deadline).toBe('2026-09-30');
+    expect(db.weeklyReviews).toEqual([]);
   });
 
   it('v2 → v3: добавляются пустые списки знаний', () => {
@@ -136,6 +151,72 @@ describe('validateDb', () => {
     expect(() => validateDb({ ...db, goals: [{ ...db.goals[0], startDate: '2026-13-01' }] })).toThrow('ГГГГ-ММ-ДД');
     expect(validateDb({ ...db, entries: [{ ...db.entries[0], date: '2028-02-29' }] }).entries[0].date).toBe('2028-02-29');
     expect(() => validateDb({ ...db, goals: [db.goals[0], db.goals[0]] })).toThrow('повторяется id');
+  });
+});
+
+describe('привычки', () => {
+  const base = () => migrate(v1Data, makeCtx());
+  const habit = (overrides: Record<string, unknown> = {}) => ({
+    id: 'h1', kind: 'habit', title: 'Английский', description: '', areaId: null, unit: 'минут', targetValue: 20,
+    startDate: '2026-09-01', deadline: null, daysPerWeek: 7, priority: 'medium', status: 'active', createdAt: 'x', ...overrides,
+  });
+
+  it('проходят проверку без изменений', () => {
+    const db = { ...base(), goals: [habit(), habit({ id: 'h2', title: 'Зал', unit: 'раз', targetValue: 1, daysPerWeek: 3 })], entries: [] };
+    expect(validateDb(db)).toEqual(db);
+  });
+
+  it('поле другого вида отбрасывается: у привычки нет срока, у цели — частоты', () => {
+    const db = base();
+    const fixed = validateDb({ ...db, goals: [habit({ deadline: '2026-10-01' }), { ...db.goals[0], daysPerWeek: 3 }] });
+    expect(fixed.goals.map((g) => [g.kind, g.deadline, g.daysPerWeek])).toEqual([
+      ['habit', null, 7],
+      ['target', '2026-09-30', null],
+    ]);
+  });
+
+  it('отклоняют ошибки', () => {
+    const db = base();
+    expect(() => validateDb({ ...db, goals: [habit({ daysPerWeek: 0 })] })).toThrow('от 1 до 7');
+    expect(() => validateDb({ ...db, goals: [habit({ daysPerWeek: 2.5 })] })).toThrow('от 1 до 7');
+    expect(() => validateDb({ ...db, goals: [habit({ daysPerWeek: null })] })).toThrow('«daysPerWeek»');
+    expect(() => validateDb({ ...db, goals: [habit({ targetValue: 0 })] })).toThrow('норма за день');
+    expect(() => validateDb({ ...db, goals: [habit({ kind: 'routine' })] })).toThrow('«kind»');
+    // У цели к сроку срок обязателен.
+    expect(() => validateDb({ ...db, goals: [{ ...db.goals[0], deadline: null }] })).toThrow('«deadline»');
+  });
+});
+
+describe('обзоры недели', () => {
+  const base = () => migrate(v1Data, makeCtx());
+  const review = (overrides: Record<string, unknown> = {}) => ({
+    id: 'w1',
+    weekStart: '2026-09-28',
+    focus: [
+      { id: 'f1', text: 'Доклад на семинаре', done: true },
+      { id: 'f2', text: 'Эссе Task 2', done: false },
+    ],
+    reflection: 'Получилось: зал три раза. Мешало: поздно ложился.',
+    createdAt: 'x',
+    ...overrides,
+  });
+
+  it('проходят проверку и сортируются по неделе', () => {
+    const db = { ...base(), weeklyReviews: [review(), review({ id: 'w0', weekStart: '2026-09-21', focus: [], reflection: '' })] };
+    expect(validateDb(db).weeklyReviews.map((r) => r.id)).toEqual(['w0', 'w1']);
+    expect(validateDb(db).weeklyReviews[1]).toEqual(review());
+  });
+
+  it('отклоняют ошибки', () => {
+    const db = base();
+    expect(() => validateDb({ ...db, weeklyReviews: [review({ weekStart: '2026-09-29' })] })).toThrow('с понедельника');
+    const four = ['а', 'б', 'в', 'г'].map((text, i) => ({ id: `f${i}`, text, done: false }));
+    expect(() => validateDb({ ...db, weeklyReviews: [review({ focus: four })] })).toThrow('не больше 3');
+    expect(() => validateDb({ ...db, weeklyReviews: [review({ focus: [{ id: 'f1', text: '', done: false }] })] })).toThrow(
+      'Обзор недели 1, пункт фокуса 1',
+    );
+    expect(() => validateDb({ ...db, weeklyReviews: [review(), review({ id: 'w2' })] })).toThrow('два обзора одной недели');
+    expect(() => validateDb({ ...db, weeklyReviews: [review(), review({ weekStart: '2026-10-05' })] })).toThrow('повторяется id');
   });
 });
 
@@ -401,6 +482,7 @@ describe('резервная копия', () => {
     expect(db.areas).toHaveLength(4);
     expect(db.areas.map((a) => a.order)).toEqual([0, 1, 2, 3]);
     expect(db.notes).toEqual([]);
+    expect(db.weeklyReviews).toEqual([]);
     expect(validateDb(db)).toEqual(db);
   });
 });

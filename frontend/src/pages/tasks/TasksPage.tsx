@@ -1,6 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { FolderKanban, Inbox, Plus, Sparkles } from 'lucide-react';
-import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { seedTasksDemo } from '../../api/demo';
 import { useAreaMap, useMaterialMap, useProjectMap, useToday, useWork } from '../../api/hooks';
@@ -19,24 +17,14 @@ import {
 import type { Task } from '../../domain/types';
 import { plural } from '../../lib/format';
 import { ErrorState, LoadingState } from '../states';
+import { useSeedDemo } from '../../components/useSeedDemo';
 
 /** Сколько закрытых задач показывать в «Сделано»: старые не нужны каждый день. */
 const CLOSED_LIMIT = 50;
 
 function EmptyTasks() {
   const openCapture = useQuickCapture();
-  const client = useQueryClient();
-  const [seeding, setSeeding] = useState(false);
-
-  async function seed() {
-    setSeeding(true);
-    try {
-      await seedTasksDemo();
-      await client.invalidateQueries();
-    } finally {
-      setSeeding(false);
-    }
-  }
+  const { seeding, seed } = useSeedDemo(seedTasksDemo);
 
   return (
     <div className="card empty">

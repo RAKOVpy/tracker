@@ -47,6 +47,11 @@ export function weekdayIndex(date: IsoDate): number {
   return (new Date(toUtcMs(date)).getUTCDay() + 6) % 7;
 }
 
+/** Понедельник недели, в которую попадает день. */
+export function startOfWeek(date: IsoDate): IsoDate {
+  return addDays(date, -weekdayIndex(date));
+}
+
 /** Количество дней от `from` до `to` (to - from). */
 export function diffDays(from: IsoDate, to: IsoDate): number {
   return Math.round((toUtcMs(to) - toUtcMs(from)) / DAY_MS);

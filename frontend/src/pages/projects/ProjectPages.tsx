@@ -1,4 +1,4 @@
-import { CircleCheck, FolderKanban, Pencil, Plus, Target, Trash2 } from 'lucide-react';
+import { CircleCheck, FolderKanban, Pencil, Plus, Repeat, Target, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
@@ -7,12 +7,13 @@ import {
   useCreateProject,
   useCreateTask,
   useDeleteProject,
-  useGoalsWithStats,
+  useGoals,
   useToday,
   useUpdateProject,
   useWork,
 } from '../../api/hooks';
 import { BackButton } from '../../components/BackButton';
+import { stateText, streakText } from '../../components/habits/habitText';
 import { describePace } from '../../components/pace';
 import { ProgressBar } from '../../components/ProgressBar';
 import { ProjectForm, type ProjectFields } from '../../components/projects/ProjectForm';
@@ -144,7 +145,7 @@ export function ProjectPage() {
   const today = useToday();
   const { data, isLoading, error } = useWork();
   const areas = useAreaMap();
-  const goals = useGoalsWithStats();
+  const goals = useGoals();
   const update = useUpdateProject();
   const remove = useDeleteProject();
   const [pendingStatus, setPendingStatus] = useState<ProjectStatus | null>(null);
@@ -159,7 +160,9 @@ export function ProjectPage() {
   const progress = projectProgress(tasks);
   const next = nextStep(project, tasks, today);
   const area = project.areaId ? areas.get(project.areaId) : undefined;
-  const goal = project.goalId ? goals.data?.find((g) => g.goal.id === project.goalId) : undefined;
+  const goal = project.goalId ? goals.data?.targets.find((g) => g.goal.id === project.goalId) : undefined;
+  const habit = project.goalId ? goals.data?.habits.find((h) => h.goal.id === project.goalId) : undefined;
+  const habitState = habit ? stateText(habit.goal, habit.stats) : null;
   const deadline = project.deadline && project.status === 'active' ? deadlineTag(project.deadline, today) : null;
   const milestoneIds = new Set(project.milestones.map((m) => m.id));
   const loose = tasks.filter((t) => t.milestoneId === null || !milestoneIds.has(t.milestoneId));
@@ -278,6 +281,19 @@ export function ProjectPage() {
             </span>
           </Link>
         )}
+        {habit && (
+          <Link to={`/goals/${habit.goal.id}`} className="card project-goal">
+            <Repeat size={18} aria-hidden />
+            <span className="spacer">
+              <span className="muted small">Привычка проекта</span>
+              <b>{habit.goal.title}</b>
+            </span>
+            <span className="project-goal__stats small">
+              {habit.stats.streak > 1 && <span className="streak">{streakText(habit.goal, habit.stats.streak)}</span>}
+              {habitState && <span className={habitState.tone ? `tag--${habitState.tone}` : 'muted'}>{habitState.text}</span>}
+            </span>
+          </Link>
+        )}
 
         {project.description && (
           <p className="muted" style={{ whiteSpace: 'pre-line', maxWidth: '65ch', margin: 0 }}>
@@ -339,10 +355,11 @@ export function ProjectPage() {
   );
 }
 
-/** Цели, с которыми можно связать проект: активные, плюс уже связанная. */
+/** Цели и привычки, с которыми можно связать проект: активные, плюс уже связанная. */
 function useGoalOptions(currentGoalId: string | null) {
-  const goals = useGoalsWithStats();
-  const options = (goals.data ?? []).map((g) => g.goal).filter((g) => g.status === 'active' || g.id === currentGoalId);
+  const goals = useGoals();
+  const all = [...(goals.data?.targets ?? []), ...(goals.data?.habits ?? [])].map((g) => g.goal);
+  const options = all.filter((g) => g.status === 'active' || g.id === currentGoalId);
   return { options, isLoading: goals.isLoading };
 }
 

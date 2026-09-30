@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronUp, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { useAreas, useCreateArea, useDeleteArea, useGoalsWithStats, useKnowledge, useUpdateArea, useWork } from '../api/hooks';
+import { useAreas, useCreateArea, useDeleteArea, useGoals, useKnowledge, useUpdateArea, useWork } from '../api/hooks';
 import { AREA_COLORS } from '../domain/meta';
 import type { Area, AreaInput } from '../domain/types';
 import { plural } from '../lib/format';
@@ -16,7 +16,7 @@ function nextColor(areas: Area[]): AreaInput['color'] {
 
 export function AreaSettings() {
   const { data: areas, isLoading, error } = useAreas();
-  const { data: goals } = useGoalsWithStats();
+  const { data: goals } = useGoals();
   const { data: knowledge } = useKnowledge();
   const { data: work } = useWork();
   const createArea = useCreateArea();
@@ -28,13 +28,14 @@ export function AreaSettings() {
   if (error || !areas) return <p className="notice notice--bad">Не удалось загрузить сферы.</p>;
 
   const list: Area[] = areas;
-  const goalCount = (areaId: string) => goals?.filter((g) => g.goal.areaId === areaId).length ?? 0;
+  const inArea = (areaId: string) => (item: { goal: { areaId: string | null } }) => item.goal.areaId === areaId;
   const materialCount = (areaId: string) => knowledge?.materials.filter((m) => m.areaId === areaId).length ?? 0;
 
-  /** «2 цели, 3 задачи и 1 материал» — что лежит в сфере. */
+  /** «2 цели, 1 привычка, 3 задачи и 1 материал» — что лежит в сфере. */
   function describeContents(areaId: string): string | null {
     const counts: [number, [string, string, string]][] = [
-      [goalCount(areaId), ['цель', 'цели', 'целей']],
+      [goals?.targets.filter(inArea(areaId)).length ?? 0, ['цель', 'цели', 'целей']],
+      [goals?.habits.filter(inArea(areaId)).length ?? 0, ['привычка', 'привычки', 'привычек']],
       [work?.projects.filter((p) => p.areaId === areaId).length ?? 0, ['проект', 'проекта', 'проектов']],
       [work?.tasks.filter((t) => t.areaId === areaId).length ?? 0, ['задача', 'задачи', 'задач']],
       [materialCount(areaId), ['материал', 'материала', 'материалов']],
@@ -49,8 +50,12 @@ export function AreaSettings() {
     const a = list[index];
     const b = list[index + direction];
     if (!b) return;
-    await updateArea.mutateAsync({ id: a.id, patch: { order: b.order } });
-    await updateArea.mutateAsync({ id: b.id, patch: { order: a.order } });
+    try {
+      await updateArea.mutateAsync({ id: a.id, patch: { order: b.order } });
+      await updateArea.mutateAsync({ id: b.id, patch: { order: a.order } });
+    } catch {
+      // Сообщение «не сохранилось» уже показано.
+    }
   }
 
   return (

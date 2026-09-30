@@ -11,20 +11,21 @@
 ## Этапы
 
 Модули продукта, исходные идеи с поправками и план этапов описаны в [PRODUCT.md](PRODUCT.md).
-Этот документ описывает техническое устройство того, что уже сделано
-(этапы 1–4), и проект бэкенда. Формат заметок Obsidian описан
+Этот документ описывает техническое устройство того, что уже сделано:
+этапы 1–5 и сервер с подключённым к нему фронтендом (этапы 6.1–6.2). Формат заметок Obsidian описан
 в [obsidian/README.md](../obsidian/README.md).
 
 ## Предметная модель
 
 ```
-Area 1 ──── * Goal 1 ──── * ProgressEntry
+Area 1 ──── * Goal 1 ──── * ProgressEntry    Goal: цель к сроку или привычка (kind)
 Area 1 ──── * Material 1 ──── * Note 1 ──── * Review
 Area 1 ──── * Task (со «Входящими»; подзадачи — список внутри задачи)
 Goal 1 ──── * Project 1 ──── * Task       Project: вехи — список внутри проекта, Task → веха
 Material 1 ──── * Task                    Material: части — список внутри материала, Task → часть
 Task 1 ──── 0..1 Task                     следующий повтор ссылается на предыдущий (repeatOf)
 Settings (одни на пользователя)        Vacation (список отпусков)
+WeeklyReview (обзор недели, один на неделю)
 ```
 
 **Area** — сфера жизни: «Чтение», «Английский», «Спорт». Пользователь создаёт,
@@ -40,18 +41,21 @@ Settings (одни на пользователя)        Vacation (список 
 | `order` | число, порядок в списке |
 | `createdAt` | дата-время |
 
-**Goal** — измеримая цель.
+**Goal** — измеримая цель к сроку (`kind: target`) или привычка (`kind: habit`).
+Записи прогресса у них общие; вид после создания не меняется.
 
 | Поле | Тип | Пример |
 |------|-----|--------|
 | `id` | UUID | |
+| `kind` | `target` (цель к сроку) \| `habit` (привычка) | `target` |
 | `title` | строка | «Прочитать „Атлант расправил плечи“» |
 | `description` | текст | заметки, мотивация |
 | `areaId` | FK → Area или `null` | цель без сферы |
-| `unit` | строка | «стр.», «часов», «тренировок» |
-| `targetValue` | число > 0 | 480 |
-| `startDate` | дата | 2026-09-20 |
-| `deadline` | дата ≥ startDate | 2026-10-19 |
+| `unit` | строка | «стр.», «часов», «раз» |
+| `targetValue` | число > 0: у цели — всего к сроку, у привычки — норма за день | 480 |
+| `startDate` | дата: старт цели или день, с которого считается привычка | 2026-09-20 |
+| `deadline` | дата ≥ startDate у цели; `null` у привычки | 2026-10-19 |
+| `daysPerWeek` | 1–7 у привычки (7 — каждый день); `null` у цели | `null` |
 | `priority` | `high` \| `medium` \| `low` | `high` |
 | `status` | `active` \| `archived` | `active` |
 | `createdAt` | дата-время | |
@@ -152,7 +156,7 @@ Settings (одни на пользователя)        Vacation (список 
 | `createdAt` | дата-время |
 
 **Project** — проект: дело из нескольких шагов, «Подготовиться к IELTS». Можно связать
-с измеримой целью («Набрать 7.0»).
+с измеримой целью («Набрать 7.0») или с привычкой («английский каждый день»).
 
 | Поле | Тип |
 |------|-----|
@@ -167,10 +171,22 @@ Settings (одни на пользователя)        Vacation (список 
 | `completedAt` | когда завершили или отменили; при возврате в работу — `null` |
 | `createdAt` | дата-время |
 
+**WeeklyReview** — обзор недели: итоги недели с понедельника по воскресенье и фокус на следующую.
+
+| Поле | Тип |
+|------|-----|
+| `id` | UUID |
+| `weekStart` | понедельник недели, которую подводили; одна неделя — один обзор |
+| `focus` | до 3 пунктов на следующую неделю: список `{ id, text, done }`, как подзадачи |
+| `reflection` | «что получилось, что мешало», может быть пустым |
+| `createdAt` | дата-время |
+
 Что **не хранится**, а вычисляется:
 
 - у целей — текущий прогресс, «достигнута», «просрочена», «долгосрочная»
   (длительность > 30 дней), норма на сегодня, серия дней;
+- у привычек — засчитанные дни, норма и выполнение недели, серия с прощёнными пропусками,
+  выполнение за четыре недели, нужна ли привычка сегодня;
 - у заметок — уровень освоения, дата следующего повторения (с учётом отпусков),
   последний интервал, число забываний;
 - у задач — срочность (из дедлайна), день в списке («сегодня», «завтра», «на неделе»…),
@@ -179,7 +195,8 @@ Settings (одни на пользователя)        Vacation (список 
   «нет следующего шага», «все задачи сделаны»;
 - у частей материала — «законспектирована» по сделанной задаче-конспекту, прогресс материала,
   следующая часть; у повторяющихся задач — дата следующего раза и прошлые разы;
-- итог дня на «Сегодня»: задачи, нормы по целям и повторение вместе;
+- итог дня на «Сегодня»: задачи, привычки, нормы по целям и повторение вместе;
+- у обзора недели — какую неделю подводить, итоги недели, подсказки для фокуса;
 - очередь на сегодня с учётом лимита, долг повторений и прогноз нагрузки. Они получаются «проигрыванием» журнала повторений, поэтому
   отмена оценки — это просто удаление записи из журнала, а смена алгоритма
   (например, на FSRS) пересчитает расписание по уже накопленной истории.
@@ -207,6 +224,52 @@ Settings (одни на пользователя)        Vacation (список 
 - **Серия** — дней подряд с прогрессом. Если сегодня ещё не отмечено, считаем со вчера,
   чтобы серия не «сгорала» утром. Дни отпуска без записей серию не прерывают, но и не продлевают.
   Сроки и нормы целей отпуск не меняет.
+
+## Привычки
+
+Логика — чистые функции в `frontend/src/domain/habits.ts`, покрыта тестами.
+
+- **Привычка = частота и норма за день.** «Английский 20 минут каждый день» — `daysPerWeek = 7`,
+  `targetValue = 20`, `unit = минут`; «зал 3 раза в неделю» — `daysPerWeek = 3`, `targetValue = 1`, `unit = раз`.
+  День засчитан, когда за него записано не меньше нормы; несколько записей за день складываются, две
+  тренировки в один день — один засчитанный день. Отметка на «Сегодня» записывает недостающее до нормы,
+  повторное нажатие удаляет записи этого дня.
+- **Норма недели** — `daysPerWeek` засчитанных дней с понедельника по воскресенье. Дни отпуска и дни
+  до старта уменьшают её пропорционально: `round(daysPerWeek × доступные дни / 7)`; неделя целиком
+  в отпуске ничего не требует.
+- **Что сегодня** (`state`): ежедневная нужна каждый день (`due`); недельная — только когда оставшихся
+  дней недели без отпуска впритык на недостающие разы, иначе «можно сегодня» (`open`), а после нормы —
+  «отдых» (`rest`). В отпуске — `paused`, до старта — `upcoming`. В итог дня попадают нужные сегодня
+  и отмеченные сегодня.
+- **Серия** — у ежедневной в днях, у недельной в неделях. Пока сегодняшний день (текущая неделя)
+  не выполнен, серия считается со вчера (с прошлой недели). **Заморозка:** у ежедневной прощается
+  пропуск, если предыдущий прощённый был не ближе чем за 7 дней («один пропуск в неделю»), у недельной —
+  неделя без одного раза не чаще раза в 4 недели. Прощённый пропуск серию не продлевает, два пропуска
+  подряд её прерывают. Отпуск не прерывает и не продлевает. Идём от сегодняшнего дня назад и прощаем
+  самые поздние пропуски — так серия получается самой длинной из честных.
+- **Выполнение за 4 недели**: у ежедневной — засчитанные дни из нужных за 28 дней (сегодня — если
+  уже отмечено, отпуск не в счёт), у недельной — по четырём прошедшим неделям, лишние разы сверх нормы
+  не в счёт.
+- **Календарь** — последние 12 недель строками: дни отмечены «сделано», «начато» (меньше нормы),
+  «пропуск», «пропуск, серия сохранена», «отпуск»; справа — «засчитано из нужного» за неделю.
+
+## Обзор недели
+
+Логика — чистые функции в `frontend/src/domain/week.ts`, покрыта тестами.
+
+- **Какая неделя.** С пятницы по воскресенье подводится текущая неделя, с понедельника по четверг —
+  прошлая: обзор, пропущенный в выходные, можно сделать в начале недели. Фокус выбирается на неделю
+  после подводимой. На «Сегодня» — фокус из обзора прошлой недели и напоминание с пятницы по понедельник,
+  пока неделю не подвели; со вторника по четверг не напоминаем.
+- **Шаги**: входящие (тот же разбор, что на странице «Входящие») → где отстаю: цели позади плана или
+  с прошедшим сроком, привычки с невыполненной нормой недели, проекты без следующего шага → повторения
+  и долг → фокус до 3 пунктов → «что получилось, что мешало» с итогами недели. Черновик хранится
+  в `sessionStorage` и переживает переход, например, в сессию повторения.
+- **Итоги недели**: сделанные задачи, повторения, привычки (засчитано из нужного, у идущей недели —
+  по сегодня) и сколько пунктов прошлого фокуса сделано.
+- **Подсказки для фокуса**: несделанное из фокуса подводимой недели, важные задачи со сроком
+  или планом до конца следующей недели, отстающие цели, проекты без следующего шага, привычки
+  с невыполненной нормой. Одинаковые тексты не повторяются.
 
 ## Расписание повторений
 
@@ -275,8 +338,8 @@ Settings (одни на пользователя)        Vacation (список 
   потом по дедлайну и плану. Сделанные сегодня остаются в списке зачёркнутыми, отметку можно снять.
 - **«Перенести на завтра»** — открытые задачи на сегодня получают план на завтра. Задачи
   с дедлайном сегодня или раньше не переносятся: перенос не отменит срок.
-- **Итог дня** — одно кольцо на всё: задачи на сегодня, нормы по целям и повторение
-  (одно дело, сколько бы ни было заметок; сделано, если очередь пуста и сегодня повторяли).
+- **Итог дня** — одно кольцо на всё: задачи на сегодня, привычки, нужные сегодня, нормы по целям
+  и повторение (одно дело, сколько бы ни было заметок; сделано, если очередь пуста и сегодня повторяли).
 - **Быстрая запись** — без даты запись попадает во «Входящие», с «Сегодня» или «Завтра»
   (или с датой, повтором, проектом в самом тексте — см. «Разбор текста при вводе») сразу
   становится задачей. Разбор входящих: в задачи (день, дедлайн, важность, сфера),
@@ -387,20 +450,29 @@ Settings (одни на пользователя)        Vacation (список 
 
 ## Хранение и резервные копии
 
-Пока данные лежат в `localStorage` браузера под ключом `tracker:data` в виде
-`{ version, areas, goals, entries, materials, notes, reviews, settings, vacations, tasks, projects }`.
-Код — `frontend/src/api/schema.ts` и `localApi.ts`.
+Где лежат данные, решается при сборке фронтенда (`frontend/src/api/index.ts`):
+
+- **на сервере** — если задан `VITE_API_URL` (например, `/api`): нужен вход, каждое изменение
+  сразу уходит в базу, данные одинаковые на всех устройствах (раздел «Работа через сервер» ниже);
+- **в браузере** — без `VITE_API_URL`: `localStorage` под ключом `tracker:data` в виде
+  `{ version, areas, goals, entries, materials, notes, reviews, settings, vacations, tasks, projects, weeklyReviews }`,
+  код — `frontend/src/api/schema.ts` и `localApi.ts`. Этот режим остался для разработки без сервера
+  и для тестов.
+
+Формат данных в обоих случаях один, поэтому резервную копию из одного режима можно загрузить в другой.
 
 - **Версия схемы.** При каждом изменении модели растёт `SCHEMA_VERSION` и добавляется
   шаг миграции. При загрузке старые данные автоматически приводятся к текущей версии.
   v1 → v2 заменила категории целей сферами, v2 → v3 добавила материалы, заметки
   и повторения, v3 → v4 — путь к файлу Obsidian, v4 → v5 — настройки нагрузки
   и отпуска, v5 → v6 — задачи, v6 → v7 — проекты, v7 → v8 — части материалов, повторы задач
-  и задачи по частям. Ключ `tracker:v1` не удаляется
+  и задачи по частям, v8 → v9 — вид цели (все прежние — цели к сроку) и обзоры недели.
+  Ключ `tracker:v1` не удаляется
   и остаётся запасной копией. Сведения о подключённом хранилище (`tracker:obsidian`)
   и дескриптор папки (IndexedDB) хранятся отдельно и в резервную копию не входят.
 - **Проверка.** После миграции данные проверяются: типы полей, настоящие календарные даты,
-  уникальность id, правила повтора. Висячие ссылки чинятся: цель, материал, задача или проект
+  уникальность id, правила повтора, частота привычки 1–7, обзор недели — с понедельника, один на неделю,
+  не больше 3 пунктов фокуса. Поле другого вида (срок у привычки, частота у цели) отбрасывается. Висячие ссылки чинятся: цель, материал, задача или проект
   удалённой сферы остаются без сферы, проект удалённой цели — без цели, задача удалённого проекта
   или вехи, материала или части — без них, повтор удалённой задачи — без ссылки на неё, заметка
   удалённого материала — без материала, повторения удалённой заметки отбрасываются.
@@ -419,9 +491,13 @@ Settings (одни на пользователя)        Vacation (список 
 ```
 frontend/src/
 ├── domain/         # предметная область, без React
-│   ├── types.ts        Area, Goal, ProgressEntry, Material, Note, Review, Settings, Vacation, Task, Project, DTO
+│   ├── types.ts        Area, Goal (TargetGoal | HabitGoal), ProgressEntry, Material, Note, Review, Settings, Vacation,
+│   │                   Task, Project, WeeklyReview, DTO
 │   ├── meta.ts         сферы по умолчанию, типы и статусы материалов, приоритеты, склонение единиц
 │   ├── progress.ts     computeGoalStats, округление нормы, сортировка для «Сегодня»
+│   ├── goals.ts        правка цели без смены вида
+│   ├── habits.ts       норма недели, что сегодня, серия с заморозкой, выполнение, календарь
+│   ├── week.ts         обзор недели: какую неделю подводить, итоги, подсказки для фокуса
 │   ├── review.ts       расписание повторений, уровни освоения, очередь
 │   ├── load.ts         дневной лимит, долг, прогноз нагрузки, проверка «можно ли начать материал»
 │   ├── vacation.ts     сдвиг расписания на отпуск, текущий и запланированный отпуск
@@ -430,16 +506,24 @@ frontend/src/
 │   ├── parseTask.ts    разбор текста: «до пт», «каждое вс», «!важно», «#учёба»
 │   ├── parts.ts        части материала, законспектированность, нумерованные части
 │   ├── projects.ts     задачи в работе, прогресс, следующий шаг, готовность вех
-│   └── day.ts          итог дня: задачи, нормы по целям и повторение
+│   └── day.ts          итог дня: задачи, привычки, нормы по целям и повторение
 ├── api/            # доступ к данным
 │   ├── types.ts        интерфейс TrackerApi — контракт с бэкендом
 │   ├── schema.ts       версия схемы, миграции, проверка, формат резервной копии
 │   ├── localApi.ts     реализация на localStorage
-│   ├── index.ts        выбор реализации, чтение резервной копии
-│   ├── hooks.ts        хуки TanStack Query: useGoalsWithStats, useKnowledge, useTasks, useAreas, …
+│   ├── http.ts         запросы к серверу: JSON, CSRF, часовой пояс, понятные ошибки, 401
+│   ├── httpApi.ts      реализация на сервере (тот же TrackerApi)
+│   ├── auth.ts         сессия, вход, регистрация, выход, смена пароля
+│   ├── index.ts        выбор реализации по VITE_API_URL, чтение резервной копии
+│   ├── hooks.ts        хуки TanStack Query: useGoals (цели и привычки), useToggleHabit, useWeeklyReviews,
+│   │                   useKnowledge, useTasks, useAreas, …
 │   └── demo.ts         демо-данные
 ├── components/     # Layout, GoalCard, GoalForm, ProgressChart, AreaSettings, DataSettings,
-│   │                   LoadSettings, VacationSettings, VacationBanner, NumberStepper, …
+│   │                   LoadSettings, VacationSettings, VacationBanner, NumberStepper,
+│   │                   Toasts (сообщения «не сохранилось»), OfflineNotice, …
+│   ├── auth/           AuthGate (вход перед приложением), AuthScreen, AccountSettings, PasswordInput
+│   ├── habits/         HabitRow и HabitCheck (отметка одним нажатием), TodayHabits, HabitCalendar, тексты
+│   ├── week/           WeekFocusCard (фокус и напоминание на «Сегодня»), FocusList
 │   ├── knowledge/      NoteForm, MaterialForm, MaterialCard, DueReviewsCard, LoadForecast,
 │                       StartMaterial (осознанный старт), лестница и строки заметок,
 │                       PartsSection, PartsEditor, PartsGenerator (части и конспекты)
@@ -448,7 +532,8 @@ frontend/src/
 │   │                   ParsedChips и useTaskParser (распознанное в тексте), подписи дат
 │   └── projects/       ProjectCard, ProjectForm (с вехами), ProjectPicker (проект и веха задачи)
 ├── obsidian/       # parse.ts, sync.ts, vault.ts, useObsidian.ts, templates.ts (из ../obsidian/templates)
-├── pages/          # TodayPage, GoalsPage, GoalPage, GoalFormPages, SettingsPage, CreatePage
+├── pages/          # TodayPage, GoalsPage, GoalPage (цель или привычка), GoalFormPages, WeekPage, SettingsPage,
+│   │                   CreatePage, LoginPage
 │   ├── knowledge/      KnowledgePage, MaterialPages, NotePages, ReviewPage
 │   ├── tasks/          TasksPage, InboxPage, TaskPages
 │   └── projects/       ProjectsPage, ProjectPages
@@ -456,33 +541,77 @@ frontend/src/
 ```
 
 **Главный принцип:** компоненты не знают, где лежат данные. Они вызывают хуки из
-`api/hooks.ts`, те обращаются к интерфейсу `TrackerApi`. Чтобы перейти на DRF,
-достаточно написать `httpApi.ts` с тем же интерфейсом и подключить его в `api/index.ts`.
+`api/hooks.ts`, те обращаются к интерфейсу `TrackerApi`, а его реализует либо `localApi.ts`,
+либо `httpApi.ts`. Переход на сервер не потребовал правок в экранах — только вход и тексты
+о том, где хранятся данные.
+
+**Работа через сервер** (сборка с `VITE_API_URL`):
+
+- **Вход.** `AuthGate` спрашивает `/api/auth/session/` и до входа показывает экран «Вход»
+  (регистрация — если сервер её разрешает). После входа открывается та страница, по ссылке
+  на которую пришли. Любой ответ `401` (сессия закончилась, вышли в другой вкладке) возвращает
+  к экрану входа с пояснением; кэш данных при этом очищается, чтобы следующий вход начинался
+  с чистого листа. Если сервер не отвечает — экран «Сервер не отвечает» с кнопкой «Повторить».
+- **Запросы** (`http.ts`): JSON, кука сессии, CSRF-токен из куки `csrftoken` в `X-CSRFToken`,
+  часовой пояс браузера в `X-Timezone`, таймаут 60 секунд. Ответ сервера превращается в ошибку
+  с текстом для человека: `400` — текст сервера (у отпуска — `VacationError`, как без сервера),
+  `404` — `NotFoundError`, `5xx` и не-JSON — «Сервер не смог выполнить запрос», обрыв — «Нет связи
+  с сервером». Если куки CSRF нет, она запрашивается заново и запрос повторяется один раз.
+  Удаление уже удалённого (например, в другой вкладке) считается успешным.
+- **Несохранённое видно всегда.** Любая неудачная правка показывает сообщение внизу экрана
+  (`Toasts`, слой popover — виден и поверх окна «Записать»); правки с мгновенным откликом (галочки,
+  счётчики нагрузки) при ошибке возвращаются как были. Формы, которые показывают ошибку сами
+  (отпуск, восстановление из копии), помечены `meta.ownErrors`.
+- **Быстрые правки по очереди.** Галочки задач и подзадач, части материала и счётчики нагрузки
+  уходят на сервер по одной (`scope` в TanStack Query): две быстрые отметки не обгонят друг друга
+  в сети. Список перечитывается после последней правки в очереди, иначе ответ на первую на миг
+  вернул бы на экран состояние без следующих.
+- **Без интернета** (`navigator.onLine`) правки не падают, а ждут связи в памяти вкладки
+  и уходят сами, когда она вернётся; плашка просит не закрывать вкладку. При возвращении
+  во вкладку данные старше 30 секунд перечитываются — изменения с другого устройства появляются сами.
+- **Obsidian.** Папка читается в браузере, `applyVault` сопоставляет её с данными с сервера,
+  а на сервер уходят только новые и изменённые материалы и заметки. Один и тот же сценарий
+  синхронизации в обоих режимах даёт одинаковые данные (проверено сквозным тестом).
+- **Пример данных** создаётся обычными запросами к API (около 70, на локальной машине —
+  меньше двух секунд); при сбое остаётся то, что успело создаться, и появляется сообщение.
+
+**Для разработки** `npm run dev` и `npm run preview` проксируют `/api` на Django
+(`BACKEND_URL`, по умолчанию `http://127.0.0.1:8000`). Заголовок `Host` при этом не подменяется:
+Django сверяет его с `Origin`, когда проверяет CSRF.
 
 **Навигация:** на компьютере — боковая панель: кнопка «Записать» (или клавиша N в любом месте,
 в любой раскладке; окно понимает «до пт», «каждое вс», «!важно», «#учёба» и показывает распознанное), Сегодня, Входящие с числом записей, Задачи с числом задач на сегодня,
-Проекты, Цели, Знания с числом заметок к повторению, список сфер, Настройки.
+Проекты, Цели, Знания с числом заметок к повторению, Неделя, список сфер, Настройки.
 На телефоне — нижняя панель: Сегодня, Задачи (оттуда же — проекты), «+» (записать), Цели, Знания;
-в шапке — Входящие и Настройки. Разделы, кроме «Сегодня», загружаются отдельными файлами, когда их открывают.
+в шапке — Неделя, Входящие и Настройки. Разделы, кроме «Сегодня», загружаются отдельными файлами, когда их открывают.
 
 **Экраны:**
 
-1. **Сегодня** (`/`) — приветствие, итог дня «осталось N дел» (задачи, нормы по целям
-   и повторение), плашка отпуска, карточка «N заметок к повторению» (в пределах лимита,
+0. **Вход** (только с сервером) — почта и пароль, показать пароль, регистрация, если сервер
+   её разрешает, подсказка, как сменить забытый пароль на сервере.
+1. **Сегодня** (`/`) — приветствие, итог дня «осталось N дел» (задачи, привычки, нормы по целям
+   и повторение), фокус недели с отметками и напоминание об обзоре, плашка отпуска, карточка «N заметок к повторению» (в пределах лимита,
    с объяснением долга), задачи на сегодня и с прошедшим сроком (отметка одним нажатием,
    повтор и материал в строке задачи, добавить задачу на сегодня — с разбором текста и подсказкой,
-   куда ушла задача не на сегодня, «Перенести на завтра», напоминание о входящих) и группы целей:
+   куда ушла задача не на сегодня, «Перенести на завтра», напоминание о входящих), привычки (отметка
+   одним нажатием, частота и норма, «на неделе 1 из 3», серия, неделя точками; сначала нужные сегодня)
+   и группы целей:
    «Цели: норма на сегодня» (сначала отстающие, затем по приоритету и сроку),
    «Цели: срок прошёл», «Цели: норма выполнена», «Цели запланированы», «Цели достигнуты».
    На карточке: иконка сферы, прогресс с отметкой плана, норма на сегодня, быстрая запись
    (пустое поле = записать остаток нормы), темп, серия, активность за 7 дней.
-2. **Цели** (`/goals`, `/goals?area=<id>`) — все цели по группам «В работе»,
+2. **Цели** (`/goals`, `/goals?area=<id>`) — привычки и цели по группам «Привычки», «В работе»,
    «Запланированы», «Достигнуты», «Архив» с фильтром по сферам.
 3. **Цель** (`/goals/:id`) — показатели, подсказка «что делать дальше», проекты цели, график
    «факт против плана», запись прогресса за любой прошедший день, история,
-   архив и удаление с подтверждением.
-4. **Создание / редактирование** (`/goals/new`, `/goals/:id/edit`) — выбор сферы,
-   быстрые единицы и сроки, предпросмотр «≈ 16 стр. в день».
+   архив и удаление с подтверждением. У привычки вместо графика — серия, неделя, выполнение
+   за 4 недели, «Отметить сегодня» с подсказкой (в том числе о прощённом пропуске), календарь
+   за 12 недель, отметка за другой день (по умолчанию — вчера, норма подставлена) и все записи списком.
+4. **Создание / редактирование** (`/goals/new`, `/goals/new?kind=habit`, `/goals/:id/edit`) — переключатель
+   «Цель к сроку / Привычка» (только при создании), выбор сферы, быстрые единицы и сроки,
+   предпросмотр «≈ 16 стр. в день». У привычки — «Каждый день» или 1–6 раз в неделю, норма за раз
+   (по умолчанию «1 раз»), день начала и предпросмотр «3 раза в неделю · один пропуск за четыре недели
+   серию не прерывает».
 5. **Знания** (`/knowledge`) — карточка «к повторению», прогноз нагрузки на 2 недели,
    материалы «Изучаю N из M» и «Хочу изучить» (на карточке — «конспекты: 3 из 8»), все заметки
    с уровнем и датой следующего повторения, изученные и отложенные материалы.
@@ -523,218 +652,115 @@ frontend/src/
     с её темпом, вехи с задачами (добавить задачу прямо в веху, с разбором текста), задачи без вехи, удаление.
     Создание и редактирование — `/projects/new?goal=<id>`, `/projects/:id/edit`: цель, срок, сфера,
     вехи с датами (по Enter), предупреждение, если удаляется веха с задачами.
-15. **Настройки** (`/settings`) — сферы (добавить, переименовать, цвет, иконка, порядок,
+15. **Неделя** (`/week`) — обзор недели по шагам (входящие прямо на странице, где отстаю, повторения,
+    фокус с подсказками, «что получилось, что мешало» с итогами недели), после сохранения — итоги,
+    фокус с отметками и «Изменить обзор»; ниже — прошлые недели.
+16. **Настройки** (`/settings`) — сферы (добавить, переименовать, цвет, иконка, порядок,
     удалить), нагрузка (`/settings#load`: лимиты и строгий режим), отпуск
     (`/settings#vacation`: начать, запланировать, вернуться, прошлые отпуска), Obsidian (`/settings#obsidian`: выбрать папку, синхронизировать, отчёт,
-    инструкция и шаблоны) и данные (скачать резервную копию, восстановить, удалить всё).
+    инструкция и шаблоны), данные (скачать резервную копию, восстановить, удалить всё)
+    и — с сервером — аккаунт (`/settings#account`: почта, смена пароля, выход).
     В «Знаниях» — кнопка синхронизации с Obsidian.
 
-## Бэкенд (проект)
+## Бэкенд
 
-**Стек:** Django 5, DRF, PostgreSQL, `djangorestframework-simplejwt`,
-`djangorestframework-camel-case` (API в camelCase, как типы на фронтенде),
-`django-filter`, `drf-spectacular` (OpenAPI-схема).
+Код — `backend/` (как запустить — [backend/README.md](../backend/README.md)).
+**Стек:** Django 5.2, Django REST Framework, PostgreSQL (для разработки — SQLite),
+`djangorestframework-camel-case` (API в camelCase, как типы на фронтенде), `drf-spectacular`
+(OpenAPI-схема на `/api/schema/`), WhiteNoise и gunicorn для запуска на сервере.
 
-```python
-class Area(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="areas")
-    name = models.CharField(max_length=40)
-    color = models.CharField(max_length=10, choices=AreaColor.choices)
-    icon = models.CharField(max_length=20, choices=AreaIcon.choices)
-    order = models.PositiveIntegerField(default=0)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["order"]
-
-
-class Goal(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="goals")
-    title = models.CharField(max_length=200)
-    description = models.TextField(blank=True)
-    area = models.ForeignKey(Area, null=True, blank=True, on_delete=models.SET_NULL, related_name="goals")
-    unit = models.CharField(max_length=30)
-    target_value = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0.01)])
-    start_date = models.DateField()
-    deadline = models.DateField()
-    priority = models.CharField(max_length=10, choices=Priority.choices, default=Priority.MEDIUM)
-    status = models.CharField(max_length=10, choices=Status.choices, default=Status.ACTIVE)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        constraints = [models.CheckConstraint(condition=Q(deadline__gte=F("start_date")), name="deadline_after_start")]
-
-
-class Task(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="tasks")
-    title = models.CharField(max_length=300)
-    notes = models.TextField(blank=True)
-    status = models.CharField(max_length=10, choices=TaskStatus.choices, default=TaskStatus.INBOX)
-    important = models.BooleanField(default=False)
-    deadline = models.DateField(null=True, blank=True)
-    planned_date = models.DateField(null=True, blank=True)
-    area = models.ForeignKey(Area, null=True, blank=True, on_delete=models.SET_NULL, related_name="tasks")
-    project = models.ForeignKey("Project", null=True, blank=True, on_delete=models.SET_NULL, related_name="tasks")
-    milestone = models.ForeignKey("Milestone", null=True, blank=True, on_delete=models.SET_NULL, related_name="tasks")
-    material = models.ForeignKey("Material", null=True, blank=True, on_delete=models.SET_NULL, related_name="tasks")
-    part = models.ForeignKey("MaterialPart", null=True, blank=True, on_delete=models.SET_NULL, related_name="tasks")
-    checklist = models.JSONField(default=list)  # [{id, text, done}] — подзадачи без своей истории
-    # {unit, interval, weekdays, start} — проверяется сериализатором; следующий повтор создаёт сервер при закрытии
-    recurrence = models.JSONField(null=True, blank=True)
-    repeat_of = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="repeats")
-    completed_at = models.DateTimeField(null=True, blank=True)  # ставит сервер при done/cancelled
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        indexes = [models.Index(fields=["user", "status", "planned_date"])]
-
-
-class Project(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="projects")
-    title = models.CharField(max_length=300)
-    description = models.TextField(blank=True)
-    area = models.ForeignKey(Area, null=True, blank=True, on_delete=models.SET_NULL, related_name="projects")
-    goal = models.ForeignKey(Goal, null=True, blank=True, on_delete=models.SET_NULL, related_name="projects")
-    status = models.CharField(max_length=10, choices=ProjectStatus.choices, default=ProjectStatus.ACTIVE)
-    deadline = models.DateField(null=True, blank=True)
-    completed_at = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-
-class Milestone(models.Model):
-    # На фронтенде вехи — список внутри проекта; в API они вложены в проект (writable nested serializer).
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="milestones")
-    title = models.CharField(max_length=200)
-    deadline = models.DateField(null=True, blank=True)
-    order = models.PositiveIntegerField(default=0)
-
-    class Meta:
-        ordering = ["order"]
-
-
-class ProgressEntry(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    goal = models.ForeignKey(Goal, on_delete=models.CASCADE, related_name="entries")
-    date = models.DateField()
-    value = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0.01)])
-    note = models.CharField(max_length=500, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        indexes = [models.Index(fields=["goal", "date"])]
-
-
-class Material(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="materials")
-    title = models.CharField(max_length=300)
-    type = models.CharField(max_length=10, choices=MaterialType.choices)
-    author = models.CharField(max_length=200, blank=True)
-    url = models.URLField(blank=True)
-    area = models.ForeignKey(Area, null=True, blank=True, on_delete=models.SET_NULL, related_name="materials")
-    status = models.CharField(max_length=10, choices=MaterialStatus.choices, default=MaterialStatus.ACTIVE)
-    obsidian_path = models.CharField(max_length=1000, null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-
-class MaterialPart(models.Model):
-    # На фронтенде части — список внутри материала; в API вложены в материал, как вехи в проект.
-    # «Законспектирована» по сделанной задаче-конспекту не хранится, а вычисляется.
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    material = models.ForeignKey(Material, on_delete=models.CASCADE, related_name="parts")
-    title = models.CharField(max_length=300)
-    status = models.CharField(max_length=12, choices=PartStatus.choices, default=PartStatus.TODO)
-    order = models.PositiveIntegerField(default=0)
-
-    class Meta:
-        ordering = ["order"]
-
-
-class Note(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notes")
-    title = models.CharField(max_length=300)
-    material = models.ForeignKey(Material, null=True, blank=True, on_delete=models.SET_NULL, related_name="notes")
-    questions = models.JSONField(default=list)
-    summary = models.TextField(blank=True)
-    obsidian_uri = models.CharField(max_length=1000, blank=True)
-    obsidian_path = models.CharField(max_length=1000, null=True, blank=True)
-    status = models.CharField(max_length=10, choices=NoteStatus.choices, default=NoteStatus.ACTIVE)
-    added_on = models.DateField()
-    created_at = models.DateTimeField(auto_now_add=True)
-
-
-class Review(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    note = models.ForeignKey(Note, on_delete=models.CASCADE, related_name="reviews")
-    date = models.DateField()
-    rating = models.CharField(max_length=5, choices=Rating.choices)
-    explain = models.CharField(max_length=5, choices=Explain.choices, null=True, blank=True)
-    taught = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        indexes = [models.Index(fields=["note", "date"])]
-
-
-class UserSettings(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True, related_name="settings")
-    daily_review_limit = models.PositiveSmallIntegerField(default=15, validators=[MinValueValidator(1), MaxValueValidator(100)])
-    active_materials_limit = models.PositiveSmallIntegerField(default=3, validators=[MinValueValidator(1), MaxValueValidator(10)])
-    new_notes_per_day = models.PositiveSmallIntegerField(default=5, validators=[MinValueValidator(1), MaxValueValidator(50)])
-    strict_mode = models.BooleanField(default=False)
-
-
-class Vacation(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="vacations")
-    start = models.DateField()
-    end = models.DateField(null=True, blank=True)  # null — пока не выключу
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["start"]
-        constraints = [models.CheckConstraint(condition=Q(end__isnull=True) | Q(end__gte=F("start")), name="vacation_end_after_start")]
-        # Пересечения проверяются в сериализаторе (та же логика, что vacationError на фронтенде).
+```
+backend/
+├── config/             настройки из переменных окружения, корневые адреса
+└── tracker/
+    ├── models.py       модели — один в один с типами фронтенда (схема v9)
+    ├── rules/          чистые функции: даты, повторы задач, проверка отпусков — перенос domain/*.ts
+    ├── serializers.py  проверка полей и ссылок, вложенные вехи и части
+    ├── services.py     закрытие задачи с повтором, синхронизация вложенных списков
+    ├── views.py        API по сущностям, настройки, резервная копия, Obsidian
+    ├── auth_views.py   вход, выход, регистрация, текущая сессия
+    ├── backup.py       выгрузка и загрузка копии в формате фронтенда, сброс
+    └── tests/          pytest: правила, API, вход, изоляция пользователей, копия фронтенда
 ```
 
-**API** (все запросы — только по объектам текущего пользователя):
+**Модели.** Те же сущности и поля, что в разделе «Предметная модель»: `Area`, `Goal`,
+`ProgressEntry`, `Material` + `MaterialPart`, `Note`, `Review`, `UserSettings`, `Vacation`,
+`Project` + `Milestone`, `Task`, `WeeklyReview` (одна неделя на пользователя — ограничение уникальности). Отличия от фронтенда:
+
+- у цели `deadline` и `days_per_week` необязательные, а вид проверяется ограничением базы: у цели к сроку
+  есть срок и нет частоты, у привычки — наоборот (частота 1–7);
+- вехи и части — отдельные таблицы (в API вложены в проект и материал, порядок — по списку);
+  задачи ссылаются на них внешним ключом с `SET_NULL`, поэтому отвязка при удалении
+  вехи, части, проекта, материала, цели или сферы делается базой;
+- подзадачи и повтор — JSON внутри задачи, `repeatOf` — ссылка на задачу;
+- `UserSettings.timezone` — часовой пояс пользователя (запоминается при входе, пригодится
+  Telegram-боту); числа целей и записей — `float`, как `number` во фронтенде.
+
+**Правила** — те же, что на фронтенде: повторы задач (`rules/recurrence.py` сверен
+с `recurrence.ts` на 3000 случайных правил), проверка отпусков, закрытие задачи
+(`completedAt`), веха — только из проекта задачи, часть — только из материала, перенос в другой
+проект снимает веху, вид цели не меняется, срок привычки и частота цели обнуляются, обзор недели —
+с понедельника, один на неделю, не больше 3 пунктов фокуса. «Сегодня» сервер берёт из заголовка `X-Timezone`, который присылает фронтенд.
+Всё, что фронтенд вычисляет (прогресс, привычки, расписание заметок, нагрузка, итоги недели), по-прежнему вычисляется
+на фронтенде: сервер хранит данные и следит за их целостностью.
+
+**Вход** — почта и пароль, сессия Django в httpOnly-куке (`SameSite=Lax`), CSRF-токен
+в заголовке `X-CSRFToken` для запросов с изменениями, в том числе для входа и регистрации.
+Без входа — `401`, без токена — `403`. Попытки входа ограничены: 20 в минуту.
+Сессия живёт 90 дней с последнего открытия трекера: запрос `/api/auth/session/` продлевает её.
+Смена пароля требует текущий пароль и завершает остальные входы в аккаунт.
+Регистрацию можно закрыть (`ALLOW_REGISTRATION=0`). Новый пользователь получает четыре сферы
+и настройки по умолчанию. Забытый пароль меняется на сервере: `manage.py changepassword <почта>`.
+
+**Ошибки** — `{ "detail": "текст для пользователя", "errors": { поле: [сообщения] } }`.
+
+**API** (все запросы — только по объектам текущего пользователя; чужой объект — `404`,
+ссылка на чужой объект — `400`):
 
 | Метод | URL | Назначение |
 |-------|-----|------------|
+| GET | `/api/auth/session/` | кто вошёл и открыта ли регистрация; ставит куку CSRF |
+| POST | `/api/auth/login/`, `/api/auth/register/`, `/api/auth/logout/` | вход, регистрация, выход |
+| POST | `/api/auth/password/` | смена пароля: `{ currentPassword, newPassword }` |
 | GET / POST | `/api/areas/` | сферы |
 | PATCH / DELETE | `/api/areas/{id}/` | сфера (при удалении цели, материалы, задачи и проекты остаются без сферы) |
-| GET | `/api/goals/?status=active` | список целей |
-| POST | `/api/goals/` | создать |
-| GET / PATCH / DELETE | `/api/goals/{id}/` | цель |
-| GET | `/api/entries/?goal={id}&date_from=…` | записи (без `goal` — по всем целям) |
-| POST | `/api/entries/` | добавить запись |
-| DELETE | `/api/entries/{id}/` | удалить запись |
+| GET / POST | `/api/goals/` | цели и привычки (`kind`; без него — цель к сроку) |
+| GET / PATCH / DELETE | `/api/goals/{id}/` | цель или привычка (вид не меняется; удаляется с записями; проекты остаются без цели) |
+| GET | `/api/entries/?goal={id}` | записи (без `goal` — по всем целям) |
+| POST / DELETE | `/api/entries/`, `/api/entries/{id}/` | добавить, удалить запись |
 | GET / POST | `/api/materials/` | материалы с вложенными частями |
-| PATCH / DELETE | `/api/materials/{id}/` | материал (задачи удалённых частей — без части; при удалении заметки и задачи остаются без материала) |
-| GET / POST | `/api/notes/` | заметки |
+| PATCH / DELETE | `/api/materials/{id}/` | материал (задачи удалённых частей — без части; заметки и задачи удалённого материала — без него) |
+| GET / POST | `/api/notes/` | заметки (`addedOn` по умолчанию — сегодня) |
 | PATCH / DELETE | `/api/notes/{id}/` | заметка (удаляется вместе с повторениями) |
-| GET / POST | `/api/reviews/` | журнал повторений |
-| DELETE | `/api/reviews/{id}/` | отмена оценки |
-| GET / POST | `/api/tasks/?status=inbox` | задачи и «Входящие» |
-| PATCH / DELETE | `/api/tasks/{id}/` | задача (при смене статуса сервер ставит или сбрасывает `completedAt`; закрытие повторяющейся создаёт следующий повтор, возврат в работу — убирает нетронутый, в одной транзакции) |
+| GET / POST / DELETE | `/api/reviews/`, `/api/reviews/{id}/` | журнал повторений, отмена оценки |
+| GET / PATCH | `/api/settings/` | лимиты нагрузки |
+| GET / POST / PATCH / DELETE | `/api/vacations/`, `/api/vacations/{id}/` | отпуска (пересечения — `400` с объяснением) |
+| GET / POST | `/api/tasks/` | задачи и «Входящие» |
+| PATCH / DELETE | `/api/tasks/{id}/` | задача: закрытие повторяющейся создаёт следующий повтор, возврат в работу убирает нетронутый — в одной транзакции, под блокировкой задачи |
 | GET / POST | `/api/projects/` | проекты с вложенными вехами |
 | PATCH / DELETE | `/api/projects/{id}/` | проект (задачи удалённых вех — без вехи, задачи удалённого проекта — без проекта) |
-| GET / PATCH | `/api/settings/` | лимиты нагрузки |
-| GET / POST | `/api/vacations/` | отпуска (400, если даты пересекаются) |
-| PATCH / DELETE | `/api/vacations/{id}/` | вернуться раньше, отменить |
-| GET | `/api/export/` | резервная копия в том же формате, что и сейчас |
-| POST | `/api/import/` | восстановление из резервной копии |
-| POST | `/api/auth/token/`, `/api/auth/token/refresh/` | JWT |
+| GET / POST | `/api/weekly-reviews/` | обзоры недели (второй обзор той же недели — `400`) |
+| PATCH / DELETE | `/api/weekly-reviews/{id}/` | обзор недели: фокус и заметка (неделю менять нельзя) |
+| GET | `/api/export/` | резервная копия в формате фронтенда |
+| POST | `/api/import/` | замена всех данных копией (текущей версии схемы; старые переводит фронтенд) |
+| POST | `/api/reset/` | удалить всё, сферы по умолчанию |
+| POST | `/api/obsidian/apply/` | новые и изменённые материалы и заметки из синхронизации с Obsidian |
 
-Расчёт статистики на MVP-этапе остаётся на клиенте: он мгновенный, работает офлайн
-и уже покрыт тестами. Когда целей и записей станет много, в `GET /api/goals/`
-добавим агрегаты (`currentValue`, `todayValue`, `lastEntryDate`) через `annotate`,
+**Резервная копия.** Выгрузка — тот же JSON, что у фронтенда без сервера, поэтому копию можно
+переносить в обе стороны. Загрузка проверяет данные так же, как `validateDb`, чинит висячие ссылки
+и выдаёт всем объектам новые id: UUID общий для всех пользователей, а одну копию могут загрузить
+два аккаунта. При ошибке данные не меняются (транзакция).
+
+Списки отдаются в порядке создания (при равном времени — по id), поэтому порядок не меняется
+между запросами.
+
+**Синхронизация с Obsidian.** Папка хранилища читается в браузере, как и раньше; фронтенд
+сопоставляет файлы с данными (`applyVault`) и отправляет на сервер только новые и изменённые
+материалы и заметки. Сервер обновляет у существующих лишь поля из файла — статус, дата добавления
+и журнал повторений остаются.
+
+Расчёт статистики остаётся на клиенте: он мгновенный и уже покрыт тестами. Когда целей
+и записей станет много, в `GET /api/goals/` добавим агрегаты через `annotate`,
 а главный экран будет запрашивать только записи за последние 7 дней.
 
 ## Решения и компромиссы
@@ -745,6 +771,28 @@ class Vacation(models.Model):
   и нельзя перебрать чужие объекты.
 - **Единица измерения — свободная строка.** Известные единицы («часов», «тренировок»)
   склоняются, остальные выводятся как есть.
-- **Дискретные цели** («12 тренировок за месяц») на MVP показывают дробную норму
-  («0,4 тренировки в день»). Правильное решение — отдельный тип «привычка» с частотой
-  (этап 5 в PRODUCT.md).
+- **Сессия вместо JWT.** Фронтенд и API живут на одном домене, поэтому httpOnly-кука сессии
+  с CSRF-защитой безопаснее токена в `localStorage`, который доступен любому скрипту на странице.
+  JWT понадобится, только если появится отдельное приложение на другом домене.
+- **Без отдельной кнопки «перенести данные из браузера».** Данные браузера привязаны к адресу
+  сайта: у трекера на сервере будет свой адрес, и там браузерных данных нет. Перенос, если он
+  нужен, — через резервную копию: скачать в старой версии, восстановить в новой.
+- **Сервер — единственный источник данных, без офлайн-режима.** Каждое изменение сразу
+  сохраняется на сервере, а без связи ждёт её в памяти вкладки. Полноценный офлайн (очередь
+  правок, которая переживает закрытие вкладки, и разрешение конфликтов) — отдельная задача
+  на потом: повторы задач создаёт сервер, и их пришлось бы согласовывать.
+- **Правила в двух местах.** Повторы, отпуска и проверки есть и на фронтенде (для работы без сервера
+  и мгновенного отклика), и на сервере (он не доверяет клиенту). Тесты обеих сторон на одних
+  примерах, а повторы сверены на случайных правилах.
+- **Дискретные цели** («12 тренировок за месяц») показывают дробную норму («0,4 тренировки в день»).
+  Для регулярных дел теперь есть привычка с частотой: «зал 3 раза в неделю».
+- **Привычка — частота в днях и норма за день, а не «сумма за неделю».** Так одно нажатие на «Сегодня»
+  всегда понятно (записать норму дня), а «150 минут в неделю» записывается как «3 раза по 50 минут».
+  Конкретные дни недели (только пн, ср, пт) не задаются: «3 раза в неделю в любые дни» гибче, а для
+  дел по расписанию есть повторяющиеся задачи.
+- **Заморозка серии ограничена.** «Не пропускай дважды» без ограничения позволяло бы держать серию,
+  делая привычку через день. Поэтому ежедневной прощается пропуск не чаще раза в 7 дней, недельной —
+  неделя без одного раза не чаще раза в 4 недели; выполнение за 4 недели при этом честно показывает процент.
+- **Обзор недели привязан к неделе, которую подводит**, а фокус — к следующей. Так обзор в воскресенье
+  и обзор в понедельник утром дают один и тот же результат, а пропущенный обзор не копится: старые недели
+  не напоминают о себе.

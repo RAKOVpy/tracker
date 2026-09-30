@@ -1,0 +1,1203 @@
+{
+ "version": 9,
+ "areas": [
+  {
+   "id": "14aff282-c3bf-4f9c-ab14-fdc50ee64192",
+   "name": "Чтение",
+   "color": "ochre",
+   "icon": "book",
+   "order": 0,
+   "createdAt": "2026-09-30T15:23:58.095Z"
+  },
+  {
+   "id": "c1ffd544-8368-4c36-b97d-e8f9bd4a4af1",
+   "name": "Языки",
+   "color": "slate",
+   "icon": "languages",
+   "order": 1,
+   "createdAt": "2026-09-30T15:23:58.095Z"
+  },
+  {
+   "id": "e5ebc84b-588a-4113-8d8e-e9026ebbe8e3",
+   "name": "Спорт",
+   "color": "sage",
+   "icon": "dumbbell",
+   "order": 2,
+   "createdAt": "2026-09-30T15:23:58.095Z"
+  },
+  {
+   "id": "b070a634-59a5-4e35-877a-10ee415a5450",
+   "name": "Учёба",
+   "color": "clay",
+   "icon": "study",
+   "order": 3,
+   "createdAt": "2026-09-30T15:23:58.095Z"
+  }
+ ],
+ "goals": [
+  {
+   "id": "2ed02d9f-b181-41f2-a161-bec61ac6834f",
+   "title": "Прочитать «Атлант расправил плечи»",
+   "description": "Том 1. Читать перед сном хотя бы полчаса.",
+   "areaId": "14aff282-c3bf-4f9c-ab14-fdc50ee64192",
+   "unit": "стр.",
+   "targetValue": 480,
+   "startDate": "2026-09-21",
+   "priority": "high",
+   "status": "active",
+   "createdAt": "2026-09-30T15:23:58.206Z",
+   "kind": "target",
+   "deadline": "2026-10-20",
+   "daysPerWeek": null
+  },
+  {
+   "id": "98c7b206-c920-4366-9545-0dddd2bdc59a",
+   "title": "Английский: 30 часов разговорной практики",
+   "description": "Созвоны с преподавателем + подкасты.",
+   "areaId": "c1ffd544-8368-4c36-b97d-e8f9bd4a4af1",
+   "unit": "часов",
+   "targetValue": 30,
+   "startDate": "2026-09-16",
+   "priority": "medium",
+   "status": "active",
+   "createdAt": "2026-09-30T15:23:58.207Z",
+   "kind": "target",
+   "deadline": "2026-12-14",
+   "daysPerWeek": null
+  },
+  {
+   "id": "d6794615-ac7d-47b1-acca-5babcc54a290",
+   "title": "Английские слова",
+   "description": "Карточки в приложении, пока пью утренний кофе.",
+   "areaId": "c1ffd544-8368-4c36-b97d-e8f9bd4a4af1",
+   "unit": "минут",
+   "targetValue": 20,
+   "startDate": "2026-09-10",
+   "priority": "medium",
+   "status": "active",
+   "createdAt": "2026-09-30T15:23:58.209Z",
+   "kind": "habit",
+   "deadline": null,
+   "daysPerWeek": 7
+  },
+  {
+   "id": "ee575021-5acf-4627-b80e-bfad547057ea",
+   "title": "Зал",
+   "description": "Три тренировки в неделю, в любые дни.",
+   "areaId": "e5ebc84b-588a-4113-8d8e-e9026ebbe8e3",
+   "unit": "раз",
+   "targetValue": 1,
+   "startDate": "2026-08-31",
+   "priority": "medium",
+   "status": "active",
+   "createdAt": "2026-09-30T15:23:58.213Z",
+   "kind": "habit",
+   "deadline": null,
+   "daysPerWeek": 3
+  }
+ ],
+ "entries": [
+  {
+   "id": "08ea97ce-83c8-4d81-b823-616164ea236b",
+   "goalId": "2ed02d9f-b181-41f2-a161-bec61ac6834f",
+   "date": "2026-09-21",
+   "value": 18,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.206Z"
+  },
+  {
+   "id": "6f509e87-8a15-48fa-89fc-d6b4267da290",
+   "goalId": "2ed02d9f-b181-41f2-a161-bec61ac6834f",
+   "date": "2026-09-22",
+   "value": 22,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.206Z"
+  },
+  {
+   "id": "6a9b7e8f-97a3-4025-a1d4-842ccb34b629",
+   "goalId": "2ed02d9f-b181-41f2-a161-bec61ac6834f",
+   "date": "2026-09-24",
+   "value": 15,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.207Z"
+  },
+  {
+   "id": "9c542995-2e6d-41b5-be85-e376c93fc365",
+   "goalId": "2ed02d9f-b181-41f2-a161-bec61ac6834f",
+   "date": "2026-09-25",
+   "value": 20,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.207Z"
+  },
+  {
+   "id": "36e439c7-35a0-4ba7-971c-76fa9375329c",
+   "goalId": "2ed02d9f-b181-41f2-a161-bec61ac6834f",
+   "date": "2026-09-28",
+   "value": 25,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.207Z"
+  },
+  {
+   "id": "8460836b-9676-48e6-a7a8-53f4ece8e46e",
+   "goalId": "2ed02d9f-b181-41f2-a161-bec61ac6834f",
+   "date": "2026-09-29",
+   "value": 12,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.207Z"
+  },
+  {
+   "id": "a4ad0bb9-58f3-4237-8624-298350ceae4c",
+   "goalId": "98c7b206-c920-4366-9545-0dddd2bdc59a",
+   "date": "2026-09-16",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.207Z"
+  },
+  {
+   "id": "83215ba0-1d51-40a0-9fab-c7df5a511b39",
+   "goalId": "98c7b206-c920-4366-9545-0dddd2bdc59a",
+   "date": "2026-09-17",
+   "value": 0.5,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.207Z"
+  },
+  {
+   "id": "1f2f22b7-7502-462b-9c70-a25e886ebab5",
+   "goalId": "98c7b206-c920-4366-9545-0dddd2bdc59a",
+   "date": "2026-09-19",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.207Z"
+  },
+  {
+   "id": "a66445a8-abfd-4152-a165-2e65f73ac1f1",
+   "goalId": "98c7b206-c920-4366-9545-0dddd2bdc59a",
+   "date": "2026-09-20",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.207Z"
+  },
+  {
+   "id": "d6000f01-c320-4f6a-a33f-6167d51916cc",
+   "goalId": "98c7b206-c920-4366-9545-0dddd2bdc59a",
+   "date": "2026-09-21",
+   "value": 0.5,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.207Z"
+  },
+  {
+   "id": "86d04507-ab72-4b34-b7b3-a3f6415a3c6c",
+   "goalId": "98c7b206-c920-4366-9545-0dddd2bdc59a",
+   "date": "2026-09-23",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.208Z"
+  },
+  {
+   "id": "0c2f8fb9-1f6e-4d3e-8eca-cb436b9a29dd",
+   "goalId": "98c7b206-c920-4366-9545-0dddd2bdc59a",
+   "date": "2026-09-24",
+   "value": 0.5,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.208Z"
+  },
+  {
+   "id": "5af6c290-d057-4629-ad65-738e07bd8ee3",
+   "goalId": "98c7b206-c920-4366-9545-0dddd2bdc59a",
+   "date": "2026-09-25",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.208Z"
+  },
+  {
+   "id": "7b1ac4c0-3004-47f7-8169-e8b07b66ac46",
+   "goalId": "98c7b206-c920-4366-9545-0dddd2bdc59a",
+   "date": "2026-09-27",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.208Z"
+  },
+  {
+   "id": "c605ce78-5ecf-4c92-bd12-abb8b10912cf",
+   "goalId": "98c7b206-c920-4366-9545-0dddd2bdc59a",
+   "date": "2026-09-28",
+   "value": 0.5,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.208Z"
+  },
+  {
+   "id": "2618547b-e6aa-4e12-a784-3ffbdc608917",
+   "goalId": "98c7b206-c920-4366-9545-0dddd2bdc59a",
+   "date": "2026-09-29",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.208Z"
+  },
+  {
+   "id": "96278a41-5975-40f6-97ec-c9a73276588f",
+   "goalId": "d6794615-ac7d-47b1-acca-5babcc54a290",
+   "date": "2026-09-10",
+   "value": 20,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.209Z"
+  },
+  {
+   "id": "af9decb7-afdb-46ab-b81a-2c1561b67f51",
+   "goalId": "d6794615-ac7d-47b1-acca-5babcc54a290",
+   "date": "2026-09-11",
+   "value": 20,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.209Z"
+  },
+  {
+   "id": "19b1aea6-37c3-4ff2-b958-26080f9a6c9f",
+   "goalId": "d6794615-ac7d-47b1-acca-5babcc54a290",
+   "date": "2026-09-12",
+   "value": 20,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.209Z"
+  },
+  {
+   "id": "d72aba90-cd91-462f-beaf-600d4a8eb89f",
+   "goalId": "d6794615-ac7d-47b1-acca-5babcc54a290",
+   "date": "2026-09-13",
+   "value": 20,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.209Z"
+  },
+  {
+   "id": "dee2a07b-f754-4920-bd9a-139b84a49c66",
+   "goalId": "d6794615-ac7d-47b1-acca-5babcc54a290",
+   "date": "2026-09-14",
+   "value": 20,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.209Z"
+  },
+  {
+   "id": "3747c802-4da1-4274-9877-5d439d3274ee",
+   "goalId": "d6794615-ac7d-47b1-acca-5babcc54a290",
+   "date": "2026-09-15",
+   "value": 20,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.209Z"
+  },
+  {
+   "id": "a6e541fa-824b-4f77-8db2-13f9e73600d5",
+   "goalId": "d6794615-ac7d-47b1-acca-5babcc54a290",
+   "date": "2026-09-16",
+   "value": 20,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.210Z"
+  },
+  {
+   "id": "a8a0dfa3-027c-41d8-91fe-8fcf01b1d549",
+   "goalId": "d6794615-ac7d-47b1-acca-5babcc54a290",
+   "date": "2026-09-18",
+   "value": 20,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.210Z"
+  },
+  {
+   "id": "e4d424c7-fd76-4af7-8fb0-cbcb6f2fd481",
+   "goalId": "d6794615-ac7d-47b1-acca-5babcc54a290",
+   "date": "2026-09-19",
+   "value": 20,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.210Z"
+  },
+  {
+   "id": "02558b85-2415-4d17-9039-49dcf437c064",
+   "goalId": "d6794615-ac7d-47b1-acca-5babcc54a290",
+   "date": "2026-09-20",
+   "value": 20,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.210Z"
+  },
+  {
+   "id": "91873fbc-a629-49b3-991b-8ecd2b3d09cf",
+   "goalId": "d6794615-ac7d-47b1-acca-5babcc54a290",
+   "date": "2026-09-21",
+   "value": 20,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.210Z"
+  },
+  {
+   "id": "1179a356-a7c8-4630-866c-0c2a3411327e",
+   "goalId": "d6794615-ac7d-47b1-acca-5babcc54a290",
+   "date": "2026-09-22",
+   "value": 20,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.211Z"
+  },
+  {
+   "id": "0489f6bf-7275-47e6-a479-572628e74630",
+   "goalId": "d6794615-ac7d-47b1-acca-5babcc54a290",
+   "date": "2026-09-23",
+   "value": 20,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.211Z"
+  },
+  {
+   "id": "52f054e8-942c-40ae-be5d-c92bee223b15",
+   "goalId": "d6794615-ac7d-47b1-acca-5babcc54a290",
+   "date": "2026-09-24",
+   "value": 20,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.211Z"
+  },
+  {
+   "id": "b77d5d72-8873-4838-99c5-7416ffca1faa",
+   "goalId": "d6794615-ac7d-47b1-acca-5babcc54a290",
+   "date": "2026-09-25",
+   "value": 20,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.212Z"
+  },
+  {
+   "id": "3495376a-7b5d-4b49-beb0-1a45a28e8fbd",
+   "goalId": "d6794615-ac7d-47b1-acca-5babcc54a290",
+   "date": "2026-09-27",
+   "value": 20,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.212Z"
+  },
+  {
+   "id": "5e58aa37-57eb-4b2a-baed-ae3a1d15c3c0",
+   "goalId": "d6794615-ac7d-47b1-acca-5babcc54a290",
+   "date": "2026-09-28",
+   "value": 20,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.212Z"
+  },
+  {
+   "id": "12c29775-fb5d-4291-8fe1-e067d07066f0",
+   "goalId": "d6794615-ac7d-47b1-acca-5babcc54a290",
+   "date": "2026-09-29",
+   "value": 20,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.212Z"
+  },
+  {
+   "id": "38cf8777-9efc-4047-b6a0-c2cdcf9f120c",
+   "goalId": "ee575021-5acf-4627-b80e-bfad547057ea",
+   "date": "2026-08-31",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.213Z"
+  },
+  {
+   "id": "37f80819-553c-4435-b0fe-a85490eb9208",
+   "goalId": "ee575021-5acf-4627-b80e-bfad547057ea",
+   "date": "2026-09-02",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.213Z"
+  },
+  {
+   "id": "e4ce3c1b-4872-4339-88ec-5f318c29ca0e",
+   "goalId": "ee575021-5acf-4627-b80e-bfad547057ea",
+   "date": "2026-09-04",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.214Z"
+  },
+  {
+   "id": "f1a76f77-2d88-4fbe-b92f-98074c26824b",
+   "goalId": "ee575021-5acf-4627-b80e-bfad547057ea",
+   "date": "2026-09-07",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.214Z"
+  },
+  {
+   "id": "d0bccc85-9d54-4c91-bf10-ea6a3e03b043",
+   "goalId": "ee575021-5acf-4627-b80e-bfad547057ea",
+   "date": "2026-09-09",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.214Z"
+  },
+  {
+   "id": "767e4e6b-3e7e-4234-b9ef-1ca3f2d57f8f",
+   "goalId": "ee575021-5acf-4627-b80e-bfad547057ea",
+   "date": "2026-09-11",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.214Z"
+  },
+  {
+   "id": "285e687c-9df2-4bec-8246-7bb2f63c1c02",
+   "goalId": "ee575021-5acf-4627-b80e-bfad547057ea",
+   "date": "2026-09-14",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.214Z"
+  },
+  {
+   "id": "68d96f69-29dc-40e5-93fe-31aba146255f",
+   "goalId": "ee575021-5acf-4627-b80e-bfad547057ea",
+   "date": "2026-09-16",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.215Z"
+  },
+  {
+   "id": "3660df78-1005-4361-a27b-a31a1aee30c9",
+   "goalId": "ee575021-5acf-4627-b80e-bfad547057ea",
+   "date": "2026-09-21",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.215Z"
+  },
+  {
+   "id": "4cce0e37-3e3b-4f52-b6dc-2df8091b1eac",
+   "goalId": "ee575021-5acf-4627-b80e-bfad547057ea",
+   "date": "2026-09-23",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.215Z"
+  },
+  {
+   "id": "c54a13a6-611a-4239-b7bb-ad2e0f4f0c9d",
+   "goalId": "ee575021-5acf-4627-b80e-bfad547057ea",
+   "date": "2026-09-25",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.215Z"
+  },
+  {
+   "id": "befef2c5-8baf-4c25-b399-b6b62d6690e6",
+   "goalId": "ee575021-5acf-4627-b80e-bfad547057ea",
+   "date": "2026-09-28",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-30T15:23:58.215Z"
+  }
+ ],
+ "materials": [
+  {
+   "id": "bcd450c3-77be-416a-bd11-71c668a81e63",
+   "title": "Алгоритмы и структуры данных",
+   "type": "course",
+   "author": "",
+   "url": "",
+   "areaId": "b070a634-59a5-4e35-877a-10ee415a5450",
+   "status": "active",
+   "parts": [
+    {
+     "id": "ca267b8b-585a-4e38-a8a2-8cf2722af0f4",
+     "title": "Лекция 1",
+     "status": "summarized"
+    },
+    {
+     "id": "16d73ce2-8f61-45d9-a444-321e9e5e73a1",
+     "title": "Лекция 2",
+     "status": "summarized"
+    },
+    {
+     "id": "cc1e3865-95b1-4d51-9bdc-7ecc2f037c87",
+     "title": "Лекция 3",
+     "status": "studied"
+    },
+    {
+     "id": "35e18dfb-fae8-4746-8391-c848bba57951",
+     "title": "Лекция 4",
+     "status": "studied"
+    },
+    {
+     "id": "2a0d83b6-8702-4bd5-8453-21af54b28d27",
+     "title": "Лекция 5",
+     "status": "todo"
+    },
+    {
+     "id": "dcbf2df2-c545-402f-aea6-1bf68fedfd37",
+     "title": "Лекция 6",
+     "status": "todo"
+    },
+    {
+     "id": "5fc09bcc-bd35-4e80-b8fe-e5016a0acbeb",
+     "title": "Лекция 7",
+     "status": "todo"
+    },
+    {
+     "id": "5888579a-ca32-4fef-b512-e2668038baf0",
+     "title": "Лекция 8",
+     "status": "todo"
+    }
+   ],
+   "obsidianPath": null,
+   "createdAt": "2026-09-30T15:23:58.217Z"
+  },
+  {
+   "id": "c79b8490-6905-4b9d-9649-bea6baab69b6",
+   "title": "English Grammar in Use",
+   "type": "book",
+   "author": "Raymond Murphy",
+   "url": "",
+   "areaId": "c1ffd544-8368-4c36-b97d-e8f9bd4a4af1",
+   "status": "active",
+   "parts": [],
+   "obsidianPath": null,
+   "createdAt": "2026-09-30T15:23:58.221Z"
+  },
+  {
+   "id": "50692ecd-7e30-4516-a6d8-22fbe545ce5b",
+   "title": "Думай медленно… решай быстро",
+   "type": "book",
+   "author": "Даниэль Канеман",
+   "url": "",
+   "areaId": "14aff282-c3bf-4f9c-ab14-fdc50ee64192",
+   "status": "queued",
+   "parts": [],
+   "obsidianPath": null,
+   "createdAt": "2026-09-30T15:23:58.222Z"
+  }
+ ],
+ "notes": [
+  {
+   "id": "747dae7f-e9d9-4c5b-a83f-74f748b6af14",
+   "title": "Графы: обход в ширину и в глубину",
+   "materialId": "bcd450c3-77be-416a-bd11-71c668a81e63",
+   "questions": [
+    "Чем обход в ширину (BFS) отличается от обхода в глубину (DFS)?",
+    "Какой обход находит кратчайший путь в невзвешенном графе и почему?",
+    "Какая сложность у BFS и DFS?"
+   ],
+   "summary": "BFS обходит граф слоями с помощью очереди: сначала все соседи, потом соседи соседей.\nПоэтому BFS находит кратчайший путь по числу рёбер в невзвешенном графе.\nDFS уходит вглубь по одной ветке через стек или рекурсию — удобен для поиска циклов и топологической сортировки.\nСложность обоих — O(V + E).",
+   "obsidianUri": "",
+   "status": "active",
+   "addedOn": "2026-09-18",
+   "obsidianPath": null,
+   "createdAt": "2026-09-30T15:23:58.223Z"
+  },
+  {
+   "id": "6921dcd6-0ac1-46f8-8d22-0947386baf10",
+   "title": "Хеш-таблицы и коллизии",
+   "materialId": "bcd450c3-77be-416a-bd11-71c668a81e63",
+   "questions": [
+    "Как хеш-таблица находит элемент в среднем за O(1)?",
+    "Что такое коллизия и как их разрешают?",
+    "Зачем таблицу расширяют при большом заполнении?"
+   ],
+   "summary": "Хеш-функция превращает ключ в номер ячейки массива, поэтому поиск не перебирает все элементы.\nКоллизия — два ключа попали в одну ячейку. Решения: цепочки (список в ячейке) и открытая адресация.\nКогда таблица заполнена больше чем на ~75%, коллизий много, поэтому массив увеличивают и перераспределяют ключи.",
+   "obsidianUri": "",
+   "status": "active",
+   "addedOn": "2026-09-27",
+   "obsidianPath": null,
+   "createdAt": "2026-09-30T15:23:58.228Z"
+  },
+  {
+   "id": "f9a58803-2cd0-46e4-87f1-bf84c458fc73",
+   "title": "Двоичный поиск",
+   "materialId": "bcd450c3-77be-416a-bd11-71c668a81e63",
+   "questions": [
+    "Какое условие обязательно для двоичного поиска?",
+    "Почему сложность O(log n)?",
+    "Какая типичная ошибка в реализации?"
+   ],
+   "summary": "Массив должен быть отсортирован.\nНа каждом шаге сравниваем с серединой и отбрасываем половину, поэтому шагов около log₂ n.\nТипичная ошибка — бесконечный цикл из-за неверного сдвига границ.",
+   "obsidianUri": "",
+   "status": "active",
+   "addedOn": "2026-09-24",
+   "obsidianPath": null,
+   "createdAt": "2026-09-30T15:23:58.229Z"
+  },
+  {
+   "id": "4b5e038f-3f38-4003-8d6f-58360a56d655",
+   "title": "Present Perfect и Past Simple",
+   "materialId": "c79b8490-6905-4b9d-9649-bea6baab69b6",
+   "questions": [
+    "Когда нужен Present Perfect, а когда Past Simple?",
+    "Почему нельзя сказать «I have seen him yesterday»?",
+    "Какие слова подсказывают Present Perfect?"
+   ],
+   "summary": "Present Perfect связывает прошлое с настоящим: важен результат или опыт, а не время (I have lost my keys).\nPast Simple — законченное действие в конкретный момент прошлого (I lost my keys yesterday).\nС точным временем в прошлом (yesterday, in 2020) Present Perfect не используется.\nПодсказки: already, yet, just, ever, never, since, for.",
+   "obsidianUri": "",
+   "status": "active",
+   "addedOn": "2026-09-10",
+   "obsidianPath": null,
+   "createdAt": "2026-09-30T15:23:58.232Z"
+  },
+  {
+   "id": "41e95697-0df1-4fac-af8b-23fe49da37b2",
+   "title": "Модальные глаголы: can, could, be able to",
+   "materialId": "c79b8490-6905-4b9d-9649-bea6baab69b6",
+   "questions": [
+    "Чем can отличается от be able to?",
+    "Как сказать о способности в будущем?",
+    "Когда could, а когда was able to?"
+   ],
+   "summary": "can — способность сейчас. У can нет будущего времени, поэтому там be able to (I will be able to swim).\ncould — общая способность в прошлом (I could swim when I was five).\nwas able to — удалось сделать в конкретной ситуации (I was able to catch the train).",
+   "obsidianUri": "",
+   "status": "active",
+   "addedOn": "2026-09-29",
+   "obsidianPath": null,
+   "createdAt": "2026-09-30T15:23:58.235Z"
+  }
+ ],
+ "reviews": [
+  {
+   "id": "c8539e87-fb2e-440c-8efb-df447089c644",
+   "noteId": "747dae7f-e9d9-4c5b-a83f-74f748b6af14",
+   "date": "2026-09-19",
+   "rating": "good",
+   "explain": null,
+   "taught": false,
+   "createdAt": "2026-09-30T15:23:58.225Z"
+  },
+  {
+   "id": "4884c78f-549a-4002-abcc-1f0b6490b46d",
+   "noteId": "747dae7f-e9d9-4c5b-a83f-74f748b6af14",
+   "date": "2026-09-20",
+   "rating": "good",
+   "explain": null,
+   "taught": false,
+   "createdAt": "2026-09-30T15:23:58.226Z"
+  },
+  {
+   "id": "742a43f3-98dc-4133-acfe-8b9f1e3e7572",
+   "noteId": "747dae7f-e9d9-4c5b-a83f-74f748b6af14",
+   "date": "2026-09-23",
+   "rating": "good",
+   "explain": null,
+   "taught": false,
+   "createdAt": "2026-09-30T15:23:58.227Z"
+  },
+  {
+   "id": "ecd165e9-8b0d-4bd0-bc38-9fdc799b0d78",
+   "noteId": "6921dcd6-0ac1-46f8-8d22-0947386baf10",
+   "date": "2026-09-28",
+   "rating": "good",
+   "explain": null,
+   "taught": false,
+   "createdAt": "2026-09-30T15:23:58.229Z"
+  },
+  {
+   "id": "5e0aec7c-7c01-4eb6-b47f-bc1c972a4e0c",
+   "noteId": "f9a58803-2cd0-46e4-87f1-bf84c458fc73",
+   "date": "2026-09-25",
+   "rating": "good",
+   "explain": null,
+   "taught": false,
+   "createdAt": "2026-09-30T15:23:58.230Z"
+  },
+  {
+   "id": "2ef0b222-b2c0-47a2-b029-8687048b8abb",
+   "noteId": "f9a58803-2cd0-46e4-87f1-bf84c458fc73",
+   "date": "2026-09-26",
+   "rating": "hard",
+   "explain": null,
+   "taught": false,
+   "createdAt": "2026-09-30T15:23:58.231Z"
+  },
+  {
+   "id": "5ce3a75c-cc89-4099-97c7-668478e68c8b",
+   "noteId": "f9a58803-2cd0-46e4-87f1-bf84c458fc73",
+   "date": "2026-09-27",
+   "rating": "good",
+   "explain": null,
+   "taught": false,
+   "createdAt": "2026-09-30T15:23:58.231Z"
+  },
+  {
+   "id": "fa267d67-4488-48af-befd-b7bb17526280",
+   "noteId": "4b5e038f-3f38-4003-8d6f-58360a56d655",
+   "date": "2026-09-11",
+   "rating": "good",
+   "explain": null,
+   "taught": false,
+   "createdAt": "2026-09-30T15:23:58.233Z"
+  },
+  {
+   "id": "c0c2c85a-c7d6-4d69-8ca5-1107eeb6531c",
+   "noteId": "4b5e038f-3f38-4003-8d6f-58360a56d655",
+   "date": "2026-09-12",
+   "rating": "good",
+   "explain": null,
+   "taught": false,
+   "createdAt": "2026-09-30T15:23:58.233Z"
+  },
+  {
+   "id": "5de1e9a7-3ade-43cc-83e4-7d2c73da4486",
+   "noteId": "4b5e038f-3f38-4003-8d6f-58360a56d655",
+   "date": "2026-09-15",
+   "rating": "good",
+   "explain": "yes",
+   "taught": false,
+   "createdAt": "2026-09-30T15:23:58.234Z"
+  },
+  {
+   "id": "d785dd9e-422d-4a76-be73-01ee8b2a2225",
+   "noteId": "4b5e038f-3f38-4003-8d6f-58360a56d655",
+   "date": "2026-09-22",
+   "rating": "easy",
+   "explain": "yes",
+   "taught": false,
+   "createdAt": "2026-09-30T15:23:58.235Z"
+  }
+ ],
+ "settings": {
+  "dailyReviewLimit": 15,
+  "activeMaterialsLimit": 3,
+  "newNotesPerDay": 5,
+  "strictMode": false
+ },
+ "vacations": [],
+ "tasks": [
+  {
+   "id": "9975a5e0-d26b-42cb-b45c-17533a04dbed",
+   "title": "Законспектировать: Лекция 3",
+   "notes": "",
+   "status": "done",
+   "important": false,
+   "deadline": null,
+   "plannedDate": null,
+   "areaId": "b070a634-59a5-4e35-877a-10ee415a5450",
+   "projectId": null,
+   "milestoneId": null,
+   "materialId": "bcd450c3-77be-416a-bd11-71c668a81e63",
+   "partId": "cc1e3865-95b1-4d51-9bdc-7ecc2f037c87",
+   "checklist": [],
+   "recurrence": null,
+   "repeatOf": null,
+   "completedAt": "2026-09-30T15:23:58.219Z",
+   "createdAt": "2026-09-30T15:23:58.219Z"
+  },
+  {
+   "id": "bcfa7cbe-3ff2-46a7-ab9f-74ee2a6e339e",
+   "title": "Законспектировать: Лекция 4",
+   "notes": "",
+   "status": "todo",
+   "important": false,
+   "deadline": "2026-10-02",
+   "plannedDate": "2026-09-30",
+   "areaId": "b070a634-59a5-4e35-877a-10ee415a5450",
+   "projectId": null,
+   "milestoneId": null,
+   "materialId": "bcd450c3-77be-416a-bd11-71c668a81e63",
+   "partId": "35e18dfb-fae8-4746-8391-c848bba57951",
+   "checklist": [],
+   "recurrence": null,
+   "repeatOf": null,
+   "completedAt": null,
+   "createdAt": "2026-09-30T15:23:58.220Z"
+  },
+  {
+   "id": "238bf4b7-395e-4176-8632-2e107918ecab",
+   "title": "Собрать материал про обход графов",
+   "notes": "",
+   "status": "todo",
+   "important": true,
+   "deadline": "2026-10-02",
+   "plannedDate": "2026-09-30",
+   "areaId": "b070a634-59a5-4e35-877a-10ee415a5450",
+   "projectId": "0fef3251-6e82-4a76-806c-be994d4aee65",
+   "milestoneId": "d3d80fbe-7b66-462a-a255-de1f73c32d79",
+   "materialId": null,
+   "partId": null,
+   "checklist": [
+    {
+     "id": "325d20c9-ccec-41a3-9254-09181d41c947",
+     "text": "Пересмотреть лекцию про графы",
+     "done": true
+    },
+    {
+     "id": "ead8e389-db4b-47da-ba18-2ab37a49e45a",
+     "text": "Выписать определения",
+     "done": false
+    },
+    {
+     "id": "b27aa8ac-6940-4edf-acdd-ffe831d9b7c2",
+     "text": "Подобрать пример для слайда",
+     "done": false
+    }
+   ],
+   "recurrence": null,
+   "repeatOf": null,
+   "completedAt": null,
+   "createdAt": "2026-09-30T15:23:58.240Z"
+  },
+  {
+   "id": "9657866e-d0ab-4fbe-8529-a67ce48a01bf",
+   "title": "Подготовить презентацию к семинару",
+   "notes": "10 минут, 8–10 слайдов. Показать пример с графами.",
+   "status": "todo",
+   "important": true,
+   "deadline": "2026-10-05",
+   "plannedDate": "2026-10-03",
+   "areaId": "b070a634-59a5-4e35-877a-10ee415a5450",
+   "projectId": "0fef3251-6e82-4a76-806c-be994d4aee65",
+   "milestoneId": "f4fc1110-e2b4-49e0-a16f-c4e11f228b9b",
+   "materialId": null,
+   "partId": null,
+   "checklist": [],
+   "recurrence": null,
+   "repeatOf": null,
+   "completedAt": null,
+   "createdAt": "2026-09-30T15:23:58.241Z"
+  },
+  {
+   "id": "76811336-4647-4680-86f2-565c30bc1bb1",
+   "title": "Прогнать выступление перед другом",
+   "notes": "",
+   "status": "todo",
+   "important": false,
+   "deadline": null,
+   "plannedDate": null,
+   "areaId": "b070a634-59a5-4e35-877a-10ee415a5450",
+   "projectId": "0fef3251-6e82-4a76-806c-be994d4aee65",
+   "milestoneId": "65f37c10-fe5b-46be-af93-5242a1fd7ecc",
+   "materialId": null,
+   "partId": null,
+   "checklist": [],
+   "recurrence": null,
+   "repeatOf": null,
+   "completedAt": null,
+   "createdAt": "2026-09-30T15:23:58.242Z"
+  },
+  {
+   "id": "cf8b7e2e-17f1-43d9-b7a7-ee07f1593630",
+   "title": "Пройти пробный тест",
+   "notes": "",
+   "status": "done",
+   "important": false,
+   "deadline": null,
+   "plannedDate": null,
+   "areaId": "c1ffd544-8368-4c36-b97d-e8f9bd4a4af1",
+   "projectId": "4d66d3be-0e55-4810-979b-588afdffdaae",
+   "milestoneId": "d5c6a511-136b-47ec-924c-d8ae4f18fe33",
+   "materialId": null,
+   "partId": null,
+   "checklist": [],
+   "recurrence": null,
+   "repeatOf": null,
+   "completedAt": "2026-09-30T15:23:58.243Z",
+   "createdAt": "2026-09-30T15:23:58.243Z"
+  },
+  {
+   "id": "9b56045d-bd4f-4c8c-ba51-f81ea5e8d3c2",
+   "title": "Написать эссе Task 2 и проверить по критериям",
+   "notes": "",
+   "status": "todo",
+   "important": false,
+   "deadline": null,
+   "plannedDate": "2026-10-02",
+   "areaId": "c1ffd544-8368-4c36-b97d-e8f9bd4a4af1",
+   "projectId": "4d66d3be-0e55-4810-979b-588afdffdaae",
+   "milestoneId": "ea186016-ce27-437c-8768-99e7b2949bc3",
+   "materialId": null,
+   "partId": null,
+   "checklist": [],
+   "recurrence": null,
+   "repeatOf": null,
+   "completedAt": null,
+   "createdAt": "2026-09-30T15:23:58.244Z"
+  },
+  {
+   "id": "8c6812d8-387f-4b73-8fb7-389ebff28f38",
+   "title": "Выучить 20 связок для эссе",
+   "notes": "",
+   "status": "todo",
+   "important": false,
+   "deadline": null,
+   "plannedDate": null,
+   "areaId": "c1ffd544-8368-4c36-b97d-e8f9bd4a4af1",
+   "projectId": "4d66d3be-0e55-4810-979b-588afdffdaae",
+   "milestoneId": "ea186016-ce27-437c-8768-99e7b2949bc3",
+   "materialId": null,
+   "partId": null,
+   "checklist": [],
+   "recurrence": null,
+   "repeatOf": null,
+   "completedAt": null,
+   "createdAt": "2026-09-30T15:23:58.245Z"
+  },
+  {
+   "id": "5299a5e5-314b-4de0-bf18-c2f033422fe3",
+   "title": "Ответить на письмо куратора",
+   "notes": "",
+   "status": "todo",
+   "important": false,
+   "deadline": null,
+   "plannedDate": "2026-09-29",
+   "areaId": null,
+   "projectId": null,
+   "milestoneId": null,
+   "materialId": null,
+   "partId": null,
+   "checklist": [],
+   "recurrence": null,
+   "repeatOf": null,
+   "completedAt": null,
+   "createdAt": "2026-09-30T15:23:58.245Z"
+  },
+  {
+   "id": "f9a4ea79-7750-420e-ac72-5443d46ecfed",
+   "title": "Оплатить интернет",
+   "notes": "",
+   "status": "done",
+   "important": false,
+   "deadline": "2026-10-01",
+   "plannedDate": null,
+   "areaId": null,
+   "projectId": null,
+   "milestoneId": null,
+   "materialId": null,
+   "partId": null,
+   "checklist": [],
+   "recurrence": {
+    "unit": "month",
+    "interval": 1,
+    "weekdays": [],
+    "start": "2026-10-01"
+   },
+   "repeatOf": null,
+   "completedAt": "2026-09-30T15:23:58.527Z",
+   "createdAt": "2026-09-30T15:23:58.246Z"
+  },
+  {
+   "id": "172093f3-6dff-4daf-a245-099cd1188676",
+   "title": "Разбор недели",
+   "notes": "Что получилось, что мешало, фокус на следующую неделю.",
+   "status": "todo",
+   "important": false,
+   "deadline": null,
+   "plannedDate": "2026-10-04",
+   "areaId": null,
+   "projectId": null,
+   "milestoneId": null,
+   "materialId": null,
+   "partId": null,
+   "checklist": [
+    {
+     "id": "f84253f5-1a7a-4fab-a604-577a25029a83",
+     "text": "Разобрать входящие",
+     "done": false
+    },
+    {
+     "id": "f1b84918-824f-4568-8f80-e6e557ed6fa2",
+     "text": "Посмотреть цели, где отстаю",
+     "done": false
+    },
+    {
+     "id": "d5c79bad-2d2e-488a-97dc-bca4bf105a05",
+     "text": "Выбрать 3 главных дела",
+     "done": false
+    }
+   ],
+   "recurrence": {
+    "unit": "week",
+    "interval": 1,
+    "weekdays": [
+     6
+    ],
+    "start": "2026-10-04"
+   },
+   "repeatOf": null,
+   "completedAt": null,
+   "createdAt": "2026-09-30T15:23:58.247Z"
+  },
+  {
+   "id": "cadd0fe5-d765-4514-897d-1ba63170c624",
+   "title": "Разобрать фотографии с отпуска",
+   "notes": "",
+   "status": "todo",
+   "important": false,
+   "deadline": null,
+   "plannedDate": null,
+   "areaId": null,
+   "projectId": null,
+   "milestoneId": null,
+   "materialId": null,
+   "partId": null,
+   "checklist": [],
+   "recurrence": null,
+   "repeatOf": null,
+   "completedAt": null,
+   "createdAt": "2026-09-30T15:23:58.248Z"
+  },
+  {
+   "id": "280920c0-6098-43fb-95c5-695993bfe18c",
+   "title": "Записаться к стоматологу",
+   "notes": "",
+   "status": "done",
+   "important": false,
+   "deadline": null,
+   "plannedDate": "2026-09-30",
+   "areaId": null,
+   "projectId": null,
+   "milestoneId": null,
+   "materialId": null,
+   "partId": null,
+   "checklist": [],
+   "recurrence": null,
+   "repeatOf": null,
+   "completedAt": "2026-09-30T15:23:58.249Z",
+   "createdAt": "2026-09-30T15:23:58.249Z"
+  },
+  {
+   "id": "e0d64791-c362-4746-8751-4552a44b9ac9",
+   "title": "Позвонить в банк про карту",
+   "notes": "",
+   "status": "inbox",
+   "important": false,
+   "deadline": null,
+   "plannedDate": null,
+   "areaId": null,
+   "projectId": null,
+   "milestoneId": null,
+   "materialId": null,
+   "partId": null,
+   "checklist": [],
+   "recurrence": null,
+   "repeatOf": null,
+   "completedAt": null,
+   "createdAt": "2026-09-30T15:23:58.250Z"
+  },
+  {
+   "id": "709e665f-103c-4725-b03c-085fc3f9212c",
+   "title": "Курс по SQL на Stepik",
+   "notes": "",
+   "status": "inbox",
+   "important": false,
+   "deadline": null,
+   "plannedDate": null,
+   "areaId": null,
+   "projectId": null,
+   "milestoneId": null,
+   "materialId": null,
+   "partId": null,
+   "checklist": [],
+   "recurrence": null,
+   "repeatOf": null,
+   "completedAt": null,
+   "createdAt": "2026-09-30T15:23:58.251Z"
+  },
+  {
+   "id": "ed2ba8dc-7351-465d-af58-22f6990423ea",
+   "title": "Переехать в новую квартиру",
+   "notes": "",
+   "status": "inbox",
+   "important": false,
+   "deadline": null,
+   "plannedDate": null,
+   "areaId": null,
+   "projectId": null,
+   "milestoneId": null,
+   "materialId": null,
+   "partId": null,
+   "checklist": [],
+   "recurrence": null,
+   "repeatOf": null,
+   "completedAt": null,
+   "createdAt": "2026-09-30T15:23:58.252Z"
+  },
+  {
+   "id": "a082aa89-317c-476e-88ba-afb531f3dde8",
+   "title": "Оплатить интернет",
+   "notes": "",
+   "status": "todo",
+   "important": false,
+   "deadline": "2026-11-01",
+   "plannedDate": null,
+   "areaId": null,
+   "projectId": null,
+   "milestoneId": null,
+   "materialId": null,
+   "partId": null,
+   "checklist": [],
+   "recurrence": {
+    "unit": "month",
+    "interval": 1,
+    "weekdays": [],
+    "start": "2026-10-01"
+   },
+   "repeatOf": "f9a4ea79-7750-420e-ac72-5443d46ecfed",
+   "completedAt": null,
+   "createdAt": "2026-09-30T15:23:58.527Z"
+  }
+ ],
+ "projects": [
+  {
+   "id": "0fef3251-6e82-4a76-806c-be994d4aee65",
+   "title": "Выступить на семинаре по алгоритмам",
+   "description": "Доклад про обход графов: 10 минут и вопросы.",
+   "areaId": "b070a634-59a5-4e35-877a-10ee415a5450",
+   "goalId": null,
+   "status": "active",
+   "deadline": "2026-10-07",
+   "milestones": [
+    {
+     "id": "d3d80fbe-7b66-462a-a255-de1f73c32d79",
+     "title": "Материал",
+     "deadline": "2026-10-02"
+    },
+    {
+     "id": "f4fc1110-e2b4-49e0-a16f-c4e11f228b9b",
+     "title": "Слайды",
+     "deadline": "2026-10-05"
+    },
+    {
+     "id": "65f37c10-fe5b-46be-af93-5242a1fd7ecc",
+     "title": "Репетиция",
+     "deadline": "2026-10-06"
+    }
+   ],
+   "completedAt": null,
+   "createdAt": "2026-09-30T15:23:58.237Z"
+  },
+  {
+   "id": "4d66d3be-0e55-4810-979b-588afdffdaae",
+   "title": "Подготовиться к IELTS",
+   "description": "",
+   "areaId": "c1ffd544-8368-4c36-b97d-e8f9bd4a4af1",
+   "goalId": "98c7b206-c920-4366-9545-0dddd2bdc59a",
+   "status": "active",
+   "deadline": "2026-12-14",
+   "milestones": [
+    {
+     "id": "d5c6a511-136b-47ec-924c-d8ae4f18fe33",
+     "title": "Диагностика",
+     "deadline": null
+    },
+    {
+     "id": "ea186016-ce27-437c-8768-99e7b2949bc3",
+     "title": "Writing",
+     "deadline": "2026-10-30"
+    },
+    {
+     "id": "6d6af6e3-84b6-4f34-9f36-c0a61781c93a",
+     "title": "Speaking",
+     "deadline": "2026-11-29"
+    }
+   ],
+   "completedAt": null,
+   "createdAt": "2026-09-30T15:23:58.239Z"
+  }
+ ],
+ "weeklyReviews": [
+  {
+   "id": "78c61171-976f-4153-8fa2-362b896b3b8a",
+   "weekStart": "2026-09-21",
+   "focus": [
+    {
+     "id": "22e0b5b6-c742-4adb-92ee-66699e786b70",
+     "text": "Собрать материал для доклада",
+     "done": true
+    },
+    {
+     "id": "c0730b0c-8af4-44c3-beba-8e47d4268be2",
+     "text": "Эссе Task 2 по критериям",
+     "done": false
+    },
+    {
+     "id": "3c031d3a-7d18-4d1b-ae9f-9f133b12c9ac",
+     "text": "Зал три раза",
+     "done": false
+    }
+   ],
+   "reflection": "Получилось: слова каждый день и конспект лекции про графы.\nМешало: засиживался допоздна — пропустил тренировку.",
+   "createdAt": "2026-09-30T15:23:58.254Z"
+  }
+ ]
+}

@@ -2394,9 +2394,12 @@ textarea {
   transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s;
 }
 
-.task-check:hover:not(:disabled) {
-  border-color: var(--good);
-  color: var(--good);
+/* На телефоне :hover «залипает» после касания: несохранённая галочка выглядела бы поставленной. */
+@media (hover: hover) {
+  .task-check:hover:not(:disabled) {
+    border-color: var(--good);
+    color: var(--good);
+  }
 }
 
 .task-check[aria-checked='true'] {
@@ -3157,4 +3160,547 @@ textarea {
   width: 72px;
   height: 6px;
   flex: none;
+}
+
+/* ================= вход ================= */
+
+.auth {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 40px 16px calc(40px + env(safe-area-inset-bottom, 0px));
+}
+
+.auth__panel {
+  display: grid;
+  gap: 20px;
+  width: 100%;
+  max-width: 400px;
+}
+
+.auth__brand {
+  justify-self: center;
+  font-size: var(--text-xl);
+}
+
+.auth__loading {
+  text-align: center;
+}
+
+.auth__card {
+  display: grid;
+  gap: 20px;
+  padding: 28px;
+  box-shadow: var(--shadow-lift);
+}
+
+.auth__card--center {
+  justify-items: center;
+}
+
+.auth__head {
+  display: grid;
+  gap: 6px;
+  text-align: center;
+}
+
+.auth__head p {
+  text-wrap: balance;
+}
+
+.auth__form {
+  gap: 16px;
+}
+
+.auth__switch {
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+  text-align: center;
+  text-wrap: balance;
+}
+
+.auth__switch--quiet {
+  margin-top: -8px;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.auth__switch code {
+  font-size: inherit;
+  overflow-wrap: anywhere;
+}
+
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.password {
+  position: relative;
+}
+
+.password .input {
+  padding-right: 44px;
+}
+
+.password__toggle {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+}
+
+.account__email {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.account__form {
+  gap: 14px;
+  max-width: 380px;
+}
+
+@media (max-width: 480px) {
+  .auth {
+    align-items: start;
+    padding-top: 48px;
+  }
+
+  .auth__card {
+    padding: 22px 18px;
+  }
+}
+
+/* ================= связь и сообщения ================= */
+
+.offline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.offline svg {
+  flex: none;
+}
+
+/* Слой-«всплывашка»: сбрасываем стандартные рамку, фон и центрирование popover. */
+.toasts {
+  position: fixed;
+  inset: auto auto 24px 50%;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 8px;
+  width: min(440px, calc(100vw - 32px));
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  overflow: visible;
+}
+
+.toasts:empty {
+  display: none;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 8px 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--bad);
+  border-radius: var(--radius);
+  background: var(--sheet);
+  box-shadow: var(--shadow-lift);
+  font-size: var(--text-sm);
+  animation: toast-in 0.18s ease-out;
+}
+
+.toast__icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--bad);
+}
+
+.toast__text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.toast__close {
+  width: 26px;
+  height: 26px;
+  margin: -3px 0;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .toasts {
+    bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 12px);
+  }
+}
+
+/* ================= привычки ================= */
+
+/* Точки недели справа от строки привычки: пн … вс. */
+.habit-row .habit-week {
+  flex: none;
+  align-self: center;
+}
+
+.week__day--partial {
+  border-color: var(--good);
+  background: linear-gradient(to top, var(--good) 50%, var(--sheet-2) 50%);
+}
+
+.week__day--vacation {
+  background: repeating-linear-gradient(-45deg, var(--sheet-2) 0 2px, var(--sheet-3) 2px 4px);
+  border-style: dashed;
+}
+
+.week__day--future {
+  opacity: 0.45;
+}
+
+.week__day--before {
+  visibility: hidden;
+}
+
+@media (max-width: 480px) {
+  .habit-row .habit-week {
+    gap: 3px;
+  }
+
+  .habit-row .week__day {
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+  }
+}
+
+/* Баннер с кнопкой: на узком экране кнопка уходит под текст, а не сжимает его в столбик. */
+.banner--action {
+  flex-wrap: wrap;
+}
+
+.banner--action .banner__text {
+  flex: 1 1 14rem;
+}
+
+.banner--action .btn {
+  flex: none;
+}
+
+@media (max-width: 640px) {
+  .banner--action .btn {
+    margin-left: 28px;
+  }
+}
+
+/* Календарь: строка — неделя, дни с понедельника и итог «засчитано из нужного». */
+.habit-calendar-wrap,
+.habit-calendar {
+  min-width: 0;
+}
+
+.habit-calendar {
+  display: grid;
+  gap: 4px;
+  max-width: 420px;
+}
+
+.habit-calendar__row {
+  display: grid;
+  grid-template-columns: 3.4rem repeat(7, minmax(0, 1fr)) 2.8rem;
+  align-items: center;
+  gap: 4px;
+}
+
+@media (max-width: 480px) {
+  .habit-calendar__row {
+    grid-template-columns: 3rem repeat(7, minmax(0, 1fr)) 2.8rem;
+    gap: 3px;
+  }
+}
+
+.habit-calendar__head {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  text-align: center;
+}
+
+.habit-calendar__head > :last-child {
+  text-align: right;
+}
+
+.habit-calendar__date {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Образец в легенде: цвета — от модификаторов .habit-day--*, поэтому правило стоит раньше них. */
+.habit-swatch {
+  display: inline-block;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--sheet-2);
+}
+
+.habit-day {
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  width: 100%;
+  max-width: 28px;
+  aspect-ratio: 1;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--sheet-2);
+  color: var(--tone-slate);
+}
+
+.habit-day--done {
+  border-color: var(--good);
+  background: var(--good);
+}
+
+.habit-day--partial {
+  border-color: var(--good);
+  background: linear-gradient(to top, var(--good) 45%, var(--good-soft) 45%);
+}
+
+.habit-day--missed {
+  border-style: dashed;
+  border-color: var(--line-strong);
+  background: var(--sheet);
+}
+
+.habit-day--forgiven {
+  border-color: var(--tone-slate);
+  background: var(--tone-slate-soft);
+}
+
+.habit-day--vacation {
+  border-style: dashed;
+  background: repeating-linear-gradient(-45deg, var(--sheet-2) 0 3px, var(--sheet-3) 3px 6px);
+}
+
+.habit-day--today {
+  outline: 1.5px solid var(--ink-2);
+  outline-offset: 1.5px;
+}
+
+.habit-day--future {
+  opacity: 0.45;
+}
+
+.habit-day--before {
+  visibility: hidden;
+}
+
+.habit-calendar__result {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.habit-calendar__result svg {
+  color: var(--tone-slate);
+}
+
+.habit-calendar__result--kept {
+  color: var(--good);
+  font-weight: 600;
+}
+
+.habit-calendar-wrap {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+}
+
+.habit-calendar-wrap .legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.habit-calendar-wrap .legend svg {
+  color: var(--tone-slate);
+}
+
+
+/* ================= обзор недели ================= */
+
+.week-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.week-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px 6px 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--sheet);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.week-step__n {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--sheet-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.week-step[data-done] .week-step__n {
+  background: var(--good);
+  color: var(--sheet);
+}
+
+.week-step[aria-current='step'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.week-step[aria-current='step'] .week-step__n {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.week-nav {
+  justify-content: flex-end;
+}
+
+.week-results {
+  margin: 0;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.week-item__icon {
+  flex: none;
+  margin-top: 3px;
+  color: var(--ink-3);
+}
+
+.focus-list .task-row__title {
+  font-weight: 500;
+}
+
+.focus-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.focus-input__n {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+
+.focus-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.focus-suggestion {
+  display: grid;
+  justify-items: start;
+  gap: 1px;
+  height: auto;
+  max-width: 100%;
+  padding-block: 6px;
+  border-radius: var(--radius);
+  line-height: 1.3;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+
+.focus-suggestion__why {
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--ink-3);
+}
+
+.week-reminder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--sheet-2);
+}
+
+.week-reminder > svg {
+  flex: none;
+  color: var(--accent);
+}
+
+.week-reminder .spacer {
+  flex: 1 1 14rem;
+  color: var(--ink-2);
+}
+
+.past-review .focus-list .task-check {
+  width: 20px;
+  height: 20px;
 }

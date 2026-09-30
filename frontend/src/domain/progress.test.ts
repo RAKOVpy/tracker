@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { computeGoalStats, compareForToday, roundUpNorm, type GoalWithStats } from './progress';
-import type { Goal, ProgressEntry } from './types';
+import type { ProgressEntry, TargetGoal } from './types';
 
-function makeGoal(overrides: Partial<Goal> = {}): Goal {
+function makeGoal(overrides: Partial<TargetGoal> = {}): TargetGoal {
   return {
     id: 'g1',
+    kind: 'target',
+    daysPerWeek: null,
     title: 'Прочитать «Мастер и Маргарита»',
     description: '',
     areaId: null,
@@ -135,7 +137,7 @@ describe('computeGoalStats', () => {
 });
 
 describe('compareForToday', () => {
-  function item(goal: Partial<Goal>, entries: ProgressEntry[], today = '2026-10-05'): GoalWithStats {
+  function item(goal: Partial<TargetGoal>, entries: ProgressEntry[], today = '2026-10-05'): GoalWithStats {
     const g = makeGoal(goal);
     return { goal: g, entries, stats: computeGoalStats(g, entries, today) };
   }

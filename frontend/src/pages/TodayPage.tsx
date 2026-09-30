@@ -1,19 +1,20 @@
-import { useQueryClient } from '@tanstack/react-query';
-import { Plus, Sparkles, Target } from 'lucide-react';
-import { useState } from 'react';
+import { Plus, Repeat, Sparkles, Target } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { seedAllDemo } from '../api/demo';
-import { useAreaMap, useGoalsWithStats, useKnowledge, useNow, useWork } from '../api/hooks';
+import { useAreaMap, useGoals, useKnowledge, useNow, useVacations, useWork } from '../api/hooks';
 import { GoalCard } from '../components/GoalCard';
+import { TodayHabits } from '../components/habits/TodayHabits';
 import { DueReviewsCard } from '../components/knowledge/DueReviewsCard';
 import { TodayTasks } from '../components/tasks/TodayTasks';
 import { VacationBanner } from '../components/VacationBanner';
+import { WeekFocusCard } from '../components/week/WeekFocusCard';
 import { compareForToday, type GoalWithStats } from '../domain/progress';
 import { summarizeDay } from '../domain/day';
 import { completedOn, isForToday } from '../domain/tasks';
 import type { Area } from '../domain/types';
 import { formatLong, formatWeekday, type IsoDate } from '../lib/dates';
 import { ErrorState, LoadingState } from './states';
+import { useSeedDemo } from '../components/useSeedDemo';
 
 interface Groups {
   todo: GoalWithStats[];
@@ -102,18 +103,7 @@ function Section({ title, items, areas, today, compact }: SectionProps) {
 }
 
 function EmptyState() {
-  const client = useQueryClient();
-  const [seeding, setSeeding] = useState(false);
-
-  async function seed() {
-    setSeeding(true);
-    try {
-      await seedAllDemo();
-      await client.invalidateQueries();
-    } finally {
-      setSeeding(false);
-    }
-  }
+  const { seeding, seed } = useSeedDemo(seedAllDemo);
 
   return (
     <div className="card empty">
@@ -122,12 +112,16 @@ function EmptyState() {
       </span>
       <h2>Пока нет ни одной цели</h2>
       <p className="muted">
-        Поставьте цель с числом и сроком, например «прочитать 320 страниц к 31 октября». Приложение посчитает, сколько
-        делать каждый день, и напомнит, если начнёте отставать.
+        Поставьте цель с числом и сроком, например «прочитать 320 страниц к 31 октября»: приложение посчитает, сколько
+        делать каждый день, и напомнит, если начнёте отставать. Или заведите привычку: «английский 20 минут каждый день»,
+        «зал 3 раза в неделю».
       </p>
       <div className="row" style={{ justifyContent: 'center' }}>
         <Link className="btn btn--primary" to="/goals/new">
           <Plus size={16} aria-hidden /> Создать цель
+        </Link>
+        <Link className="btn" to="/goals/new?kind=habit">
+          <Repeat size={16} aria-hidden /> Привычка
         </Link>
         <button className="btn" type="button" onClick={seed} disabled={seeding}>
           <Sparkles size={16} aria-hidden /> Показать пример
@@ -138,22 +132,26 @@ function EmptyState() {
 }
 
 export function TodayPage() {
-  const { data, today, isLoading, error } = useGoalsWithStats();
+  const { data, today, isLoading, error } = useGoals();
   const areas = useAreaMap();
   const now = useNow();
   const knowledge = useKnowledge();
+  const { data: vacations = [] } = useVacations();
   // Задачи проектов на паузе и завершённых на «Сегодня» не попадают.
   const work = useWork();
 
   if (isLoading) return <LoadingState />;
   if (error || !data) return <ErrorState error={error} />;
 
-  const groups = groupGoals(data);
+  const groups = groupGoals(data.targets);
+  const habits = data.habits.filter((h) => h.goal.status === 'active');
   const weekday = formatWeekday(today);
   const sectionProps = { areas, today };
   const day = summarizeDay({
     tasksLeft: work.data?.inWork.filter((t) => isForToday(t, today)).length ?? 0,
     tasksDone: work.data?.inWork.filter((t) => t.status === 'done' && completedOn(t) === today).length ?? 0,
+    habitsLeft: habits.filter((h) => h.stats.state === 'due').length,
+    habitsDone: habits.filter((h) => h.stats.todayDone).length,
     goalsLeft: groups.todo.length,
     goalsDone: groups.doneToday.length,
     reviewsLeft: knowledge.data?.load.queue.length ?? 0,
@@ -181,6 +179,8 @@ export function TodayPage() {
         </div>
       )}
 
+      <WeekFocusCard today={today} />
+
       {knowledge.data?.load.vacation && (
         <div className="slot">
           <VacationBanner vacation={knowledge.data.load.vacation} />
@@ -201,7 +201,9 @@ export function TodayPage() {
 
       {work.data && <TodayTasks tasks={work.data.inWork} today={today} />}
 
-      {data.length === 0 ? (
+      <TodayHabits habits={data.habits} today={today} vacations={vacations} />
+
+      {data.targets.length === 0 && data.habits.length === 0 ? (
         <EmptyState />
       ) : (
         <>
