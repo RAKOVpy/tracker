@@ -11,8 +11,8 @@
 ## Этапы
 
 Модули продукта, исходные идеи с поправками и план этапов описаны в [PRODUCT.md](PRODUCT.md).
-Этот документ описывает техническое устройство того, что уже сделано
-(этапы 1–4), и проект бэкенда. Формат заметок Obsidian описан
+Этот документ описывает техническое устройство того, что уже сделано:
+этапы 1–4 и сервер (этап 6.1). Формат заметок Obsidian описан
 в [obsidian/README.md](../obsidian/README.md).
 
 ## Предметная модель
@@ -529,212 +529,94 @@ frontend/src/
     инструкция и шаблоны) и данные (скачать резервную копию, восстановить, удалить всё).
     В «Знаниях» — кнопка синхронизации с Obsidian.
 
-## Бэкенд (проект)
+## Бэкенд
 
-**Стек:** Django 5, DRF, PostgreSQL, `djangorestframework-simplejwt`,
-`djangorestframework-camel-case` (API в camelCase, как типы на фронтенде),
-`django-filter`, `drf-spectacular` (OpenAPI-схема).
+Код — `backend/` (как запустить — [backend/README.md](../backend/README.md)).
+**Стек:** Django 5.2, Django REST Framework, PostgreSQL (для разработки — SQLite),
+`djangorestframework-camel-case` (API в camelCase, как типы на фронтенде), `drf-spectacular`
+(OpenAPI-схема на `/api/schema/`), WhiteNoise и gunicorn для запуска на сервере.
 
-```python
-class Area(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="areas")
-    name = models.CharField(max_length=40)
-    color = models.CharField(max_length=10, choices=AreaColor.choices)
-    icon = models.CharField(max_length=20, choices=AreaIcon.choices)
-    order = models.PositiveIntegerField(default=0)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["order"]
-
-
-class Goal(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="goals")
-    title = models.CharField(max_length=200)
-    description = models.TextField(blank=True)
-    area = models.ForeignKey(Area, null=True, blank=True, on_delete=models.SET_NULL, related_name="goals")
-    unit = models.CharField(max_length=30)
-    target_value = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0.01)])
-    start_date = models.DateField()
-    deadline = models.DateField()
-    priority = models.CharField(max_length=10, choices=Priority.choices, default=Priority.MEDIUM)
-    status = models.CharField(max_length=10, choices=Status.choices, default=Status.ACTIVE)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        constraints = [models.CheckConstraint(condition=Q(deadline__gte=F("start_date")), name="deadline_after_start")]
-
-
-class Task(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="tasks")
-    title = models.CharField(max_length=300)
-    notes = models.TextField(blank=True)
-    status = models.CharField(max_length=10, choices=TaskStatus.choices, default=TaskStatus.INBOX)
-    important = models.BooleanField(default=False)
-    deadline = models.DateField(null=True, blank=True)
-    planned_date = models.DateField(null=True, blank=True)
-    area = models.ForeignKey(Area, null=True, blank=True, on_delete=models.SET_NULL, related_name="tasks")
-    project = models.ForeignKey("Project", null=True, blank=True, on_delete=models.SET_NULL, related_name="tasks")
-    milestone = models.ForeignKey("Milestone", null=True, blank=True, on_delete=models.SET_NULL, related_name="tasks")
-    material = models.ForeignKey("Material", null=True, blank=True, on_delete=models.SET_NULL, related_name="tasks")
-    part = models.ForeignKey("MaterialPart", null=True, blank=True, on_delete=models.SET_NULL, related_name="tasks")
-    checklist = models.JSONField(default=list)  # [{id, text, done}] — подзадачи без своей истории
-    # {unit, interval, weekdays, start} — проверяется сериализатором; следующий повтор создаёт сервер при закрытии
-    recurrence = models.JSONField(null=True, blank=True)
-    repeat_of = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="repeats")
-    completed_at = models.DateTimeField(null=True, blank=True)  # ставит сервер при done/cancelled
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        indexes = [models.Index(fields=["user", "status", "planned_date"])]
-
-
-class Project(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="projects")
-    title = models.CharField(max_length=300)
-    description = models.TextField(blank=True)
-    area = models.ForeignKey(Area, null=True, blank=True, on_delete=models.SET_NULL, related_name="projects")
-    goal = models.ForeignKey(Goal, null=True, blank=True, on_delete=models.SET_NULL, related_name="projects")
-    status = models.CharField(max_length=10, choices=ProjectStatus.choices, default=ProjectStatus.ACTIVE)
-    deadline = models.DateField(null=True, blank=True)
-    completed_at = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-
-class Milestone(models.Model):
-    # На фронтенде вехи — список внутри проекта; в API они вложены в проект (writable nested serializer).
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="milestones")
-    title = models.CharField(max_length=200)
-    deadline = models.DateField(null=True, blank=True)
-    order = models.PositiveIntegerField(default=0)
-
-    class Meta:
-        ordering = ["order"]
-
-
-class ProgressEntry(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    goal = models.ForeignKey(Goal, on_delete=models.CASCADE, related_name="entries")
-    date = models.DateField()
-    value = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0.01)])
-    note = models.CharField(max_length=500, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        indexes = [models.Index(fields=["goal", "date"])]
-
-
-class Material(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="materials")
-    title = models.CharField(max_length=300)
-    type = models.CharField(max_length=10, choices=MaterialType.choices)
-    author = models.CharField(max_length=200, blank=True)
-    url = models.URLField(blank=True)
-    area = models.ForeignKey(Area, null=True, blank=True, on_delete=models.SET_NULL, related_name="materials")
-    status = models.CharField(max_length=10, choices=MaterialStatus.choices, default=MaterialStatus.ACTIVE)
-    obsidian_path = models.CharField(max_length=1000, null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-
-class MaterialPart(models.Model):
-    # На фронтенде части — список внутри материала; в API вложены в материал, как вехи в проект.
-    # «Законспектирована» по сделанной задаче-конспекту не хранится, а вычисляется.
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    material = models.ForeignKey(Material, on_delete=models.CASCADE, related_name="parts")
-    title = models.CharField(max_length=300)
-    status = models.CharField(max_length=12, choices=PartStatus.choices, default=PartStatus.TODO)
-    order = models.PositiveIntegerField(default=0)
-
-    class Meta:
-        ordering = ["order"]
-
-
-class Note(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notes")
-    title = models.CharField(max_length=300)
-    material = models.ForeignKey(Material, null=True, blank=True, on_delete=models.SET_NULL, related_name="notes")
-    questions = models.JSONField(default=list)
-    summary = models.TextField(blank=True)
-    obsidian_uri = models.CharField(max_length=1000, blank=True)
-    obsidian_path = models.CharField(max_length=1000, null=True, blank=True)
-    status = models.CharField(max_length=10, choices=NoteStatus.choices, default=NoteStatus.ACTIVE)
-    added_on = models.DateField()
-    created_at = models.DateTimeField(auto_now_add=True)
-
-
-class Review(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    note = models.ForeignKey(Note, on_delete=models.CASCADE, related_name="reviews")
-    date = models.DateField()
-    rating = models.CharField(max_length=5, choices=Rating.choices)
-    explain = models.CharField(max_length=5, choices=Explain.choices, null=True, blank=True)
-    taught = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        indexes = [models.Index(fields=["note", "date"])]
-
-
-class UserSettings(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True, related_name="settings")
-    daily_review_limit = models.PositiveSmallIntegerField(default=15, validators=[MinValueValidator(1), MaxValueValidator(100)])
-    active_materials_limit = models.PositiveSmallIntegerField(default=3, validators=[MinValueValidator(1), MaxValueValidator(10)])
-    new_notes_per_day = models.PositiveSmallIntegerField(default=5, validators=[MinValueValidator(1), MaxValueValidator(50)])
-    strict_mode = models.BooleanField(default=False)
-
-
-class Vacation(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="vacations")
-    start = models.DateField()
-    end = models.DateField(null=True, blank=True)  # null — пока не выключу
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["start"]
-        constraints = [models.CheckConstraint(condition=Q(end__isnull=True) | Q(end__gte=F("start")), name="vacation_end_after_start")]
-        # Пересечения проверяются в сериализаторе (та же логика, что vacationError на фронтенде).
+```
+backend/
+├── config/             настройки из переменных окружения, корневые адреса
+└── tracker/
+    ├── models.py       модели — один в один с типами фронтенда (схема v8)
+    ├── rules/          чистые функции: даты, повторы задач, проверка отпусков — перенос domain/*.ts
+    ├── serializers.py  проверка полей и ссылок, вложенные вехи и части
+    ├── services.py     закрытие задачи с повтором, синхронизация вложенных списков
+    ├── views.py        API по сущностям, настройки, резервная копия, Obsidian
+    ├── auth_views.py   вход, выход, регистрация, текущая сессия
+    ├── backup.py       выгрузка и загрузка копии в формате фронтенда, сброс
+    └── tests/          pytest: правила, API, вход, изоляция пользователей, копия фронтенда
 ```
 
-**API** (все запросы — только по объектам текущего пользователя):
+**Модели.** Те же сущности и поля, что в разделе «Предметная модель»: `Area`, `Goal`,
+`ProgressEntry`, `Material` + `MaterialPart`, `Note`, `Review`, `UserSettings`, `Vacation`,
+`Project` + `Milestone`, `Task`. Отличия от фронтенда:
+
+- вехи и части — отдельные таблицы (в API вложены в проект и материал, порядок — по списку);
+  задачи ссылаются на них внешним ключом с `SET_NULL`, поэтому отвязка при удалении
+  вехи, части, проекта, материала, цели или сферы делается базой;
+- подзадачи и повтор — JSON внутри задачи, `repeatOf` — ссылка на задачу;
+- `UserSettings.timezone` — часовой пояс пользователя (запоминается при входе, пригодится
+  Telegram-боту); числа целей и записей — `float`, как `number` во фронтенде.
+
+**Правила** — те же, что на фронтенде: повторы задач (`rules/recurrence.py` сверен
+с `recurrence.ts` на 3000 случайных правил), проверка отпусков, закрытие задачи
+(`completedAt`), веха — только из проекта задачи, часть — только из материала, перенос в другой
+проект снимает веху. «Сегодня» сервер берёт из заголовка `X-Timezone`, который присылает фронтенд.
+Всё, что фронтенд вычисляет (прогресс, расписание заметок, нагрузка), по-прежнему вычисляется
+на фронтенде: сервер хранит данные и следит за их целостностью.
+
+**Вход** — почта и пароль, сессия Django в httpOnly-куке (`SameSite=Lax`), CSRF-токен
+в заголовке `X-CSRFToken` для запросов с изменениями, в том числе для входа и регистрации.
+Без входа — `401`, без токена — `403`. Попытки входа ограничены: 20 в минуту.
+Регистрацию можно закрыть (`ALLOW_REGISTRATION=0`). Новый пользователь получает четыре сферы
+и настройки по умолчанию.
+
+**Ошибки** — `{ "detail": "текст для пользователя", "errors": { поле: [сообщения] } }`.
+
+**API** (все запросы — только по объектам текущего пользователя; чужой объект — `404`,
+ссылка на чужой объект — `400`):
 
 | Метод | URL | Назначение |
 |-------|-----|------------|
+| GET | `/api/auth/session/` | кто вошёл и открыта ли регистрация; ставит куку CSRF |
+| POST | `/api/auth/login/`, `/api/auth/register/`, `/api/auth/logout/` | вход, регистрация, выход |
 | GET / POST | `/api/areas/` | сферы |
 | PATCH / DELETE | `/api/areas/{id}/` | сфера (при удалении цели, материалы, задачи и проекты остаются без сферы) |
-| GET | `/api/goals/?status=active` | список целей |
-| POST | `/api/goals/` | создать |
-| GET / PATCH / DELETE | `/api/goals/{id}/` | цель |
-| GET | `/api/entries/?goal={id}&date_from=…` | записи (без `goal` — по всем целям) |
-| POST | `/api/entries/` | добавить запись |
-| DELETE | `/api/entries/{id}/` | удалить запись |
+| GET / POST | `/api/goals/` | цели |
+| GET / PATCH / DELETE | `/api/goals/{id}/` | цель (удаляется с записями; проекты остаются без цели) |
+| GET | `/api/entries/?goal={id}` | записи (без `goal` — по всем целям) |
+| POST / DELETE | `/api/entries/`, `/api/entries/{id}/` | добавить, удалить запись |
 | GET / POST | `/api/materials/` | материалы с вложенными частями |
-| PATCH / DELETE | `/api/materials/{id}/` | материал (задачи удалённых частей — без части; при удалении заметки и задачи остаются без материала) |
-| GET / POST | `/api/notes/` | заметки |
+| PATCH / DELETE | `/api/materials/{id}/` | материал (задачи удалённых частей — без части; заметки и задачи удалённого материала — без него) |
+| GET / POST | `/api/notes/` | заметки (`addedOn` по умолчанию — сегодня) |
 | PATCH / DELETE | `/api/notes/{id}/` | заметка (удаляется вместе с повторениями) |
-| GET / POST | `/api/reviews/` | журнал повторений |
-| DELETE | `/api/reviews/{id}/` | отмена оценки |
-| GET / POST | `/api/tasks/?status=inbox` | задачи и «Входящие» |
-| PATCH / DELETE | `/api/tasks/{id}/` | задача (при смене статуса сервер ставит или сбрасывает `completedAt`; закрытие повторяющейся создаёт следующий повтор, возврат в работу — убирает нетронутый, в одной транзакции) |
+| GET / POST / DELETE | `/api/reviews/`, `/api/reviews/{id}/` | журнал повторений, отмена оценки |
+| GET / PATCH | `/api/settings/` | лимиты нагрузки |
+| GET / POST / PATCH / DELETE | `/api/vacations/`, `/api/vacations/{id}/` | отпуска (пересечения — `400` с объяснением) |
+| GET / POST | `/api/tasks/` | задачи и «Входящие» |
+| PATCH / DELETE | `/api/tasks/{id}/` | задача: закрытие повторяющейся создаёт следующий повтор, возврат в работу убирает нетронутый — в одной транзакции, под блокировкой задачи |
 | GET / POST | `/api/projects/` | проекты с вложенными вехами |
 | PATCH / DELETE | `/api/projects/{id}/` | проект (задачи удалённых вех — без вехи, задачи удалённого проекта — без проекта) |
-| GET / PATCH | `/api/settings/` | лимиты нагрузки |
-| GET / POST | `/api/vacations/` | отпуска (400, если даты пересекаются) |
-| PATCH / DELETE | `/api/vacations/{id}/` | вернуться раньше, отменить |
-| GET | `/api/export/` | резервная копия в том же формате, что и сейчас |
-| POST | `/api/import/` | восстановление из резервной копии |
-| POST | `/api/auth/token/`, `/api/auth/token/refresh/` | JWT |
+| GET | `/api/export/` | резервная копия в формате фронтенда |
+| POST | `/api/import/` | замена всех данных копией (текущей версии схемы; старые переводит фронтенд) |
+| POST | `/api/reset/` | удалить всё, сферы по умолчанию |
+| POST | `/api/obsidian/apply/` | новые и изменённые материалы и заметки из синхронизации с Obsidian |
 
-Расчёт статистики на MVP-этапе остаётся на клиенте: он мгновенный, работает офлайн
-и уже покрыт тестами. Когда целей и записей станет много, в `GET /api/goals/`
-добавим агрегаты (`currentValue`, `todayValue`, `lastEntryDate`) через `annotate`,
+**Резервная копия.** Выгрузка — тот же JSON, что у фронтенда без сервера, поэтому копию можно
+переносить в обе стороны. Загрузка проверяет данные так же, как `validateDb`, чинит висячие ссылки
+и выдаёт всем объектам новые id: UUID общий для всех пользователей, а одну копию могут загрузить
+два аккаунта. При ошибке данные не меняются (транзакция).
+
+**Синхронизация с Obsidian.** Папка хранилища читается в браузере, как и раньше; фронтенд
+сопоставляет файлы с данными (`applyVault`) и отправляет на сервер только новые и изменённые
+материалы и заметки. Сервер обновляет у существующих лишь поля из файла — статус, дата добавления
+и журнал повторений остаются.
+
+Расчёт статистики остаётся на клиенте: он мгновенный и уже покрыт тестами. Когда целей
+и записей станет много, в `GET /api/goals/` добавим агрегаты через `annotate`,
 а главный экран будет запрашивать только записи за последние 7 дней.
 
 ## Решения и компромиссы
@@ -745,6 +627,12 @@ class Vacation(models.Model):
   и нельзя перебрать чужие объекты.
 - **Единица измерения — свободная строка.** Известные единицы («часов», «тренировок»)
   склоняются, остальные выводятся как есть.
+- **Сессия вместо JWT.** Фронтенд и API живут на одном домене, поэтому httpOnly-кука сессии
+  с CSRF-защитой безопаснее токена в `localStorage`, который доступен любому скрипту на странице.
+  JWT понадобится, только если появится отдельное приложение на другом домене.
+- **Правила в двух местах.** Повторы, отпуска и проверки есть и на фронтенде (для работы без сервера
+  и мгновенного отклика), и на сервере (он не доверяет клиенту). Тесты обеих сторон на одних
+  примерах, а повторы сверены на случайных правилах.
 - **Дискретные цели** («12 тренировок за месяц») на MVP показывают дробную норму
   («0,4 тренировки в день»). Правильное решение — отдельный тип «привычка» с частотой
   (этап 5 в PRODUCT.md).
