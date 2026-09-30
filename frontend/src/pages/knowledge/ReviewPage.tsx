@@ -7,6 +7,7 @@ import { EXTRA_CHUNK } from '../../domain/load';
 import { EXPLAIN_OPTIONS, LEVELS, projectReview, RATINGS, type NoteWithState } from '../../domain/review';
 import type { ExplainAnswer, MasteryLevel, Rating, Vacation } from '../../domain/types';
 import type { IsoDate } from '../../lib/dates';
+import { isControl, isTyping } from '../../lib/keyboard';
 import { plural } from '../../lib/format';
 import { ErrorState, LoadingState, NotFoundState } from '../states';
 
@@ -26,14 +27,6 @@ function ratingLabel(rating: Rating): string {
   return RATINGS.find((r) => r.value === rating)?.label ?? rating;
 }
 
-function isTyping(target: EventTarget | null): boolean {
-  return target instanceof HTMLElement && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
-}
-
-/** Enter и пробел на кнопке или ссылке должны нажимать её, а не открывать ответ. */
-function isControl(target: EventTarget | null): boolean {
-  return target instanceof HTMLElement && target.closest('a, button, input, select, textarea, summary, [contenteditable="true"]') !== null;
-}
 
 interface CardProps {
   item: NoteWithState;
@@ -57,6 +50,8 @@ function ReviewCard({ item, materialTitle, today, vacations, busy, initial, onRa
     function onKey(event: KeyboardEvent) {
       // Зажатая клавиша повторяет нажатие — иначе одна «3» оценила бы подряд несколько заметок.
       if (event.repeat || isTyping(event.target) || event.metaKey || event.ctrlKey || event.altKey) return;
+      // Поверх сессии открыто окно «Записать»: клавиши относятся к нему.
+      if (event.target instanceof Element && event.target.closest('dialog')) return;
       if (!revealed && (event.key === ' ' || event.key === 'Enter')) {
         if (isControl(event.target)) return;
         event.preventDefault();

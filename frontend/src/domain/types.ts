@@ -155,6 +155,43 @@ export interface Vacation {
   createdAt: string;
 }
 
+// ---------- задачи ----------
+
+/** inbox — записано во «Входящие» и ещё не разобрано; todo — задача; done — сделана; cancelled — не буду делать. */
+export type TaskStatus = 'inbox' | 'todo' | 'done' | 'cancelled';
+
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+/**
+ * Задача. «Входящие» — это задачи со статусом inbox, отдельной сущности нет.
+ * Срочность не хранится: она вычисляется из дедлайна (см. domain/tasks.ts).
+ */
+export interface Task {
+  id: string;
+  title: string;
+  notes: string;
+  status: TaskStatus;
+  /** Важность ставится вручную: важно / обычно. */
+  important: boolean;
+  /** Дедлайн: «сдать до пятницы». */
+  deadline: IsoDate | null;
+  /** Когда делаю: «сяду в среду». Не путать с дедлайном. */
+  plannedDate: IsoDate | null;
+  areaId: string | null;
+  /** Подзадачи — чек-лист. */
+  checklist: ChecklistItem[];
+  /** Когда задачу сделали или отменили. */
+  completedAt: string | null;
+  createdAt: string;
+}
+
+export type TaskInput = Pick<Task, 'title' | 'notes' | 'status' | 'important' | 'deadline' | 'plannedDate' | 'areaId' | 'checklist'>;
+export type TaskPatch = Partial<TaskInput>;
+
 export type SettingsPatch = Partial<Settings>;
 export type VacationInput = Pick<Vacation, 'start' | 'end'>;
 

@@ -1,7 +1,13 @@
-import { BookOpen, NotebookPen, Target } from 'lucide-react';
+import { BookOpen, ListTodo, NotebookPen, Target } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const OPTIONS = [
+  {
+    to: '/tasks/new',
+    icon: ListTodo,
+    title: 'Задача',
+    text: 'Дело со сроком или днём, когда за него сесть: «законспектировать лекцию 5 до пятницы».',
+  },
   {
     to: '/goals/new',
     icon: Target,
@@ -22,7 +28,7 @@ const OPTIONS = [
   },
 ];
 
-/** Выбор, что создать, — нужен на телефоне, где нет боковой панели. */
+/** Выбор, что создать подробно. Быстро записать можно кнопкой «Записать» или клавишей N. */
 export function CreatePage() {
   return (
     <>

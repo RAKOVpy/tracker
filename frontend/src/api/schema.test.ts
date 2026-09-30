@@ -31,7 +31,7 @@ const v1Data = {
 
 /** Данные в формате v2: как их хранила предыдущая версия приложения. */
 function migrateToV2() {
-  const { materials: _m, notes: _n, reviews: _r, settings: _s, vacations: _v, ...v2 } = migrate(v1Data, makeCtx());
+  const { materials: _m, notes: _n, reviews: _r, settings: _s, vacations: _v, tasks: _t, ...v2 } = migrate(v1Data, makeCtx());
   return v2;
 }
 
@@ -55,6 +55,11 @@ describe('migrate', () => {
     const db = migrate({ version: 4, ...migrateToV2(), materials: [], notes: [], reviews: [] }, makeCtx());
     expect(db.settings).toEqual({ dailyReviewLimit: 15, activeMaterialsLimit: 3, newNotesPerDay: 5, strictMode: false });
     expect(db.vacations).toEqual([]);
+  });
+
+  it('v5 → v6: появляется пустой список задач', () => {
+    const v5 = { version: 5, ...migrateToV2(), materials: [], notes: [], reviews: [], settings: {}, vacations: [] };
+    expect(migrate(v5, makeCtx()).tasks).toEqual([]);
   });
 
   it('v2 → v3: добавляются пустые списки знаний', () => {
@@ -205,6 +210,41 @@ describe('нагрузка', () => {
       validateDb({ ...db, vacations: [vacation('a', '2026-09-01', null), vacation('b', '2026-10-01', '2026-10-02')] }),
     ).toThrow('пересекаются');
     expect(() => validateDb({ ...db, vacations: [vacation('a', '2026-09-10', '2026-09-01')] })).toThrow('раньше');
+  });
+});
+
+describe('задачи', () => {
+  const base = () => migrate(v1Data, makeCtx());
+  const task = (overrides: Record<string, unknown> = {}) => ({
+    id: 't1',
+    title: 'Сдать отчёт',
+    notes: '',
+    status: 'todo',
+    important: true,
+    deadline: '2026-10-09',
+    plannedDate: null,
+    areaId: null,
+    checklist: [{ id: 'c1', text: 'Собрать цифры', done: true }],
+    completedAt: null,
+    createdAt: 'x',
+    ...overrides,
+  });
+
+  it('проходят проверку без изменений', () => {
+    const db = { ...base(), tasks: [task()] };
+    expect(validateDb(db)).toEqual(db);
+  });
+
+  it('задача удалённой сферы остаётся без сферы', () => {
+    expect(validateDb({ ...base(), tasks: [task({ areaId: 'нет-такой' })] }).tasks[0].areaId).toBeNull();
+  });
+
+  it('отклоняет ошибки', () => {
+    const db = base();
+    expect(() => validateDb({ ...db, tasks: [task({ status: 'later' })] })).toThrow('Задача 1: недопустимое значение поля «status»');
+    expect(() => validateDb({ ...db, tasks: [task({ deadline: '9 окт' })] })).toThrow('ГГГГ-ММ-ДД');
+    expect(() => validateDb({ ...db, tasks: [task({ checklist: [{ id: 'c1', text: '', done: false }] })] })).toThrow('пункт 1');
+    expect(() => validateDb({ ...db, tasks: [task(), task()] })).toThrow('повторяется id');
   });
 });
 

@@ -3,14 +3,16 @@ import { Plus, Sparkles, Target } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { seedAllDemo } from '../api/demo';
-import { useAreaMap, useGoalsWithStats, useKnowledge, useNow } from '../api/hooks';
+import { useAreaMap, useGoalsWithStats, useKnowledge, useNow, useTasks } from '../api/hooks';
 import { GoalCard } from '../components/GoalCard';
 import { DueReviewsCard } from '../components/knowledge/DueReviewsCard';
+import { TodayTasks } from '../components/tasks/TodayTasks';
 import { VacationBanner } from '../components/VacationBanner';
 import { compareForToday, type GoalWithStats } from '../domain/progress';
+import { summarizeDay } from '../domain/day';
+import { completedOn, isForToday } from '../domain/tasks';
 import type { Area } from '../domain/types';
 import { formatLong, formatWeekday, type IsoDate } from '../lib/dates';
-import { plural } from '../lib/format';
 import { ErrorState, LoadingState } from './states';
 
 interface Groups {
@@ -140,14 +142,22 @@ export function TodayPage() {
   const areas = useAreaMap();
   const now = useNow();
   const knowledge = useKnowledge();
+  const tasks = useTasks();
 
   if (isLoading) return <LoadingState />;
   if (error || !data) return <ErrorState error={error} />;
 
   const groups = groupGoals(data);
-  const activeToday = groups.todo.length + groups.doneToday.length;
   const weekday = formatWeekday(today);
   const sectionProps = { areas, today };
+  const day = summarizeDay({
+    tasksLeft: tasks.data?.filter((t) => isForToday(t, today)).length ?? 0,
+    tasksDone: tasks.data?.filter((t) => t.status === 'done' && completedOn(t) === today).length ?? 0,
+    goalsLeft: groups.todo.length,
+    goalsDone: groups.doneToday.length,
+    reviewsLeft: knowledge.data?.load.queue.length ?? 0,
+    reviewedToday: knowledge.data?.load.reviewedToday ?? 0,
+  });
 
   return (
     <>
@@ -159,6 +169,16 @@ export function TodayPage() {
           <h1>{greeting(now)}</h1>
         </div>
       </div>
+
+      {day.total > 0 && (
+        <div className="card summary slot">
+          <Ring done={day.done} total={day.total} />
+          <div>
+            <div className="summary__title">{day.title}</div>
+            <div className="muted small">{day.hint}</div>
+          </div>
+        </div>
+      )}
 
       {knowledge.data?.load.vacation && (
         <div className="slot">
@@ -178,33 +198,17 @@ export function TodayPage() {
         </div>
       )}
 
+      {tasks.data && <TodayTasks tasks={tasks.data} today={today} />}
+
       {data.length === 0 ? (
         <EmptyState />
       ) : (
         <>
-          {activeToday > 0 && (
-            <div className="card summary">
-              <Ring done={groups.doneToday.length} total={activeToday} />
-              <div>
-                <div className="summary__title">
-                  {groups.todo.length === 0
-                    ? 'На сегодня всё сделано'
-                    : `Осталось ${groups.todo.length} ${plural(groups.todo.length, ['цель', 'цели', 'целей'])} на сегодня`}
-                </div>
-                <div className="muted small">
-                  {groups.todo.length === 0
-                    ? 'Можно отдохнуть или сделать немного впрок.'
-                    : 'Выполните дневную норму, чтобы успеть к сроку.'}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <Section title="Нужно сделать сегодня" items={groups.todo} {...sectionProps} />
-          <Section title="Срок прошёл" items={groups.overdue} {...sectionProps} />
-          <Section title="Сегодня уже сделано" items={groups.doneToday} {...sectionProps} />
-          <Section title="Запланированы" items={groups.upcoming} {...sectionProps} compact />
-          <Section title="Достигнуты" items={groups.achieved} {...sectionProps} compact />
+          <Section title="Цели: норма на сегодня" items={groups.todo} {...sectionProps} />
+          <Section title="Цели: срок прошёл" items={groups.overdue} {...sectionProps} />
+          <Section title="Цели: норма выполнена" items={groups.doneToday} {...sectionProps} />
+          <Section title="Цели запланированы" items={groups.upcoming} {...sectionProps} compact />
+          <Section title="Цели достигнуты" items={groups.achieved} {...sectionProps} compact />
         </>
       )}
     </>

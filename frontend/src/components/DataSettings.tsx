@@ -11,6 +11,7 @@ type Status = { kind: 'idle' } | { kind: 'success'; text: string } | { kind: 'er
 function describeCounts(db: Db): string {
   const parts: [number, [string, string, string]][] = [
     [db.goals.length, ['цель', 'цели', 'целей']],
+    [db.tasks.length, ['задача', 'задачи', 'задач']],
     [db.entries.length, ['запись прогресса', 'записи прогресса', 'записей прогресса']],
     [db.materials.length, ['материал', 'материала', 'материалов']],
     [db.notes.length, ['заметка', 'заметки', 'заметок']],
@@ -131,8 +132,8 @@ export function DataSettings() {
         {confirmingReset ? (
           <div className="confirm">
             <p>
-              Удалить все цели, материалы, заметки, повторения, сферы, настройки и отпуска в этом браузере? Если резервной копии
-              нет, вернуть их не получится.
+              Удалить все задачи, цели, материалы, заметки, повторения, сферы, настройки и отпуска в этом браузере? Если
+              резервной копии нет, вернуть их не получится.
             </p>
             <div className="row">
               <button className="btn btn--sm btn--danger-solid" type="button" disabled={resetData.isPending} onClick={confirmReset}>

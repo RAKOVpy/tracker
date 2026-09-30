@@ -1,21 +1,51 @@
+import { lazy, type ComponentType } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
-import { CreatePage } from './pages/CreatePage';
-import { EditGoalPage, NewGoalPage } from './pages/GoalFormPages';
-import { GoalPage } from './pages/GoalPage';
-import { GoalsPage } from './pages/GoalsPage';
-import { KnowledgePage } from './pages/knowledge/KnowledgePage';
-import { EditMaterialPage, MaterialPage, NewMaterialPage } from './pages/knowledge/MaterialPages';
-import { EditNotePage, NewNotePage, NotePage } from './pages/knowledge/NotePages';
-import { ReviewPage } from './pages/knowledge/ReviewPage';
-import { SettingsPage } from './pages/SettingsPage';
 import { TodayPage } from './pages/TodayPage';
+
+/**
+ * Разделы грузятся, когда их открывают: главный экран «Сегодня» — сразу, остальное — отдельными
+ * файлами, чтобы первый запуск был быстрым. Страницы одного раздела лежат в одном файле.
+ */
+function page<M extends Record<string, unknown>>(load: () => Promise<M>, name: keyof M) {
+  return lazy(async () => ({ default: (await load())[name] as ComponentType }));
+}
+
+const tasks = () => import('./pages/tasks/TaskPages');
+const materials = () => import('./pages/knowledge/MaterialPages');
+const notes = () => import('./pages/knowledge/NotePages');
+const goalForms = () => import('./pages/GoalFormPages');
+
+const InboxPage = page(() => import('./pages/tasks/InboxPage'), 'InboxPage');
+const TasksPage = page(() => import('./pages/tasks/TasksPage'), 'TasksPage');
+const TaskPage = page(tasks, 'TaskPage');
+const NewTaskPage = page(tasks, 'NewTaskPage');
+const EditTaskPage = page(tasks, 'EditTaskPage');
+const GoalsPage = page(() => import('./pages/GoalsPage'), 'GoalsPage');
+const GoalPage = page(() => import('./pages/GoalPage'), 'GoalPage');
+const NewGoalPage = page(goalForms, 'NewGoalPage');
+const EditGoalPage = page(goalForms, 'EditGoalPage');
+const KnowledgePage = page(() => import('./pages/knowledge/KnowledgePage'), 'KnowledgePage');
+const MaterialPage = page(materials, 'MaterialPage');
+const NewMaterialPage = page(materials, 'NewMaterialPage');
+const EditMaterialPage = page(materials, 'EditMaterialPage');
+const NotePage = page(notes, 'NotePage');
+const NewNotePage = page(notes, 'NewNotePage');
+const EditNotePage = page(notes, 'EditNotePage');
+const ReviewPage = page(() => import('./pages/knowledge/ReviewPage'), 'ReviewPage');
+const CreatePage = page(() => import('./pages/CreatePage'), 'CreatePage');
+const SettingsPage = page(() => import('./pages/SettingsPage'), 'SettingsPage');
 
 export default function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<TodayPage />} />
+        <Route path="inbox" element={<InboxPage />} />
+        <Route path="tasks" element={<TasksPage />} />
+        <Route path="tasks/new" element={<NewTaskPage />} />
+        <Route path="tasks/:id" element={<TaskPage />} />
+        <Route path="tasks/:id/edit" element={<EditTaskPage />} />
         <Route path="goals" element={<GoalsPage />} />
         <Route path="goals/new" element={<NewGoalPage />} />
         <Route path="goals/:id" element={<GoalPage />} />

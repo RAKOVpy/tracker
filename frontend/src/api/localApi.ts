@@ -1,3 +1,4 @@
+import { applyTaskPatch, createTask } from '../domain/tasks';
 import type { Area, Goal, Material, Note, ProgressEntry, Review, Vacation } from '../domain/types';
 import { sortVacations, vacationError } from '../domain/vacation';
 import { todayIso } from '../lib/dates';
@@ -65,6 +66,7 @@ export const localApi: TrackerApi = {
     db.areas = db.areas.filter((a) => a.id !== id);
     db.goals = db.goals.map((g) => (g.areaId === id ? { ...g, areaId: null } : g));
     db.materials = db.materials.map((m) => (m.areaId === id ? { ...m, areaId: null } : m));
+    db.tasks = db.tasks.map((t) => (t.areaId === id ? { ...t, areaId: null } : t));
     save(db);
   },
 
@@ -246,6 +248,32 @@ export const localApi: TrackerApi = {
   async deleteVacation(id) {
     const db = load();
     db.vacations = db.vacations.filter((v) => v.id !== id);
+    save(db);
+  },
+
+  async listTasks() {
+    return load().tasks;
+  },
+
+  async createTask(input) {
+    const db = load();
+    const task = createTask(input, { id: crypto.randomUUID(), now: new Date().toISOString() });
+    db.tasks.push(task);
+    save(db);
+    return task;
+  },
+
+  async updateTask(id, patch) {
+    const db = load();
+    const index = findIndex(db.tasks, id, 'Задача');
+    db.tasks[index] = applyTaskPatch(db.tasks[index], patch, new Date().toISOString());
+    save(db);
+    return db.tasks[index];
+  },
+
+  async deleteTask(id) {
+    const db = load();
+    db.tasks = db.tasks.filter((t) => t.id !== id);
     save(db);
   },
 

@@ -14,6 +14,8 @@ import type {
   Rating,
   Review,
   Settings,
+  Task,
+  TaskStatus,
   Vacation,
 } from '../domain/types';
 import { sortVacations } from '../domain/vacation';
@@ -22,7 +24,7 @@ import { sortVacations } from '../domain/vacation';
  * Схема данных в хранилище и в файлах резервных копий.
  * При изменении модели: увеличить SCHEMA_VERSION и добавить шаг в MIGRATIONS.
  */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export interface Db {
   areas: Area[];
@@ -33,6 +35,7 @@ export interface Db {
   reviews: Review[];
   settings: Settings;
   vacations: Vacation[];
+  tasks: Task[];
 }
 
 export interface Backup extends Db {
@@ -68,6 +71,7 @@ export function createEmptyDb(ctx: Ctx): Db {
     reviews: [],
     settings: { ...DEFAULT_SETTINGS },
     vacations: [],
+    tasks: [],
   };
 }
 
@@ -113,11 +117,17 @@ function v4ToV5(raw: Raw): Raw {
   return { ...raw, settings: { ...DEFAULT_SETTINGS }, vacations: [] };
 }
 
+/** v5 → v6: задачи и «Входящие». */
+function v5ToV6(raw: Raw): Raw {
+  return { ...raw, tasks: [] };
+}
+
 const MIGRATIONS: Record<number, (raw: Raw, ctx: Ctx) => Raw> = {
   1: v1ToV2,
   2: v2ToV3,
   3: v3ToV4,
   4: v4ToV5,
+  5: v5ToV6,
 };
 
 /** Приводит данные любой известной версии к текущей схеме и проверяет их. */
@@ -167,6 +177,7 @@ const MATERIAL_STATUSES: MaterialStatus[] = ['queued', 'active', 'done', 'droppe
 const NOTE_STATUSES: Note['status'][] = ['active', 'paused'];
 const RATINGS: Rating[] = ['again', 'hard', 'good', 'easy'];
 const EXPLAIN_ANSWERS: ExplainAnswer[] = ['no', 'hints', 'yes'];
+const TASK_STATUSES: TaskStatus[] = ['inbox', 'todo', 'done', 'cancelled'];
 
 function isObject(value: unknown): value is Raw {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -227,6 +238,10 @@ function optionalStr(obj: Raw, key: string, where: string): string | null {
   return value;
 }
 
+function optionalDate(obj: Raw, key: string, where: string): string | null {
+  return obj[key] === null ? null : date(obj, key, where);
+}
+
 function bool(obj: Raw, key: string, where: string): boolean {
   const value = obj[key];
   if (typeof value !== 'boolean') throw new DataError(`${where}: поле «${key}» должно быть true или false`);
@@ -251,7 +266,7 @@ function uniqueIds(items: { id: string }[], what: string): void {
 
 /**
  * Проверяет данные и возвращает чистую копию только с известными полями.
- * Висячие ссылки чинятся: цель или материал удалённой сферы остаются без сферы, заметка удалённого
+ * Висячие ссылки чинятся: цель, материал или задача удалённой сферы остаются без сферы, заметка удалённого
  * материала — без материала, записи и повторения удалённых целей и заметок отбрасываются.
  */
 export function validateDb(raw: unknown): Db {
@@ -399,7 +414,32 @@ export function validateDb(raw: unknown): Db {
     }
   });
 
-  return { areas, goals, entries, materials, notes, reviews, settings, vacations };
+  const tasks: Task[] = asArray(data.tasks, 'tasks').map((item, i) => {
+    const t = asObject(item, `Задача ${i + 1}`);
+    const where = `Задача ${i + 1}`;
+    const checklist = asArray(t.checklist, `${where}: checklist`).map((raw, j) => {
+      const c = asObject(raw, `${where}, пункт ${j + 1}`);
+      const at = `${where}, пункт ${j + 1}`;
+      return { id: str(c, 'id', at), text: str(c, 'text', at), done: bool(c, 'done', at) };
+    });
+    uniqueIds(checklist, `${where}: пункты`);
+    return {
+      id: str(t, 'id', where),
+      title: str(t, 'title', where),
+      notes: str(t, 'notes', where, { allowEmpty: true }),
+      status: oneOf(t, 'status', TASK_STATUSES, where),
+      important: bool(t, 'important', where),
+      deadline: optionalDate(t, 'deadline', where),
+      plannedDate: optionalDate(t, 'plannedDate', where),
+      areaId: typeof t.areaId === 'string' && areaIds.has(t.areaId) ? t.areaId : null,
+      checklist,
+      completedAt: optionalStr(t, 'completedAt', where),
+      createdAt: str(t, 'createdAt', where),
+    };
+  });
+  uniqueIds(tasks, 'Задачи');
+
+  return { areas, goals, entries, materials, notes, reviews, settings, vacations, tasks };
 }
 
 /**

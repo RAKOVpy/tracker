@@ -1,4 +1,4 @@
-import type { AreaInput, ExplainAnswer, NoteInput, Rating } from '../domain/types';
+import type { AreaInput, ExplainAnswer, NoteInput, Rating, TaskInput } from '../domain/types';
 import { addDays, todayIso } from '../lib/dates';
 import { api } from '.';
 
@@ -64,11 +64,48 @@ export async function seedDemoData(): Promise<void> {
 
 type LogItem = [dayOffset: number, rating: Rating, explain?: ExplainAnswer, taught?: boolean];
 
-/** Пример для пустого трекера: цели, а если знаний ещё нет — и материалы с заметками. */
+/** Пример для пустого трекера: цели, а если знаний и задач ещё нет — и они. */
 export async function seedAllDemo(): Promise<void> {
   await seedDemoData();
-  const [materials, notes] = await Promise.all([api.listMaterials(), api.listNotes()]);
+  const [materials, notes, tasks] = await Promise.all([api.listMaterials(), api.listNotes(), api.listTasks()]);
   if (materials.length === 0 && notes.length === 0) await seedKnowledgeDemo();
+  if (tasks.length === 0) await seedTasksDemo();
+}
+
+/** Пример задач: на сегодня, перенесённая со вчера, срочная, на неделе, без даты, сделанная и «Входящие». */
+export async function seedTasksDemo(): Promise<void> {
+  const today = todayIso();
+  const study = await findOrCreateArea({ name: 'Учёба', color: 'clay', icon: 'study' });
+  const base: TaskInput = { title: '', notes: '', status: 'todo', important: false, deadline: null, plannedDate: null, areaId: null, checklist: [] };
+  const item = (text: string, done = false) => ({ id: crypto.randomUUID(), text, done });
+  const tasks: TaskInput[] = [
+    {
+      ...base,
+      title: 'Законспектировать лекцию 5 по алгоритмам',
+      important: true,
+      plannedDate: today,
+      deadline: addDays(today, 2),
+      areaId: study,
+      checklist: [item('Пересмотреть запись', true), item('Выписать определения'), item('Сделать 3 заметки с вопросами')],
+    },
+    { ...base, title: 'Ответить на письмо куратора', plannedDate: addDays(today, -1) },
+    { ...base, title: 'Оплатить интернет', deadline: addDays(today, 1) },
+    {
+      ...base,
+      title: 'Подготовить презентацию к семинару',
+      important: true,
+      plannedDate: addDays(today, 3),
+      deadline: addDays(today, 5),
+      areaId: study,
+      notes: '10 минут, 8–10 слайдов. Показать пример с графами.',
+    },
+    { ...base, title: 'Разобрать фотографии с отпуска' },
+    { ...base, title: 'Записаться к стоматологу', plannedDate: today, status: 'done' },
+    { ...base, title: 'Позвонить в банк про карту', status: 'inbox' },
+    { ...base, title: 'Курс по SQL на Stepik', status: 'inbox' },
+    { ...base, title: 'Купить подарок на день рождения', status: 'inbox' },
+  ];
+  for (const task of tasks) await api.createTask(task);
 }
 
 /** Пример материалов и заметок с историей повторений: часть заметок ждёт повторения сегодня. */

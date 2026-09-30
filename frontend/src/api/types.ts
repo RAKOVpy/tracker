@@ -17,6 +17,9 @@ import type {
   ReviewInput,
   Settings,
   SettingsPatch,
+  Task,
+  TaskInput,
+  TaskPatch,
   Vacation,
   VacationInput,
 } from '../domain/types';
@@ -73,6 +76,13 @@ export interface TrackerApi {
   createVacation(input: VacationInput): Promise<Vacation>;
   updateVacation(id: string, input: VacationInput): Promise<Vacation>;
   deleteVacation(id: string): Promise<void>;
+
+  /** Задачи вместе со «Входящими» (статус inbox). */
+  listTasks(): Promise<Task[]>;
+  createTask(input: TaskInput): Promise<Task>;
+  /** При смене статуса на done/cancelled запоминается время, при возврате — сбрасывается. */
+  updateTask(id: string, patch: TaskPatch): Promise<Task>;
+  deleteTask(id: string): Promise<void>;
 
   /** Переносит заметки и материалы из хранилища Obsidian (см. obsidian/sync.ts). */
   syncObsidian(vault: ParsedVault): Promise<SyncReport>;

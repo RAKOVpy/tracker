@@ -3,10 +3,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { checkStart, forecastReviews, planReviews, type ForecastDay, type ReviewLoad, type StartCheck } from '../domain/load';
 import { computeGoalStats, type GoalWithStats } from '../domain/progress';
 import { withState, type NoteWithState } from '../domain/review';
+import { applyTaskPatch } from '../domain/tasks';
 import type {
   Area,
   AreaInput,
   AreaPatch,
+  ChecklistItem,
   EntryInput,
   GoalInput,
   GoalPatch,
@@ -18,6 +20,9 @@ import type {
   ReviewInput,
   Settings,
   SettingsPatch,
+  Task,
+  TaskInput,
+  TaskPatch,
   Vacation,
   VacationInput,
 } from '../domain/types';
@@ -35,6 +40,7 @@ const keys = {
   reviews: ['reviews'] as const,
   settings: ['settings'] as const,
   vacations: ['vacations'] as const,
+  tasks: ['tasks'] as const,
 };
 
 /** Текущее время с точностью до минуты: экран обновится, если приложение открыто через полночь. */
@@ -181,11 +187,12 @@ export function useDeleteArea() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.deleteArea(id),
-    // Цели и материалы удалённой сферы остаются без сферы.
+    // Цели, материалы и задачи удалённой сферы остаются без сферы.
     onSuccess: () => {
       client.invalidateQueries({ queryKey: keys.areas });
       client.invalidateQueries({ queryKey: keys.goals });
       client.invalidateQueries({ queryKey: keys.materials });
+      client.invalidateQueries({ queryKey: keys.tasks });
     },
   });
 }
@@ -391,5 +398,99 @@ export function useDeleteReview() {
   return useMutation({
     mutationFn: (id: string) => api.deleteReview(id),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.reviews }),
+  });
+}
+
+// ---------- задачи ----------
+
+export function useTasks() {
+  return useQuery({ queryKey: keys.tasks, queryFn: () => api.listTasks() });
+}
+
+export function useCreateTask() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: TaskInput) => api.createTask(input),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.tasks }),
+  });
+}
+
+/** Галочки и правки применяются сразу, не дожидаясь сохранения; при ошибке список возвращается как был. */
+export function useUpdateTask() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: TaskPatch }) => api.updateTask(id, patch),
+    onMutate: async ({ id, patch }) => {
+      await client.cancelQueries({ queryKey: keys.tasks });
+      const previous = client.getQueryData<Task[]>(keys.tasks);
+      if (previous) {
+        const now = new Date().toISOString();
+        client.setQueryData(
+          keys.tasks,
+          previous.map((task) => (task.id === id ? applyTaskPatch(task, patch, now) : task)),
+        );
+      }
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) client.setQueryData(keys.tasks, context.previous);
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: keys.tasks }),
+  });
+}
+
+/**
+ * Правка подзадач от самой свежей версии задачи в кэше, а не от той, что была при отрисовке:
+ * иначе две быстрые правки подряд затёрли бы друг друга.
+ */
+export function useEditChecklist() {
+  const client = useQueryClient();
+  const update = useUpdateTask();
+  const edit = (task: Task, change: (checklist: ChecklistItem[]) => ChecklistItem[]) => {
+    const latest = client.getQueryData<Task[]>(keys.tasks)?.find((t) => t.id === task.id) ?? task;
+    update.mutate({ id: task.id, patch: { checklist: change(latest.checklist) } });
+  };
+  return { edit, isPending: update.isPending };
+}
+
+export function useDeleteTask() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteTask(id),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.tasks }),
+  });
+}
+
+/** Несколько задач сразу получают новый план — «перенести на завтра». */
+export function usePlanTasks() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ ids, plannedDate }: { ids: string[]; plannedDate: string }) => {
+      for (const id of ids) await api.updateTask(id, { plannedDate });
+    },
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.tasks }),
+  });
+}
+
+/** Запись из «Входящих» становится материалом в «Хочу изучить». */
+export function useInboxToMaterial() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (task: Task) => {
+      const material = await api.createMaterial({
+        title: task.title,
+        type: 'other',
+        author: '',
+        url: '',
+        areaId: task.areaId,
+        status: 'queued',
+      });
+      await api.deleteTask(task.id);
+      return material;
+    },
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: keys.tasks });
+      client.invalidateQueries({ queryKey: keys.materials });
+    },
   });
 }
