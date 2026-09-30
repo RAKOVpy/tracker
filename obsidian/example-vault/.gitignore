@@ -1,0 +1,4 @@
+# Obsidian записывает сюда состояние окна и настройки при открытии хранилища.
+.obsidian/*
+!.obsidian/templates.json
+.trash/
