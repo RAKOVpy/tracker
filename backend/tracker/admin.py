@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Area, Goal, Material, Note, ProgressEntry, Project, Review, Task, UserSettings, Vacation
+from .models import Area, Goal, Material, Note, ProgressEntry, Project, Review, Task, UserSettings, Vacation, WeeklyReview
 
 
 @admin.register(Area)
@@ -11,8 +11,8 @@ class AreaAdmin(admin.ModelAdmin):
 
 @admin.register(Goal)
 class GoalAdmin(admin.ModelAdmin):
-    list_display = ["title", "user", "target_value", "unit", "deadline", "status"]
-    list_filter = ["user", "status"]
+    list_display = ["title", "user", "kind", "target_value", "unit", "deadline", "days_per_week", "status"]
+    list_filter = ["user", "kind", "status"]
 
 
 @admin.register(Task)
@@ -39,6 +39,12 @@ class NoteAdmin(admin.ModelAdmin):
     list_display = ["title", "user", "status", "added_on"]
     list_filter = ["user", "status"]
     search_fields = ["title"]
+
+
+@admin.register(WeeklyReview)
+class WeeklyReviewAdmin(admin.ModelAdmin):
+    list_display = ["week_start", "user"]
+    list_filter = ["user"]
 
 
 admin.site.register(ProgressEntry)

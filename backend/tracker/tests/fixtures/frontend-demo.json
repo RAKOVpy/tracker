@@ -1,5 +1,5 @@
 {
- "version": 8,
+ "version": 9,
  "areas": [
   {
    "id": "3ca71055-6e11-40f6-809b-109300f5cbe1",
@@ -46,7 +46,9 @@
    "deadline": "2026-10-20",
    "priority": "high",
    "status": "active",
-   "createdAt": "2026-09-30T10:26:11.509Z"
+   "createdAt": "2026-09-30T10:26:11.509Z",
+   "kind": "target",
+   "daysPerWeek": null
   },
   {
    "id": "e467b4e4-1502-4b33-8f3e-a9afd6b049a1",
@@ -59,7 +61,9 @@
    "deadline": "2026-12-14",
    "priority": "medium",
    "status": "active",
-   "createdAt": "2026-09-30T10:26:11.513Z"
+   "createdAt": "2026-09-30T10:26:11.513Z",
+   "kind": "target",
+   "daysPerWeek": null
   },
   {
    "id": "081179e5-7815-47f0-9f86-a24861e25b73",
@@ -72,7 +76,24 @@
    "deadline": "2026-10-23",
    "priority": "medium",
    "status": "active",
-   "createdAt": "2026-09-30T10:26:11.521Z"
+   "createdAt": "2026-09-30T10:26:11.521Z",
+   "kind": "target",
+   "daysPerWeek": null
+  },
+  {
+   "id": "47368574-bb3b-4f73-a8bc-a2d8f285d69f",
+   "kind": "habit",
+   "title": "Зал",
+   "description": "",
+   "areaId": "14cd7d23-66d9-4cf9-93dc-eeb3daf09356",
+   "unit": "раз",
+   "targetValue": 1,
+   "startDate": "2026-09-14",
+   "deadline": null,
+   "daysPerWeek": 3,
+   "priority": "medium",
+   "status": "active",
+   "createdAt": "2026-09-30T10:26:12.000Z"
   }
  ],
  "entries": [
@@ -243,6 +264,46 @@
    "value": 1,
    "note": "",
    "createdAt": "2026-09-30T10:26:11.524Z"
+  },
+  {
+   "id": "4fbdb4c8-928d-4cad-84cf-023bea200e84",
+   "goalId": "47368574-bb3b-4f73-a8bc-a2d8f285d69f",
+   "date": "2026-09-14",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-14T19:00:00.000Z"
+  },
+  {
+   "id": "4983a171-1b8d-48f0-9e9c-5f9ddf6ba721",
+   "goalId": "47368574-bb3b-4f73-a8bc-a2d8f285d69f",
+   "date": "2026-09-16",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-16T19:00:00.000Z"
+  },
+  {
+   "id": "17c4193e-3d93-4b0d-aa3a-e9cbc9b8308f",
+   "goalId": "47368574-bb3b-4f73-a8bc-a2d8f285d69f",
+   "date": "2026-09-18",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-18T19:00:00.000Z"
+  },
+  {
+   "id": "12d06c7f-6070-4964-a024-642c22d21e50",
+   "goalId": "47368574-bb3b-4f73-a8bc-a2d8f285d69f",
+   "date": "2026-09-21",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-21T19:00:00.000Z"
+  },
+  {
+   "id": "5bc86314-15c6-4a43-abce-63786a326d4b",
+   "goalId": "47368574-bb3b-4f73-a8bc-a2d8f285d69f",
+   "date": "2026-09-23",
+   "value": 1,
+   "note": "",
+   "createdAt": "2026-09-23T19:00:00.000Z"
   }
  ],
  "materials": [
@@ -944,6 +1005,26 @@
    ],
    "completedAt": null,
    "createdAt": "2026-09-30T10:26:11.553Z"
+  }
+ ],
+ "weeklyReviews": [
+  {
+   "id": "e10d77bc-5554-429f-9718-65379c466808",
+   "weekStart": "2026-09-21",
+   "focus": [
+    {
+     "id": "2099c6b6-6732-424b-bceb-8f807cccb4f6",
+     "text": "Доклад на семинаре",
+     "done": true
+    },
+    {
+     "id": "6fc659a1-3c86-4a1a-90b6-aad127619980",
+     "text": "Эссе Task 2",
+     "done": false
+    }
+   ],
+   "reflection": "Получилось: зал три раза.",
+   "createdAt": "2026-09-27T18:00:00.000Z"
   }
  ]
 }

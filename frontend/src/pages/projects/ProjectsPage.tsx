@@ -1,6 +1,6 @@
 import { FolderKanban, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useAreaMap, useGoalsWithStats, useToday, useWork } from '../../api/hooks';
+import { useAreaMap, useGoals, useToday, useWork } from '../../api/hooks';
 import { ProjectCard } from '../../components/projects/ProjectCard';
 import { PROJECT_STATUSES } from '../../domain/projects';
 import type { Project, ProjectStatus, Task } from '../../domain/types';
@@ -10,7 +10,7 @@ export function ProjectsPage() {
   const today = useToday();
   const { data, isLoading, error } = useWork();
   const areas = useAreaMap();
-  const goals = useGoalsWithStats();
+  const goals = useGoals();
 
   if (isLoading) return <LoadingState />;
   if (error || !data) return <ErrorState error={error} />;
@@ -19,7 +19,7 @@ export function ProjectsPage() {
   for (const task of data.tasks) {
     if (task.projectId) tasksByProject.set(task.projectId, [...(tasksByProject.get(task.projectId) ?? []), task]);
   }
-  const goalById = new Map((goals.data ?? []).map((g) => [g.goal.id, g.goal]));
+  const goalById = new Map([...(goals.data?.targets ?? []), ...(goals.data?.habits ?? [])].map((g) => [g.goal.id, g.goal]));
   const byStatus = (status: ProjectStatus) =>
     data.projects
       .filter((p) => p.status === status)

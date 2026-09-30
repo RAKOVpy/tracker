@@ -1,6 +1,6 @@
 import { UNIT_FORMS } from '../domain/meta';
 import type { GoalStats } from '../domain/progress';
-import type { Goal } from '../domain/types';
+import type { TargetGoal } from '../domain/types';
 import { formatShort } from '../lib/dates';
 import { formatNumber, plural } from '../lib/format';
 
@@ -14,7 +14,7 @@ export function formatAmount(value: number, unit: string): string {
   return `${formatNumber(rounded)} ${word}`;
 }
 
-export function describePace(goal: Goal, stats: GoalStats): { text: string; tone: Tone } {
+export function describePace(goal: TargetGoal, stats: GoalStats): { text: string; tone: Tone } {
   switch (stats.status) {
     case 'achieved':
       return { text: 'Цель достигнута', tone: 'good' };

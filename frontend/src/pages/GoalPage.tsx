@@ -1,22 +1,39 @@
-import { Archive, ArchiveRestore, CalendarClock, CircleCheck, Flag, FolderKanban, Pencil, Plus, Trash2, TrendingUp, TriangleAlert } from 'lucide-react';
-import { useState } from 'react';
+import {
+  Archive,
+  ArchiveRestore,
+  CalendarClock,
+  Check,
+  CircleCheck,
+  Flag,
+  FolderKanban,
+  Pencil,
+  Plus,
+  Trash2,
+  TrendingUp,
+  TriangleAlert,
+  type LucideIcon,
+} from 'lucide-react';
+import { useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useAreaMap, useDeleteGoal, useGoalWithStats, useUpdateGoal, useWork } from '../api/hooks';
+import { useAreaMap, useDeleteGoal, useGoal, useToggleHabit, useUpdateGoal, useVacations, useWork, type GoalView } from '../api/hooks';
 import { AreaMark } from '../components/AreaIcon';
 import { BackButton } from '../components/BackButton';
 import { EntryForm } from '../components/EntryForm';
 import { EntryHistory } from '../components/EntryHistory';
+import { HabitCalendar } from '../components/habits/HabitCalendar';
+import { amountText, frequencyText, scheduleText, streakText } from '../components/habits/habitText';
 import { describePace, formatAmount, type Tone } from '../components/pace';
 import { ProgressBar } from '../components/ProgressBar';
 import { ProgressChart } from '../components/ProgressChart';
+import { DAILY_FREEZE_DAYS, habitCalendar, isDaily, type HabitWithStats } from '../domain/habits';
 import type { GoalStats } from '../domain/progress';
 import { nextStep, PROJECT_STATUSES, projectProgress } from '../domain/projects';
-import type { Goal } from '../domain/types';
-import { formatLong, formatShort } from '../lib/dates';
+import type { Area, Goal, TargetGoal } from '../domain/types';
+import { addDays, formatLong, formatShort, type IsoDate } from '../lib/dates';
 import { formatDays, formatNumber, plural } from '../lib/format';
 import { ErrorState, LoadingState } from './states';
 
-const TONE_ICONS: Record<Tone, typeof CircleCheck> = {
+const TONE_ICONS: Record<Tone, LucideIcon> = {
   good: CircleCheck,
   warn: TrendingUp,
   bad: TriangleAlert,
@@ -24,7 +41,7 @@ const TONE_ICONS: Record<Tone, typeof CircleCheck> = {
 };
 
 /** Второе предложение баннера: что делать дальше. */
-function paceAdvice(goal: Goal, stats: GoalStats): string {
+function paceAdvice(goal: TargetGoal, stats: GoalStats): string {
   switch (stats.status) {
     case 'achieved':
       return `Сделано ${formatAmount(stats.current, goal.unit)} из ${formatNumber(goal.targetValue)}. Можно ставить следующую цель.`;
@@ -45,13 +62,8 @@ function paceAdvice(goal: Goal, stats: GoalStats): string {
 
 export function GoalPage() {
   const { id = '' } = useParams();
-  const navigate = useNavigate();
-  const { data, today, isLoading, error } = useGoalWithStats(id);
+  const { data, today, isLoading, error } = useGoal(id);
   const areas = useAreaMap();
-  const updateGoal = useUpdateGoal(id);
-  const deleteGoal = useDeleteGoal();
-  const work = useWork();
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   if (isLoading) return <LoadingState />;
   if (!data) {
@@ -67,17 +79,15 @@ export function GoalPage() {
     );
   }
 
-  const { goal, entries, stats } = data;
-  const area = goal.areaId ? areas.get(goal.areaId) : undefined;
-  const pace = describePace(goal, stats);
-  const PaceIcon = TONE_ICONS[pace.tone];
-  const isArchived = goal.status === 'archived';
-  const projects = work.data?.projects.filter((p) => p.goalId === goal.id) ?? [];
+  const area = data.goal.areaId ? areas.get(data.goal.areaId) : undefined;
+  return data.kind === 'habit' ? <HabitView item={data} area={area} today={today} /> : <TargetView item={data} area={area} today={today} />;
+}
 
+/** Шапка страницы цели или привычки: сфера, название, отметки, «Изменить» и заметки. */
+function GoalHead({ goal, area, badges }: { goal: Goal; area: Area | undefined; badges: ReactNode }) {
   return (
     <>
       <BackButton fallback="/goals" />
-
       <div className="page-head" style={{ alignItems: 'flex-start' }}>
         <div className="goal-card__head">
           <AreaMark area={area} />
@@ -90,8 +100,8 @@ export function GoalPage() {
                   <Flag size={12} strokeWidth={2.2} aria-hidden /> Важно
                 </span>
               )}
-              <span className="badge">{stats.isLongTerm ? 'Долгосрочная' : 'Краткосрочная'}</span>
-              {isArchived && <span className="badge">В архиве</span>}
+              {badges}
+              {goal.status === 'archived' && <span className="badge">В архиве</span>}
             </div>
           </div>
         </div>
@@ -105,6 +115,118 @@ export function GoalPage() {
           {goal.description}
         </p>
       )}
+    </>
+  );
+}
+
+/** Проекты, которые ведут к цели или привычке. */
+function GoalProjects({ goal, today }: { goal: Goal; today: IsoDate }) {
+  const work = useWork();
+  const projects = work.data?.projects.filter((p) => p.goalId === goal.id) ?? [];
+  return (
+    <section className="card stack">
+      <div className="panel-head">
+        <h2 className="section__title" style={{ margin: 0 }}>
+          Проекты {projects.length > 0 && <span className="section__count">{projects.length}</span>}
+        </h2>
+        <Link className="btn btn--sm btn--ghost" to={`/projects/new?goal=${goal.id}`}>
+          <Plus size={15} aria-hidden /> Проект
+        </Link>
+      </div>
+      {projects.length === 0 ? (
+        <p className="muted small" style={{ margin: 0 }}>
+          {goal.kind === 'habit'
+            ? 'Привычка может поддерживать проект: «английский каждый день» — для «подготовиться к IELTS».'
+            : 'Проект — путь к цели по шагам: для «набрать 7.0 на IELTS» это «подготовиться к IELTS» с вехами и задачами.'}
+        </p>
+      ) : (
+        <ul className="goal-projects">
+          {projects.map((project) => {
+            const tasks = work.data?.tasks.filter((t) => t.projectId === project.id) ?? [];
+            const progress = projectProgress(tasks);
+            const next = project.status === 'active' ? nextStep(project, tasks, today) : null;
+            return (
+              <li key={project.id} className="goal-projects__row">
+                <FolderKanban size={16} aria-hidden />
+                <span className="spacer">
+                  <Link to={`/projects/${project.id}`} className="task-row__title">
+                    {project.title}
+                  </Link>
+                  <span className="task-row__meta">
+                    <span className="num">
+                      {progress.done} из {progress.total}
+                    </span>
+                    {project.status !== 'active' && <span>{PROJECT_STATUSES[project.status].toLowerCase()}</span>}
+                    {next && <span>дальше: {next.title}</span>}
+                  </span>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/** Архив и удаление с подтверждением. */
+function GoalActions({ goal, entries }: { goal: Goal; entries: number }) {
+  const navigate = useNavigate();
+  const updateGoal = useUpdateGoal(goal.id);
+  const deleteGoal = useDeleteGoal();
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const isArchived = goal.status === 'archived';
+  const what = goal.kind === 'habit' ? 'привычку' : 'цель';
+
+  if (confirmingDelete) {
+    return (
+      <div className="confirm">
+        <p>
+          Удалить {what} «{goal.title}» вместе со всей историей ({entries} {plural(entries, ['запись', 'записи', 'записей'])})? Отменить это
+          нельзя.
+        </p>
+        <div className="row">
+          <button
+            className="btn btn--sm btn--danger-solid"
+            type="button"
+            disabled={deleteGoal.isPending}
+            onClick={() => deleteGoal.mutate(goal.id, { onSuccess: () => navigate('/goals') })}
+          >
+            <Trash2 size={14} aria-hidden /> Удалить навсегда
+          </button>
+          <button className="btn btn--sm" type="button" onClick={() => setConfirmingDelete(false)}>
+            Отмена
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="row">
+      <button
+        className="btn btn--sm"
+        type="button"
+        disabled={updateGoal.isPending}
+        onClick={() => updateGoal.mutate({ status: isArchived ? 'active' : 'archived' })}
+      >
+        {isArchived ? <ArchiveRestore size={14} aria-hidden /> : <Archive size={14} aria-hidden />}
+        {isArchived ? 'Вернуть из архива' : 'В архив'}
+      </button>
+      <button className="btn btn--sm btn--ghost btn--danger" type="button" onClick={() => setConfirmingDelete(true)}>
+        <Trash2 size={14} aria-hidden /> Удалить
+      </button>
+    </div>
+  );
+}
+
+function TargetView({ item, area, today }: { item: Extract<GoalView, { kind: 'target' }>; area: Area | undefined; today: IsoDate }) {
+  const { goal, entries, stats } = item;
+  const pace = describePace(goal, stats);
+  const PaceIcon = TONE_ICONS[pace.tone];
+
+  return (
+    <>
+      <GoalHead goal={goal} area={area} badges={<span className="badge">{stats.isLongTerm ? 'Долгосрочная' : 'Краткосрочная'}</span>} />
 
       <div className="stack" style={{ gap: 16 }}>
         <div className="card stack" style={{ gap: 16 }}>
@@ -158,46 +280,7 @@ export function GoalPage() {
           </div>
         </div>
 
-        <section className="card stack">
-          <div className="panel-head">
-            <h2 className="section__title" style={{ margin: 0 }}>
-              Проекты {projects.length > 0 && <span className="section__count">{projects.length}</span>}
-            </h2>
-            <Link className="btn btn--sm btn--ghost" to={`/projects/new?goal=${goal.id}`}>
-              <Plus size={15} aria-hidden /> Проект
-            </Link>
-          </div>
-          {projects.length === 0 ? (
-            <p className="muted small" style={{ margin: 0 }}>
-              Проект — путь к цели по шагам: для «набрать 7.0 на IELTS» это «подготовиться к IELTS» с вехами и задачами.
-            </p>
-          ) : (
-            <ul className="goal-projects">
-              {projects.map((project) => {
-                const tasks = work.data?.tasks.filter((t) => t.projectId === project.id) ?? [];
-                const progress = projectProgress(tasks);
-                const next = project.status === 'active' ? nextStep(project, tasks, today) : null;
-                return (
-                  <li key={project.id} className="goal-projects__row">
-                    <FolderKanban size={16} aria-hidden />
-                    <span className="spacer">
-                      <Link to={`/projects/${project.id}`} className="task-row__title">
-                        {project.title}
-                      </Link>
-                      <span className="task-row__meta">
-                        <span className="num">
-                          {progress.done} из {progress.total}
-                        </span>
-                        {project.status !== 'active' && <span>{PROJECT_STATUSES[project.status].toLowerCase()}</span>}
-                        {next && <span>дальше: {next.title}</span>}
-                      </span>
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
+        <GoalProjects goal={goal} today={today} />
 
         <section className="card stack">
           <h2 className="section__title" style={{ margin: 0 }}>
@@ -220,42 +303,148 @@ export function GoalPage() {
           <EntryHistory goal={goal} entries={entries} today={today} />
         </section>
 
-        {confirmingDelete ? (
-          <div className="confirm">
-            <p>
-              Удалить цель «{goal.title}» вместе со всей историей ({entries.length}{' '}
-              {plural(entries.length, ['запись', 'записи', 'записей'])})? Отменить это нельзя.
-            </p>
-            <div className="row">
-              <button
-                className="btn btn--sm btn--danger-solid"
-                type="button"
-                disabled={deleteGoal.isPending}
-                onClick={() => deleteGoal.mutate(goal.id, { onSuccess: () => navigate('/goals') })}
-              >
-                <Trash2 size={14} aria-hidden /> Удалить навсегда
-              </button>
-              <button className="btn btn--sm" type="button" onClick={() => setConfirmingDelete(false)}>
-                Отмена
-              </button>
+        <GoalActions goal={goal} entries={entries.length} />
+      </div>
+    </>
+  );
+}
+
+/** Что с привычкой сегодня и что делать дальше — одним баннером. */
+function habitAdvice({ goal, stats }: HabitWithStats, today: IsoDate): { tone: Tone; title: string; text: string } {
+  const { week } = stats;
+  const weekText = `На неделе ${week.done} из ${week.quota}`;
+  // Прощённый недавно пропуск: следующий в эти дни прервёт серию.
+  const lastForgiven = isDaily(goal) ? stats.forgiven[0] : undefined;
+  const freezeUntil = lastForgiven ? addDays(lastForgiven, DAILY_FREEZE_DAYS - 1) : null;
+  const freezeText =
+    freezeUntil && freezeUntil >= today && stats.streak > 0
+      ? ` Пропуск ${formatShort(lastForgiven!)} серия простила — до ${formatShort(freezeUntil)} лучше не пропускать.`
+      : '';
+
+  switch (stats.state) {
+    case 'upcoming':
+      return { tone: 'muted', title: `Начнётся ${formatShort(goal.startDate)}`, text: 'До старта отмечать не нужно.' };
+    case 'paused':
+      return { tone: 'muted', title: 'Отпуск: привычка на паузе', text: 'Серия не сгорит. Отметить день всё равно можно — он засчитается.' };
+    case 'done':
+      return {
+        tone: 'good',
+        title: 'Сегодня отмечено',
+        text: isDaily(goal) ? `Так держать.${freezeText}` : `${weekText}.${week.done >= week.quota ? ' Норма недели выполнена.' : ''}`,
+      };
+    case 'due':
+      return isDaily(goal)
+        ? { tone: freezeText ? 'warn' : 'muted', title: 'Сегодня ещё не отмечено', text: freezeText.trim() || 'Одна отметка — и день засчитан.' }
+        : { tone: 'warn', title: 'Сегодня нужно', text: `${weekText}: иначе до воскресенья не успеть.` };
+    case 'open':
+      return { tone: 'muted', title: weekText, text: `Осталось ${week.quota - week.done} — можно сегодня или в другой день.` };
+    case 'rest':
+      return week.quota === 0
+        ? { tone: 'muted', title: 'На этой неделе можно не делать', text: 'Неделя почти вся в отпуске или до старта привычки.' }
+        : { tone: 'good', title: 'Норма недели выполнена', text: `${weekText}. Можно отдохнуть или сделать ещё.` };
+  }
+}
+
+function HabitView({ item, area, today }: { item: Extract<GoalView, { kind: 'habit' }>; area: Area | undefined; today: IsoDate }) {
+  const { goal, entries, stats } = item;
+  const { data: vacations = [] } = useVacations();
+  const toggle = useToggleHabit();
+  const daily = isDaily(goal);
+  const advice = habitAdvice(item, today);
+  const AdviceIcon = TONE_ICONS[advice.tone];
+  const rate = stats.rate;
+  const canCheck = goal.status === 'active' && stats.state !== 'upcoming';
+  const yesterday = addDays(today, -1);
+
+  return (
+    <>
+      <GoalHead goal={goal} area={area} badges={<span className="badge">Привычка: {scheduleText(goal)}</span>} />
+
+      <div className="stack" style={{ gap: 16 }}>
+        <div className="card stack" style={{ gap: 16 }}>
+          <div className="stats">
+            <div>
+              <div className="stat__label">Серия</div>
+              <div className="stat__value">{stats.streak}</div>
+              <div className="stat__sub">{streakText(goal, stats.streak).replace(/^\d+ /, '')}</div>
+            </div>
+            <div>
+              <div className="stat__label">Эта неделя</div>
+              <div className="stat__value num">
+                {stats.week.done} из {stats.week.quota}
+              </div>
+              <div className="stat__sub">{daily ? 'дней' : 'раз'} засчитано</div>
+            </div>
+            <div>
+              <div className="stat__label">За 4 недели</div>
+              <div className="stat__value">{rate ? `${Math.round((rate.done / rate.total) * 100)}%` : '—'}</div>
+              <div className="stat__sub num">{rate ? `${rate.done} из ${rate.total}` : 'пока мало истории'}</div>
+            </div>
+            <div>
+              <div className="stat__label">Сегодня</div>
+              <div className="stat__value">
+                {stats.todayDone ? 'Сделано' : stats.todayValue > 0 ? formatAmount(stats.todayValue, goal.unit) : 'Нет'}
+              </div>
+              <div className="stat__sub">{amountText(goal) ? `норма ${amountText(goal)}` : 'одна отметка'}</div>
             </div>
           </div>
-        ) : (
-          <div className="row">
-            <button
-              className="btn btn--sm"
-              type="button"
-              disabled={updateGoal.isPending}
-              onClick={() => updateGoal.mutate({ status: isArchived ? 'active' : 'archived' })}
-            >
-              {isArchived ? <ArchiveRestore size={14} aria-hidden /> : <Archive size={14} aria-hidden />}
-              {isArchived ? 'Вернуть из архива' : 'В архив'}
-            </button>
-            <button className="btn btn--sm btn--ghost btn--danger" type="button" onClick={() => setConfirmingDelete(true)}>
-              <Trash2 size={14} aria-hidden /> Удалить
-            </button>
+
+          <div className={`banner banner--${advice.tone}`}>
+            <AdviceIcon size={18} strokeWidth={2} aria-hidden />
+            <div className="banner__text spacer">
+              <strong>{advice.title}</strong>
+              <span>{advice.text}</span>
+            </div>
+            {canCheck && (
+              <button
+                className={stats.todayDone ? 'btn btn--sm' : 'btn btn--sm btn--primary'}
+                type="button"
+                onClick={() => toggle.mutate({ goal, date: today, value: stats.todayDone ? null : stats.todayLeft })}
+              >
+                {stats.todayDone ? (
+                  'Снять отметку'
+                ) : (
+                  <>
+                    <Check size={15} strokeWidth={2.5} aria-hidden /> Отметить сегодня
+                  </>
+                )}
+              </button>
+            )}
           </div>
+
+          <p className="muted small" style={{ margin: 0 }}>
+            {daily
+              ? 'Серия — дни подряд. Один пропуск в неделю её не прерывает, но и не продлевает; отпуск тоже.'
+              : `Серия — недели подряд с выполненной нормой (${frequencyText(goal)}). Неделя без одного раза не чаще раза в четыре недели серию не прерывает; отпуск уменьшает норму недели.`}
+          </p>
+        </div>
+
+        <section className="card stack">
+          <h2 className="section__title" style={{ margin: 0 }}>
+            Последние недели
+          </h2>
+          <HabitCalendar weeks={habitCalendar(item, today, vacations)} unit={goal.unit} daily={daily} />
+        </section>
+
+        <GoalProjects goal={goal} today={today} />
+
+        <section className="card stack">
+          <h2 className="section__title" style={{ margin: 0 }}>
+            Отметить за другой день
+          </h2>
+          <EntryForm goal={goal} today={today} defaultDate={yesterday >= goal.startDate ? yesterday : today} suggested={goal.targetValue} />
+        </section>
+
+        {entries.length > 0 && (
+          <details className="card details">
+            <summary className="small">Все записи: {entries.length}</summary>
+            <div style={{ marginTop: 12 }}>
+              <EntryHistory goal={goal} entries={entries} today={today} />
+            </div>
+          </details>
         )}
+
+        <GoalActions goal={goal} entries={entries.length} />
       </div>
     </>
   );

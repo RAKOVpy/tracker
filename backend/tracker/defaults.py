@@ -18,6 +18,9 @@ DEFAULT_SETTINGS = {
     "strict_mode": False,
 }
 
+# Сколько пунктов можно выбрать в фокус недели — как FOCUS_LIMIT на фронтенде.
+FOCUS_LIMIT = 3
+
 # Допустимые значения настроек — те же, что SETTINGS_RANGES на фронтенде.
 SETTINGS_RANGES = {
     "daily_review_limit": (1, 100),

@@ -1,5 +1,5 @@
 """
-Резервная копия в формате фронтенда (api/schema.ts, версия 8): выгрузка, загрузка, сброс,
+Резервная копия в формате фронтенда (api/schema.ts, версия 9): выгрузка, загрузка, сброс,
 а также запись результата синхронизации с Obsidian.
 
 Загрузка проверяет данные так же, как validateDb на фронтенде, и чинит висячие ссылки.
@@ -15,13 +15,14 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
-from .defaults import DEFAULT_SETTINGS, SETTINGS_RANGES, create_default_areas, user_settings
+from .defaults import DEFAULT_SETTINGS, FOCUS_LIMIT, SETTINGS_RANGES, create_default_areas, user_settings
 from .models import (
     Area,
     AreaColor,
     AreaIcon,
     Explain,
     Goal,
+    GoalKind,
     GoalStatus,
     Material,
     MaterialPart,
@@ -40,6 +41,7 @@ from .models import (
     Task,
     TaskStatus,
     Vacation,
+    WeeklyReview,
 )
 from .rules.recurrence import RuleError, parse_rule
 from .serializers import (
@@ -53,9 +55,10 @@ from .serializers import (
     SettingsSerializer,
     TaskSerializer,
     VacationSerializer,
+    WeeklyReviewSerializer,
 )
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 
 class DataError(ValueError):
@@ -86,6 +89,7 @@ def export_data(request) -> dict:
         "vacations": many(VacationSerializer, Vacation.objects.filter(user=user)),
         "tasks": many(TaskSerializer, Task.objects.filter(user=user)),
         "projects": many(ProjectSerializer, Project.objects.filter(user=user).prefetch_related("milestones")),
+        "weekly_reviews": many(WeeklyReviewSerializer, WeeklyReview.objects.filter(user=user)),
     }
 
 
@@ -159,6 +163,17 @@ def _moment(obj: dict, key: str) -> datetime | None:
     if parsed is not None and timezone.is_naive(parsed):
         parsed = parsed.replace(tzinfo=dt_timezone.utc)
     return parsed
+
+
+def _checklist(value, where: str, list_label: str, item_label: str) -> list[dict]:
+    """Отметки {id, text, done}: подзадачи задачи и фокус недели. «Задача 1, пункт 2: …»."""
+    items, ids = [], IdMap(f"{where}: {list_label}")
+    for j, raw in enumerate(_list(value, f"{where}: {list_label}"), start=1):
+        c, at = _obj(raw, f"{where}, {item_label} {j}"), f"{where}, {item_label} {j}"
+        item_id = _str(c, "id", at)
+        ids.add(item_id)
+        items.append({"id": item_id, "text": _str(c, "text", at), "done": _bool(c, "done", at)})
+    return items
 
 
 class IdMap:
@@ -242,24 +257,35 @@ def import_data(user, raw) -> None:
     goals = []
     for i, item in enumerate(_list(data.get("goals"), "goals"), start=1):
         g, where = _obj(item, f"Цель {i}"), f"Цель {i}"
+        kind = _one_of(g, "kind", GoalKind, where)
         goal = Goal(
             id=goal_ids.add(_str(g, "id", where)),
             user=user,
+            kind=kind,
             title=_str(g, "title", where, max_length=500),
             description=_str(g, "description", where, allow_empty=True),
             area_id=area_ids.get(g.get("area_id")),
             unit=_str(g, "unit", where, max_length=50),
             target_value=_num(g, "target_value", where),
             start_date=_date(g, "start_date", where),
-            deadline=_date(g, "deadline", where),
             priority=_one_of(g, "priority", Priority, where),
             status=_one_of(g, "status", GoalStatus, where),
             created_at=created(g),
         )
-        if goal.target_value <= 0:
-            raise DataError(f"{where}: цель должна быть больше нуля")
-        if goal.deadline < goal.start_date:
-            raise DataError(f"{where}: дедлайн раньше даты старта")
+        # Поле другого вида (срок у привычки, частота у цели) отбрасывается, как в validateDb.
+        if kind == GoalKind.HABIT:
+            if goal.target_value <= 0:
+                raise DataError(f"{where}: норма за день должна быть больше нуля")
+            days = _num(g, "days_per_week", where)
+            if days != int(days) or not 1 <= days <= 7:
+                raise DataError(f"{where}: сколько раз в неделю — целое число от 1 до 7")
+            goal.days_per_week = int(days)
+        else:
+            if goal.target_value <= 0:
+                raise DataError(f"{where}: цель должна быть больше нуля")
+            goal.deadline = _date(g, "deadline", where)
+            if goal.deadline < goal.start_date:
+                raise DataError(f"{where}: дедлайн раньше даты старта")
         goals.append(goal)
 
     entries = []
@@ -392,13 +418,7 @@ def import_data(user, raw) -> None:
     tasks, repeat_links = [], []
     for i, item in enumerate(_list(data.get("tasks"), "tasks"), start=1):
         t, where = _obj(item, f"Задача {i}"), f"Задача {i}"
-        checklist = []
-        local = IdMap(f"{where}: пункты")
-        for j, raw_item in enumerate(_list(t.get("checklist"), f"{where}: checklist"), start=1):
-            c, at = _obj(raw_item, f"{where}, пункт {j}"), f"{where}, пункт {j}"
-            item_id = _str(c, "id", at)
-            local.add(item_id)
-            checklist.append({"id": item_id, "text": _str(c, "text", at), "done": _bool(c, "done", at)})
+        checklist = _checklist(t.get("checklist"), where, "пункты", "пункт")
         recurrence = None
         if t.get("recurrence") is not None:
             try:
@@ -438,6 +458,30 @@ def import_data(user, raw) -> None:
         target = task_ids.get(old)
         task.repeat_of_id = target if target != task.id else None
 
+    review_ids = IdMap("Обзоры недели")
+    weekly_reviews, weeks = [], set()
+    for i, item in enumerate(_list(data.get("weekly_reviews"), "weekly_reviews"), start=1):
+        r, where = _obj(item, f"Обзор недели {i}"), f"Обзор недели {i}"
+        week_start = _date(r, "week_start", where)
+        if week_start.weekday() != 0:
+            raise DataError(f"{where}: неделя должна начинаться с понедельника")
+        if week_start in weeks:
+            raise DataError(f"Обзоры недели: два обзора одной недели ({week_start.isoformat()})")
+        weeks.add(week_start)
+        focus = _checklist(r.get("focus"), where, "фокус", "пункт фокуса")
+        if len(focus) > FOCUS_LIMIT:
+            raise DataError(f"{where}: в фокусе не больше {FOCUS_LIMIT} пунктов")
+        weekly_reviews.append(
+            WeeklyReview(
+                id=review_ids.add(_str(r, "id", where)),
+                user=user,
+                week_start=week_start,
+                focus=focus,
+                reflection=_str(r, "reflection", where, allow_empty=True),
+                created_at=created(r),
+            )
+        )
+
     _delete_all(user)
     Area.objects.bulk_create(areas)
     Goal.objects.bulk_create(goals)
@@ -450,6 +494,7 @@ def import_data(user, raw) -> None:
     Project.objects.bulk_create(projects)
     Milestone.objects.bulk_create(milestones)
     Task.objects.bulk_create(tasks)
+    WeeklyReview.objects.bulk_create(weekly_reviews)
     settings = user_settings(user)
     for key, value in settings_values.items():
         setattr(settings, key, value)
@@ -464,6 +509,7 @@ def _delete_all(user) -> None:
     Material.objects.filter(user=user).delete()
     Goal.objects.filter(user=user).delete()
     Vacation.objects.filter(user=user).delete()
+    WeeklyReview.objects.filter(user=user).delete()
     Area.objects.filter(user=user).delete()
 
 

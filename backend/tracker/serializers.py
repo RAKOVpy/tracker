@@ -3,14 +3,15 @@
 формат совпадает с типами фронтенда. Ссылки проверяются: сослаться можно только на свои объекты.
 """
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import serializers
 
-from .defaults import SETTINGS_RANGES
+from .defaults import FOCUS_LIMIT, SETTINGS_RANGES
 from .models import (
     Area,
     Goal,
+    GoalKind,
     Material,
     MaterialPart,
     Milestone,
@@ -21,6 +22,7 @@ from .models import (
     Task,
     UserSettings,
     Vacation,
+    WeeklyReview,
 )
 from .rules.recurrence import RuleError, parse_rule
 from .rules.vacations import vacation_error
@@ -61,21 +63,57 @@ class AreaSerializer(serializers.ModelSerializer):
 
 
 class GoalSerializer(serializers.ModelSerializer):
+    """Цель к сроку или привычка. Вид после создания не меняется; поле другого вида (срок привычки,
+    частота цели) обнуляется, как в applyGoalPatch на фронтенде."""
+
     area_id = optional_ref(Area, "area")
 
     class Meta:
         model = Goal
-        fields = ["id", "title", "description", "area_id", "unit", "target_value", "start_date", "deadline", "priority", "status", "created_at"]
+        fields = [
+            "id",
+            "kind",
+            "title",
+            "description",
+            "area_id",
+            "unit",
+            "target_value",
+            "start_date",
+            "deadline",
+            "days_per_week",
+            "priority",
+            "status",
+            "created_at",
+        ]
         read_only_fields = ["id", "created_at"]
-        extra_kwargs = {"description": {"required": False}, "status": {"required": False}}
+        extra_kwargs = {
+            "kind": {"required": False},
+            "description": {"required": False},
+            "status": {"required": False},
+            "deadline": {"required": False},
+            "days_per_week": {"required": False, "min_value": 1, "max_value": 7},
+        }
 
     def validate(self, attrs):
-        start = attrs.get("start_date", getattr(self.instance, "start_date", None))
-        deadline = attrs.get("deadline", getattr(self.instance, "deadline", None))
-        if start and deadline and deadline < start:
-            raise serializers.ValidationError({"deadline": "Дедлайн раньше даты старта."})
+        goal = self.instance
+        if goal is not None and "kind" in attrs and attrs["kind"] != goal.kind:
+            raise serializers.ValidationError({"kind": "Вид цели после создания не меняется."})
+        kind = attrs.get("kind", getattr(goal, "kind", GoalKind.TARGET))
         if "target_value" in attrs and attrs["target_value"] <= 0:
-            raise serializers.ValidationError({"target_value": "Цель должна быть больше нуля."})
+            label = "Норма за день должна быть больше нуля." if kind == GoalKind.HABIT else "Цель должна быть больше нуля."
+            raise serializers.ValidationError({"target_value": label})
+        if kind == GoalKind.HABIT:
+            attrs["deadline"] = None
+            if attrs.get("days_per_week", getattr(goal, "days_per_week", None)) is None:
+                raise serializers.ValidationError({"days_per_week": "Сколько раз в неделю: от 1 до 7."})
+            return attrs
+        attrs["days_per_week"] = None
+        start = attrs.get("start_date", getattr(goal, "start_date", None))
+        deadline = attrs.get("deadline", getattr(goal, "deadline", None))
+        if deadline is None:
+            raise serializers.ValidationError({"deadline": "Укажите срок цели."})
+        if start and deadline < start:
+            raise serializers.ValidationError({"deadline": "Дедлайн раньше даты старта."})
         return attrs
 
     def create(self, validated_data):
@@ -214,22 +252,22 @@ class VacationSerializer(serializers.ModelSerializer):
         return Vacation.objects.create(user=self.context["request"].user, **validated_data)
 
 
-def clean_checklist(value) -> list[dict]:
-    """Подзадачи: [{id, text, done}] с непустыми id и текстом; лишние поля отбрасываются."""
+def clean_checklist(value, item: str = "Подзадача", items_label: str = "Подзадачи") -> list[dict]:
+    """Отметки [{id, text, done}] с непустыми id и текстом — подзадачи и фокус недели; лишние поля отбрасываются."""
     if not isinstance(value, list):
-        raise serializers.ValidationError("Подзадачи должны быть списком.")
+        raise serializers.ValidationError(f"{items_label} должны быть списком.")
     items = []
-    for i, item in enumerate(value, start=1):
-        if not isinstance(item, dict):
-            raise serializers.ValidationError(f"Подзадача {i} должна быть объектом.")
-        item_id, text, done = item.get("id"), item.get("text"), item.get("done")
+    for i, raw in enumerate(value, start=1):
+        if not isinstance(raw, dict):
+            raise serializers.ValidationError(f"{item} {i}: ожидался объект.")
+        item_id, text, done = raw.get("id"), raw.get("text"), raw.get("done")
         if not isinstance(item_id, str) or not item_id.strip() or not isinstance(text, str) or not text.strip():
-            raise serializers.ValidationError(f"Подзадача {i}: нужны id и текст.")
+            raise serializers.ValidationError(f"{item} {i}: нужны id и текст.")
         if not isinstance(done, bool):
-            raise serializers.ValidationError(f"Подзадача {i}: поле done должно быть true или false.")
+            raise serializers.ValidationError(f"{item} {i}: поле done должно быть true или false.")
         items.append({"id": item_id, "text": text, "done": done})
-    if len({item["id"] for item in items}) != len(items):
-        raise serializers.ValidationError("Подзадачи: повторяется id.")
+    if len({i["id"] for i in items}) != len(items):
+        raise serializers.ValidationError(f"{items_label}: повторяется id.")
     return items
 
 
@@ -366,3 +404,35 @@ class ProjectSerializer(serializers.ModelSerializer):
         if milestones is not None:
             sync_children(project, "project", Milestone, milestones)
         return project
+
+
+class WeeklyReviewSerializer(serializers.ModelSerializer):
+    """Обзор недели. Неделя — с понедельника, одна неделя — один обзор, в фокусе — до FOCUS_LIMIT пунктов."""
+
+    focus = serializers.JSONField(required=False)
+
+    class Meta:
+        model = WeeklyReview
+        fields = ["id", "week_start", "focus", "reflection", "created_at"]
+        read_only_fields = ["id", "created_at"]
+        extra_kwargs = {"reflection": {"required": False}}
+
+    def validate_week_start(self, value):
+        if self.instance is not None and value != self.instance.week_start:
+            raise serializers.ValidationError("Неделю обзора менять нельзя.")
+        if value.weekday() != 0:
+            raise serializers.ValidationError("Неделя обзора начинается с понедельника.")
+        return value
+
+    def validate_focus(self, value):
+        items = clean_checklist(value, item="Пункт фокуса", items_label="Пункты фокуса")
+        if len(items) > FOCUS_LIMIT:
+            raise serializers.ValidationError(f"В фокусе не больше {FOCUS_LIMIT} пунктов.")
+        return items
+
+    def create(self, validated_data):
+        try:
+            with transaction.atomic():
+                return WeeklyReview.objects.create(user=self.context["request"].user, **validated_data)
+        except IntegrityError:
+            raise serializers.ValidationError({"week_start": "Обзор этой недели уже есть."}) from None

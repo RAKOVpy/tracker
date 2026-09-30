@@ -7,7 +7,7 @@ export type ProjectFields = Omit<ProjectInput, 'status'>;
 
 interface Props {
   areas: Area[];
-  /** Цели, с которыми можно связать проект. */
+  /** Цели и привычки, с которыми можно связать проект. */
   goals: Goal[];
   initial: ProjectFields;
   /** Сколько задач у каждой вехи — чтобы предупредить при удалении вехи. */
@@ -94,11 +94,34 @@ export function ProjectForm({ areas, goals, initial, milestoneTasks, submitLabel
             onChange={(e) => set('goalId', e.target.value || null)}
           >
             <option value="">Без цели</option>
-            {goals.map((goal) => (
-              <option key={goal.id} value={goal.id}>
-                {goal.title}
-              </option>
-            ))}
+            {goals.some((g) => g.kind === 'habit') ? (
+              <>
+                <optgroup label="Цели к сроку">
+                  {goals
+                    .filter((g) => g.kind === 'target')
+                    .map((goal) => (
+                      <option key={goal.id} value={goal.id}>
+                        {goal.title}
+                      </option>
+                    ))}
+                </optgroup>
+                <optgroup label="Привычки">
+                  {goals
+                    .filter((g) => g.kind === 'habit')
+                    .map((goal) => (
+                      <option key={goal.id} value={goal.id}>
+                        {goal.title}
+                      </option>
+                    ))}
+                </optgroup>
+              </>
+            ) : (
+              goals.map((goal) => (
+                <option key={goal.id} value={goal.id}>
+                  {goal.title}
+                </option>
+              ))
+            )}
           </select>
           <span className="field__hint">Проект — путь, цель — измеримый результат: «IELTS» и «набрать 7.0».</span>
         </div>

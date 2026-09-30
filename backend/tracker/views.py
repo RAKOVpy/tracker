@@ -14,7 +14,7 @@ from rest_framework.views import APIView
 
 from . import backup
 from .defaults import user_settings
-from .models import Area, Goal, Material, Note, ProgressEntry, Project, Review, Task, Vacation
+from .models import Area, Goal, Material, Note, ProgressEntry, Project, Review, Task, Vacation, WeeklyReview
 from .serializers import (
     AreaSerializer,
     EntrySerializer,
@@ -26,6 +26,7 @@ from .serializers import (
     SettingsSerializer,
     TaskSerializer,
     VacationSerializer,
+    WeeklyReviewSerializer,
 )
 
 # Полная замена объекта (PUT) не нужна: фронтенд присылает только изменённые поля.
@@ -52,7 +53,7 @@ class AreaViewSet(OwnedViewSet):
 
 
 class GoalViewSet(OwnedViewSet):
-    """Цели. Удаляются с записями прогресса; проекты удалённой цели остаются без цели."""
+    """Цели к сроку и привычки (kind). Удаляются с записями прогресса; проекты удалённой цели остаются без цели."""
 
     model = Goal
     serializer_class = GoalSerializer
@@ -132,6 +133,13 @@ class ProjectViewSet(OwnedViewSet):
 
     def get_queryset(self):
         return super().get_queryset().prefetch_related("milestones")
+
+
+class WeeklyReviewViewSet(OwnedViewSet):
+    """Обзоры недели: одна неделя — один обзор, неделя начинается с понедельника."""
+
+    model = WeeklyReview
+    serializer_class = WeeklyReviewSerializer
 
 
 class SettingsView(APIView):

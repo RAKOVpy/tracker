@@ -4,6 +4,7 @@ import { obsidianUri } from '../obsidian/uri';
 import { createAuthApi } from './auth';
 import { createHttp, onUnauthorized } from './http';
 import { createHttpApi } from './httpApi';
+import { SCHEMA_VERSION } from './schema';
 import { ApiError, AuthError, NetworkError, NotFoundError, VacationError } from './types';
 
 interface Call {
@@ -139,7 +140,37 @@ describe('httpApi', () => {
     ]);
     expect(calls[1].body).toEqual({ status: 'done' });
     expect(calls[2].body).toMatchObject({ title: 'Н', addedOn: '2026-09-01' });
-    expect(calls[3].body).toEqual({ version: 8, areas: [] });
+    expect(calls[3].body).toEqual({ version: SCHEMA_VERSION, areas: [] });
+  });
+
+  it('creates habits and saves weekly reviews', async () => {
+    const a = api();
+    await a.createGoal({
+      kind: 'habit',
+      title: 'Зал',
+      description: '',
+      areaId: null,
+      unit: 'раз',
+      targetValue: 1,
+      startDate: '2026-10-05',
+      deadline: null,
+      daysPerWeek: 3,
+      priority: 'medium',
+    });
+    await a.listWeeklyReviews();
+    await a.createWeeklyReview({ weekStart: '2026-09-28', focus: [{ id: 'f1', text: 'Доклад', done: false }], reflection: '' });
+    await a.updateWeeklyReview('w 1', { focus: [] });
+    replies.push(json(204));
+    await a.deleteWeeklyReview('w1');
+    expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
+      'POST /api/goals/',
+      'GET /api/weekly-reviews/',
+      'POST /api/weekly-reviews/',
+      'PATCH /api/weekly-reviews/w%201/',
+      'DELETE /api/weekly-reviews/w1/',
+    ]);
+    expect(calls[0].body).toMatchObject({ kind: 'habit', daysPerWeek: 3, deadline: null });
+    expect(calls[2].body).toEqual({ weekStart: '2026-09-28', focus: [{ id: 'f1', text: 'Доклад', done: false }], reflection: '' });
   });
 
   it('treats deleting a missing object as done', async () => {

@@ -25,6 +25,9 @@ import type {
   TaskPatch,
   Vacation,
   VacationInput,
+  WeeklyReview,
+  WeeklyReviewInput,
+  WeeklyReviewPatch,
 } from '../domain/types';
 import type { IsoDate } from '../lib/dates';
 import type { ParsedVault, SyncReport } from '../obsidian/sync';
@@ -41,9 +44,11 @@ export interface TrackerApi {
   /** Цели, материалы, задачи и проекты удалённой сферы остаются без сферы. */
   deleteArea(id: string): Promise<void>;
 
+  /** Цели к сроку и привычки (вид — в поле kind). */
   listGoals(): Promise<Goal[]>;
   getGoal(id: string): Promise<Goal>;
   createGoal(input: GoalInput): Promise<Goal>;
+  /** Вид цели не меняется: срок привычке и частота цели к сроку игнорируются. */
   updateGoal(id: string, patch: GoalPatch): Promise<Goal>;
   /** Удаляет цель с записями прогресса; связанные проекты остаются без цели. */
   deleteGoal(id: string): Promise<void>;
@@ -100,6 +105,13 @@ export interface TrackerApi {
   updateProject(id: string, patch: ProjectPatch): Promise<Project>;
   /** Задачи удалённого проекта остаются без проекта. */
   deleteProject(id: string): Promise<void>;
+
+  /** Обзоры недели по порядку недель. */
+  listWeeklyReviews(): Promise<WeeklyReview[]>;
+  /** Одна неделя — один обзор: второй обзор той же недели — ошибка. */
+  createWeeklyReview(input: WeeklyReviewInput): Promise<WeeklyReview>;
+  updateWeeklyReview(id: string, patch: WeeklyReviewPatch): Promise<WeeklyReview>;
+  deleteWeeklyReview(id: string): Promise<void>;
 
   /** Переносит заметки и материалы из хранилища Obsidian (см. obsidian/sync.ts). */
   syncObsidian(vault: ParsedVault): Promise<SyncReport>;

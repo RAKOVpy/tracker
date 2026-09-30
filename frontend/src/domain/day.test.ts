@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { summarizeDay } from './day';
 
-const none = { tasksLeft: 0, tasksDone: 0, goalsLeft: 0, goalsDone: 0, reviewsLeft: 0, reviewedToday: 0 };
+const none = { tasksLeft: 0, tasksDone: 0, habitsLeft: 0, habitsDone: 0, goalsLeft: 0, goalsDone: 0, reviewsLeft: 0, reviewedToday: 0 };
 
 describe('summarizeDay', () => {
   it('нечего делать — пустой итог', () => {
@@ -25,6 +25,15 @@ describe('summarizeDay', () => {
       title: 'Осталось 5 дел на сегодня',
       hint: 'Норма по 5 целям.',
     });
+  });
+
+  it('привычки — после задач, каждая отдельным делом', () => {
+    expect(summarizeDay({ ...none, tasksLeft: 1, habitsLeft: 2, habitsDone: 1, goalsLeft: 1 })).toMatchObject({
+      done: 1,
+      total: 5,
+      hint: '1 задача, 2 привычки и норма по 1 цели.',
+    });
+    expect(summarizeDay({ ...none, habitsLeft: 5 }).hint).toBe('5 привычек.');
   });
 
   it('всё сделано', () => {

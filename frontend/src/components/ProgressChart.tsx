@@ -1,11 +1,11 @@
 import type { GoalStats } from '../domain/progress';
-import type { Goal } from '../domain/types';
+import type { TargetGoal } from '../domain/types';
 import { addDays, diffDays, formatShort, type IsoDate } from '../lib/dates';
 import { formatNumber } from '../lib/format';
 import { formatAmount } from './pace';
 
 interface Props {
-  goal: Goal;
+  goal: TargetGoal;
   stats: GoalStats;
   today: IsoDate;
 }

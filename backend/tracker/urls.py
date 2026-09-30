@@ -14,6 +14,7 @@ router.register("reviews", views.ReviewViewSet, basename="review")
 router.register("vacations", views.VacationViewSet, basename="vacation")
 router.register("tasks", views.TaskViewSet, basename="task")
 router.register("projects", views.ProjectViewSet, basename="project")
+router.register("weekly-reviews", views.WeeklyReviewViewSet, basename="weekly-review")
 
 urlpatterns = [
     path("auth/session/", auth_views.SessionView.as_view(), name="auth-session"),

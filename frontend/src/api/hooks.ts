@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
+import { computeHabitStats, type HabitWithStats } from '../domain/habits';
 import { checkStart, forecastReviews, planReviews, type ForecastDay, type ReviewLoad, type StartCheck } from '../domain/load';
 import { computeGoalStats, type GoalWithStats } from '../domain/progress';
 import { withState, type NoteWithState } from '../domain/review';
@@ -13,12 +14,14 @@ import type {
   EntryInput,
   GoalInput,
   GoalPatch,
+  HabitGoal,
   Material,
   MaterialInput,
   MaterialPart,
   MaterialPatch,
   NoteInput,
   NotePatch,
+  ProgressEntry,
   Project,
   ProjectInput,
   ProjectPatch,
@@ -30,9 +33,11 @@ import type {
   TaskPatch,
   Vacation,
   VacationInput,
+  WeeklyReview,
+  WeeklyReviewInput,
 } from '../domain/types';
 import { finishVacation } from '../domain/vacation';
-import { todayIso } from '../lib/dates';
+import { todayIso, type IsoDate } from '../lib/dates';
 import { api, type Db } from '.';
 
 declare module '@tanstack/react-query' {
@@ -54,6 +59,7 @@ const keys = {
   vacations: ['vacations'] as const,
   tasks: ['tasks'] as const,
   projects: ['projects'] as const,
+  weeklyReviews: ['weekly-reviews'] as const,
 };
 
 /**
@@ -65,6 +71,8 @@ const queues = {
   task: ['update-task'] as const,
   material: ['update-material'] as const,
   settings: ['update-settings'] as const,
+  habit: ['toggle-habit'] as const,
+  weeklyReview: ['update-weekly-review'] as const,
 };
 
 /** В обработчике завершения своя правка ещё считается незавершённой — поэтому «последняя» значит «одна». */
@@ -96,19 +104,29 @@ function groupBy<T>(items: T[], key: (item: T) => string): Map<string, T[]> {
   return map;
 }
 
-export function useGoalsWithStats() {
+export interface GoalsData {
+  /** Цели к сроку. */
+  targets: GoalWithStats[];
+  habits: HabitWithStats[];
+}
+
+/** Цели к сроку и привычки со статистикой на сегодня. */
+export function useGoals() {
   const today = useToday();
   const goals = useQuery({ queryKey: keys.goals, queryFn: () => api.listGoals() });
   const entries = useQuery({ queryKey: keys.entries(), queryFn: () => api.listEntries() });
   const vacations = useVacations();
 
-  const data = useMemo<GoalWithStats[] | undefined>(() => {
+  const data = useMemo<GoalsData | undefined>(() => {
     if (!goals.data || !entries.data || !vacations.data) return undefined;
     const byGoal = groupBy(entries.data, (e) => e.goalId);
-    return goals.data.map((goal) => {
-      const goalEntries = byGoal.get(goal.id) ?? [];
-      return { goal, entries: goalEntries, stats: computeGoalStats(goal, goalEntries, today, vacations.data) };
-    });
+    const result: GoalsData = { targets: [], habits: [] };
+    for (const goal of goals.data) {
+      const own = byGoal.get(goal.id) ?? [];
+      if (goal.kind === 'habit') result.habits.push({ goal, entries: own, stats: computeHabitStats(goal, own, today, vacations.data) });
+      else result.targets.push({ goal, entries: own, stats: computeGoalStats(goal, own, today, vacations.data) });
+    }
+    return result;
   }, [goals.data, entries.data, vacations.data, today]);
 
   return {
@@ -119,19 +137,21 @@ export function useGoalsWithStats() {
   };
 }
 
-export function useGoalWithStats(id: string) {
+/** Цель к сроку или привычка — со своей статистикой. */
+export type GoalView = ({ kind: 'target' } & GoalWithStats) | ({ kind: 'habit' } & HabitWithStats);
+
+export function useGoal(id: string) {
   const today = useToday();
   const goal = useQuery({ queryKey: keys.goal(id), queryFn: () => api.getGoal(id), retry: false });
   const entries = useQuery({ queryKey: keys.entries(id), queryFn: () => api.listEntries(id) });
   const vacations = useVacations();
 
-  const data = useMemo<GoalWithStats | undefined>(() => {
+  const data = useMemo<GoalView | undefined>(() => {
     if (!goal.data || !entries.data || !vacations.data) return undefined;
-    return {
-      goal: goal.data,
-      entries: entries.data,
-      stats: computeGoalStats(goal.data, entries.data, today, vacations.data),
-    };
+    const g = goal.data;
+    return g.kind === 'habit'
+      ? { kind: 'habit', goal: g, entries: entries.data, stats: computeHabitStats(g, entries.data, today, vacations.data) }
+      : { kind: 'target', goal: g, entries: entries.data, stats: computeGoalStats(g, entries.data, today, vacations.data) };
   }, [goal.data, entries.data, vacations.data, today]);
 
   return {
@@ -184,6 +204,48 @@ export function useDeleteEntry() {
   return useMutation({
     mutationFn: (id: string) => api.deleteEntry(id),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.entries() }),
+  });
+}
+
+/**
+ * Отметка привычки одним нажатием: `value` — записать столько за день, null — снять отметку (удалить
+ * записи этого дня). На экране меняется сразу, на сервер уходит по очереди; при ошибке всё возвращается.
+ */
+export function useToggleHabit() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ goal, date, value }: { goal: HabitGoal; date: IsoDate; value: number | null }) => {
+      if (value !== null) {
+        await api.createEntry({ goalId: goal.id, date, value, note: '' });
+        return;
+      }
+      // Записи берём с сервера: в кэше у только что сделанной отметки ещё временный id.
+      for (const entry of await api.listEntries(goal.id)) {
+        if (entry.date === date) await api.deleteEntry(entry.id);
+      }
+    },
+    mutationKey: queues.habit,
+    scope: { id: 'toggle-habit' },
+    onMutate: async ({ goal, date, value }) => {
+      await client.cancelQueries({ queryKey: keys.entries() });
+      const change = (list: ProgressEntry[] | undefined) => {
+        if (!list) return list;
+        if (value === null) return list.filter((e) => !(e.goalId === goal.id && e.date === date));
+        const pending = { id: `pending-${crypto.randomUUID()}`, goalId: goal.id, date, value, note: '', createdAt: new Date().toISOString() };
+        return [...list, pending];
+      };
+      const previous = { all: client.getQueryData<ProgressEntry[]>(keys.entries()), own: client.getQueryData<ProgressEntry[]>(keys.entries(goal.id)) };
+      client.setQueryData(keys.entries(), change(previous.all));
+      client.setQueryData(keys.entries(goal.id), change(previous.own));
+      return previous;
+    },
+    onError: (_error, { goal }, previous) => {
+      if (previous?.all) client.setQueryData(keys.entries(), previous.all);
+      if (previous?.own) client.setQueryData(keys.entries(goal.id), previous.own);
+    },
+    onSettled: () => {
+      if (isLastInQueue(client, queues.habit)) return client.invalidateQueries({ queryKey: keys.entries() });
+    },
   });
 }
 
@@ -646,4 +708,52 @@ export function useInboxToProject() {
       client.invalidateQueries({ queryKey: keys.projects });
     },
   });
+}
+
+// ---------- обзор недели ----------
+
+export function useWeeklyReviews() {
+  return useQuery({ queryKey: keys.weeklyReviews, queryFn: () => api.listWeeklyReviews() });
+}
+
+/** Сохранить обзор недели: в первый раз — создать, потом — изменить. */
+export function useSaveWeeklyReview() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ existing, input }: { existing: WeeklyReview | null; input: WeeklyReviewInput }) =>
+      existing
+        ? api.updateWeeklyReview(existing.id, { focus: input.focus, reflection: input.reflection })
+        : api.createWeeklyReview(input),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.weeklyReviews }),
+  });
+}
+
+/**
+ * Отметки в фокусе недели — как подзадачи: сразу на экране, на сервер по очереди, от самой свежей версии
+ * обзора в кэше, чтобы две быстрые отметки не затёрли друг друга.
+ */
+export function useEditFocus() {
+  const client = useQueryClient();
+  const update = useMutation({
+    mutationFn: ({ id, focus }: { id: string; focus: ChecklistItem[] }) => api.updateWeeklyReview(id, { focus }),
+    mutationKey: queues.weeklyReview,
+    scope: { id: 'update-weekly-review' },
+    onMutate: async ({ id, focus }) => {
+      await client.cancelQueries({ queryKey: keys.weeklyReviews });
+      const previous = client.getQueryData<WeeklyReview[]>(keys.weeklyReviews);
+      if (previous) client.setQueryData(keys.weeklyReviews, previous.map((r) => (r.id === id ? { ...r, focus } : r)));
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) client.setQueryData(keys.weeklyReviews, context.previous);
+    },
+    onSettled: () => {
+      if (isLastInQueue(client, queues.weeklyReview)) return client.invalidateQueries({ queryKey: keys.weeklyReviews });
+    },
+  });
+  const edit = (review: WeeklyReview, change: (focus: ChecklistItem[]) => ChecklistItem[]) => {
+    const latest = client.getQueryData<WeeklyReview[]>(keys.weeklyReviews)?.find((r) => r.id === review.id) ?? review;
+    update.mutate({ id: review.id, focus: change(latest.focus) });
+  };
+  return { edit, isPending: update.isPending };
 }

@@ -3360,3 +3360,171 @@ textarea {
     bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 12px);
   }
 }
+
+/* ================= привычки ================= */
+
+/* Точки недели справа от строки привычки: пн … вс. */
+.habit-row .habit-week {
+  flex: none;
+  align-self: center;
+}
+
+.week__day--partial {
+  border-color: var(--good);
+  background: linear-gradient(to top, var(--good) 50%, var(--sheet-2) 50%);
+}
+
+.week__day--vacation {
+  background: repeating-linear-gradient(-45deg, var(--sheet-2) 0 2px, var(--sheet-3) 2px 4px);
+  border-style: dashed;
+}
+
+.week__day--future {
+  opacity: 0.45;
+}
+
+.week__day--before {
+  visibility: hidden;
+}
+
+@media (max-width: 480px) {
+  .habit-row .habit-week {
+    gap: 3px;
+  }
+
+  .habit-row .week__day {
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+  }
+}
+
+/* Календарь: строка — неделя, дни с понедельника и итог «засчитано из нужного». */
+.habit-calendar {
+  display: grid;
+  gap: 4px;
+  max-width: 420px;
+}
+
+.habit-calendar__row {
+  display: grid;
+  grid-template-columns: 3.4rem repeat(7, minmax(0, 1fr)) 2.6rem;
+  align-items: center;
+  gap: 4px;
+}
+
+.habit-calendar__head {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  text-align: center;
+}
+
+.habit-calendar__head > :last-child {
+  text-align: right;
+}
+
+.habit-calendar__date {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Образец в легенде: цвета — от модификаторов .habit-day--*, поэтому правило стоит раньше них. */
+.habit-swatch {
+  display: inline-block;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--sheet-2);
+}
+
+.habit-day {
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  width: 100%;
+  max-width: 28px;
+  aspect-ratio: 1;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--sheet-2);
+  color: var(--tone-slate);
+}
+
+.habit-day--done {
+  border-color: var(--good);
+  background: var(--good);
+}
+
+.habit-day--partial {
+  border-color: var(--good);
+  background: linear-gradient(to top, var(--good) 45%, var(--good-soft) 45%);
+}
+
+.habit-day--missed {
+  border-style: dashed;
+  border-color: var(--line-strong);
+  background: var(--sheet);
+}
+
+.habit-day--forgiven {
+  border-color: var(--tone-slate);
+  background: var(--tone-slate-soft);
+}
+
+.habit-day--vacation {
+  border-style: dashed;
+  background: repeating-linear-gradient(-45deg, var(--sheet-2) 0 3px, var(--sheet-3) 3px 6px);
+}
+
+.habit-day--today {
+  outline: 1.5px solid var(--ink-2);
+  outline-offset: 1.5px;
+}
+
+.habit-day--future {
+  opacity: 0.45;
+}
+
+.habit-day--before {
+  visibility: hidden;
+}
+
+.habit-calendar__result {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.habit-calendar__result svg {
+  color: var(--tone-slate);
+}
+
+.habit-calendar__result--kept {
+  color: var(--good);
+  font-weight: 600;
+}
+
+.habit-calendar-wrap {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+}
+
+.habit-calendar-wrap .legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.habit-calendar-wrap .legend svg {
+  color: var(--tone-slate);
+}
+

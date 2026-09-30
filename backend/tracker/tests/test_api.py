@@ -1,10 +1,10 @@
-"""CRUD, проверки и изоляция пользователей для сфер, целей, записей, знаний, настроек и отпусков."""
+"""CRUD, проверки и изоляция пользователей для сфер, целей и привычек, записей, знаний, настроек, отпусков и обзоров недели."""
 
 import uuid
 
 import pytest
 
-from tracker.models import Area, Material, Note, ProgressEntry, Review, Task
+from tracker.models import Area, Goal, Material, Note, ProgressEntry, Review, Task, WeeklyReview
 
 pytestmark = pytest.mark.django_db
 
@@ -90,6 +90,118 @@ class TestGoalsAndEntries:
         assert api.post("/api/entries/", {"goalId": a["id"], "date": "2026-10-02", "value": -1}, format="json").status_code == 400
         api.delete(f"/api/goals/{a['id']}/")
         assert ProgressEntry.objects.count() == 1
+
+
+def habit_body(**fields):
+    return {
+        "kind": "habit",
+        "title": "Английский",
+        "description": "",
+        "areaId": None,
+        "unit": "минут",
+        "targetValue": 20,
+        "startDate": "2026-10-01",
+        "deadline": None,
+        "daysPerWeek": 7,
+        "priority": "medium",
+        **fields,
+    }
+
+
+class TestHabits:
+    def test_create_habit_and_target_by_default(self, api):
+        habit = api.post("/api/goals/", habit_body(), format="json")
+        assert habit.status_code == 201
+        assert {k: habit.json()[k] for k in ("kind", "deadline", "daysPerWeek", "targetValue")} == {
+            "kind": "habit",
+            "deadline": None,
+            "daysPerWeek": 7,
+            "targetValue": 20,
+        }
+        # Без kind — цель к сроку, как раньше.
+        goal = api.post("/api/goals/", goal_body(), format="json").json()
+        assert goal["kind"] == "target" and goal["daysPerWeek"] is None
+
+    def test_validation(self, api):
+        assert api.post("/api/goals/", habit_body(daysPerWeek=0), format="json").status_code == 400
+        assert api.post("/api/goals/", habit_body(daysPerWeek=8), format="json").status_code == 400
+        missing = api.post("/api/goals/", habit_body(daysPerWeek=None), format="json")
+        assert missing.status_code == 400 and "от 1 до 7" in missing.json()["detail"]
+        zero = api.post("/api/goals/", habit_body(targetValue=0), format="json")
+        assert "Норма за день" in zero.json()["detail"]
+        no_deadline = api.post("/api/goals/", goal_body(deadline=None), format="json")
+        assert no_deadline.status_code == 400 and "срок" in no_deadline.json()["detail"]
+
+    def test_fields_of_other_kind_are_dropped(self, api):
+        """Срок привычке и частота цели к сроку не нужны — они обнуляются, как в applyGoalPatch."""
+        habit = api.post("/api/goals/", habit_body(deadline="2026-12-31"), format="json").json()
+        assert habit["deadline"] is None
+        goal = api.post("/api/goals/", goal_body(daysPerWeek=3), format="json").json()
+        assert goal["daysPerWeek"] is None
+        assert api.patch(f"/api/goals/{goal['id']}/", {"daysPerWeek": 5}, format="json").json()["daysPerWeek"] is None
+
+    def test_patch_keeps_kind(self, api):
+        habit = api.post("/api/goals/", habit_body(), format="json").json()
+        updated = api.patch(f"/api/goals/{habit['id']}/", {"daysPerWeek": 3, "targetValue": 30}, format="json")
+        assert updated.status_code == 200 and updated.json()["daysPerWeek"] == 3
+        changed = api.patch(f"/api/goals/{habit['id']}/", {"kind": "target", "deadline": "2026-12-31"}, format="json")
+        assert changed.status_code == 400 and "не меняется" in changed.json()["detail"]
+        assert Goal.objects.get(id=habit["id"]).kind == "habit"
+
+    def test_entries_work_for_habits(self, api):
+        habit = api.post("/api/goals/", habit_body(), format="json").json()
+        entry = api.post("/api/entries/", {"goalId": habit["id"], "date": "2026-10-02", "value": 20}, format="json")
+        assert entry.status_code == 201
+        api.delete(f"/api/goals/{habit['id']}/")
+        assert ProgressEntry.objects.count() == 0
+
+
+def review_body(**fields):
+    return {
+        "weekStart": "2026-09-28",
+        "focus": [{"id": "f1", "text": "Доклад на семинаре", "done": False}],
+        "reflection": "Получилось: зал три раза.",
+        **fields,
+    }
+
+
+class TestWeeklyReviews:
+    def test_create_list_update_delete(self, api):
+        created = api.post("/api/weekly-reviews/", review_body(), format="json")
+        assert created.status_code == 201
+        review = created.json()
+        assert set(review) == {"id", "weekStart", "focus", "reflection", "createdAt"}
+        api.post("/api/weekly-reviews/", review_body(weekStart="2026-09-21", focus=[], reflection=""), format="json")
+        assert [r["weekStart"] for r in api.get("/api/weekly-reviews/").json()] == ["2026-09-21", "2026-09-28"]
+        ticked = [{**review["focus"][0], "done": True}]
+        updated = api.patch(f"/api/weekly-reviews/{review['id']}/", {"focus": ticked}, format="json").json()
+        assert updated["focus"] == ticked and updated["reflection"] == review["reflection"]
+        assert api.delete(f"/api/weekly-reviews/{review['id']}/").status_code == 204
+        assert WeeklyReview.objects.count() == 1
+
+    def test_one_review_per_week(self, api, other):
+        api.post("/api/weekly-reviews/", review_body(), format="json")
+        again = api.post("/api/weekly-reviews/", review_body(), format="json")
+        assert again.status_code == 400 and again.json()["detail"] == "Обзор этой недели уже есть."
+        # У другого пользователя своя неделя.
+        assert other.post("/api/weekly-reviews/", review_body(), format="json").status_code == 201
+
+    def test_validation(self, api):
+        tuesday = api.post("/api/weekly-reviews/", review_body(weekStart="2026-09-29"), format="json")
+        assert tuesday.status_code == 400 and "понедельника" in tuesday.json()["detail"]
+        four = [{"id": f"f{i}", "text": "Дело", "done": False} for i in range(4)]
+        assert "не больше 3" in api.post("/api/weekly-reviews/", review_body(focus=four), format="json").json()["detail"]
+        empty = api.post("/api/weekly-reviews/", review_body(focus=[{"id": "f1", "text": " ", "done": False}]), format="json")
+        assert "Пункт фокуса 1" in empty.json()["detail"]
+        review = api.post("/api/weekly-reviews/", review_body(), format="json").json()
+        moved = api.patch(f"/api/weekly-reviews/{review['id']}/", {"weekStart": "2026-10-05"}, format="json")
+        assert moved.status_code == 400
+
+    def test_isolation(self, api, other):
+        review = api.post("/api/weekly-reviews/", review_body(), format="json").json()
+        assert other.get("/api/weekly-reviews/").json() == []
+        assert other.patch(f"/api/weekly-reviews/{review['id']}/", {"reflection": "взлом"}, format="json").status_code == 404
+        assert other.delete(f"/api/weekly-reviews/{review['id']}/").status_code == 404
 
 
 class TestKnowledge:

@@ -1,5 +1,5 @@
 """
-Модель данных повторяет типы фронтенда (frontend/src/domain/types.ts, схема v8).
+Модель данных повторяет типы фронтенда (frontend/src/domain/types.ts, схема v9).
 Всё, что можно вычислить (прогресс целей, расписание заметок, «законспектирована» у части),
 не хранится. id — UUID: их нельзя перебрать, и они совпадают по формату с фронтендом.
 """
@@ -49,6 +49,11 @@ class Priority(models.TextChoices):
 class GoalStatus(models.TextChoices):
     ACTIVE = "active"
     ARCHIVED = "archived"
+
+
+class GoalKind(models.TextChoices):
+    TARGET = "target"
+    HABIT = "habit"
 
 
 class MaterialType(models.TextChoices):
@@ -128,17 +133,25 @@ class Area(models.Model):
 
 
 class Goal(models.Model):
-    """Измеримая цель: «прочитать 480 страниц к 19 октября»."""
+    """
+    Цель к сроку («прочитать 480 страниц к 19 октября») или привычка («английский 20 минут каждый день»,
+    «зал 3 раза в неделю»). У привычки нет срока, а target_value — норма за день.
+    """
 
     id = models.UUIDField(primary_key=True, default=new_id, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="goals")
+    kind = models.CharField(max_length=10, choices=GoalKind.choices, default=GoalKind.TARGET)
     title = models.CharField(max_length=500)
     description = models.TextField(blank=True)
     area = models.ForeignKey(Area, null=True, blank=True, on_delete=models.SET_NULL, related_name="goals")
     unit = models.CharField(max_length=50)
+    # Цель — сколько всего к сроку; привычка — сколько за день.
     target_value = models.FloatField()
     start_date = models.DateField()
-    deadline = models.DateField()
+    # Только у цели к сроку.
+    deadline = models.DateField(null=True, blank=True)
+    # Только у привычки: 7 — каждый день, 3 — «3 раза в неделю» в любые дни.
+    days_per_week = models.PositiveSmallIntegerField(null=True, blank=True)
     priority = models.CharField(max_length=10, choices=Priority.choices, default=Priority.MEDIUM)
     status = models.CharField(max_length=10, choices=GoalStatus.choices, default=GoalStatus.ACTIVE)
     created_at = models.DateTimeField(default=timezone.now)
@@ -146,8 +159,15 @@ class Goal(models.Model):
     class Meta:
         ordering = ["created_at", "id"]
         constraints = [
-            models.CheckConstraint(condition=Q(deadline__gte=F("start_date")), name="goal_deadline_after_start"),
+            models.CheckConstraint(
+                condition=Q(deadline__isnull=True) | Q(deadline__gte=F("start_date")), name="goal_deadline_after_start"
+            ),
             models.CheckConstraint(condition=Q(target_value__gt=0), name="goal_target_positive"),
+            models.CheckConstraint(
+                condition=(Q(kind=GoalKind.TARGET) & Q(deadline__isnull=False) & Q(days_per_week__isnull=True))
+                | (Q(kind=GoalKind.HABIT) & Q(deadline__isnull=True) & Q(days_per_week__gte=1) & Q(days_per_week__lte=7)),
+                name="goal_kind_fields",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -338,3 +358,24 @@ class Task(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+
+class WeeklyReview(models.Model):
+    """
+    Обзор недели: итоги недели и фокус на следующую. week_start — понедельник недели, которую подводили;
+    фокус — до трёх пунктов [{id, text, done}], как подзадачи у задачи.
+    """
+
+    id = models.UUIDField(primary_key=True, default=new_id, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="weekly_reviews")
+    week_start = models.DateField()
+    focus = models.JSONField(default=list)
+    reflection = models.TextField(blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["week_start"]
+        constraints = [models.UniqueConstraint(fields=["user", "week_start"], name="weekly_review_one_per_week")]
+
+    def __str__(self) -> str:
+        return f"Обзор недели {self.week_start}"

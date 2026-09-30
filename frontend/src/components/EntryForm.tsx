@@ -2,21 +2,26 @@ import { useState, type FormEvent } from 'react';
 import { useCreateEntry } from '../api/hooks';
 import type { Goal } from '../domain/types';
 import type { IsoDate } from '../lib/dates';
+import { formatNumber } from '../lib/format';
 
 interface Props {
   goal: Goal;
   today: IsoDate;
+  /** С какой даты открывается форма; по умолчанию — сегодня. */
+  defaultDate?: IsoDate;
+  /** Подставляется, если поле пустое: у привычки — норма за день. */
+  suggested?: number;
 }
 
 /** Запись прогресса за любой прошедший день — если забыл отметить вчера. */
-export function EntryForm({ goal, today }: Props) {
-  const [date, setDate] = useState(today);
+export function EntryForm({ goal, today, defaultDate = today, suggested }: Props) {
+  const [date, setDate] = useState(defaultDate);
   const [raw, setRaw] = useState('');
   const [note, setNote] = useState('');
   const createEntry = useCreateEntry();
 
-  const value = Number(raw.replace(',', '.'));
-  const isValid = raw.trim() !== '' && Number.isFinite(value) && value > 0 && date >= goal.startDate && date <= today;
+  const value = raw.trim() === '' && suggested ? suggested : Number(raw.replace(',', '.'));
+  const isValid = Number.isFinite(value) && value > 0 && date >= goal.startDate && date <= today;
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -50,7 +55,7 @@ export function EntryForm({ goal, today }: Props) {
         <input
           className="input"
           inputMode="decimal"
-          placeholder={goal.unit}
+          placeholder={suggested ? formatNumber(suggested) : goal.unit}
           value={raw}
           onChange={(e) => setRaw(e.target.value)}
           aria-label={`Сделано, ${goal.unit}`}

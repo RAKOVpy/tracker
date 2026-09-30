@@ -1,5 +1,5 @@
 """
-Резервная копия: загрузка копии фронтенда (пример данных из браузера, схема v8), выгрузка
+Резервная копия: загрузка копии фронтенда (пример данных из браузера, схема v9), выгрузка
 в том же формате, проверка и починка ссылок, сброс и запись результата синхронизации с Obsidian.
 """
 
@@ -76,6 +76,10 @@ def comparable(db: dict) -> dict:
             })
             for p in db["projects"]
         ),
+        "weeklyReviews": sorted(
+            key({**r, "id": None, "focus": [{**f, "id": None} for f in r["focus"]], "createdAt": moment(r["createdAt"])})
+            for r in db["weeklyReviews"]
+        ),
         "tasks": sorted(
             key({
                 **t, "id": None, "areaId": areas.get(t["areaId"]),
@@ -94,7 +98,9 @@ def comparable(db: dict) -> dict:
 def test_frontend_backup_round_trip(api):
     assert api.post("/api/import/", FIXTURE, format="json").status_code == 204
     exported = api.get("/api/export/").json()
-    assert exported["app"] == "tracker" and exported["version"] == 8 and parse_datetime(exported["exportedAt"])
+    assert exported["app"] == "tracker" and exported["version"] == 9 and parse_datetime(exported["exportedAt"])
+    # В примере есть и цели к сроку, и привычки, и обзор недели.
+    assert {g["kind"] for g in exported["goals"]} == {"target", "habit"} and exported["weeklyReviews"]
     assert comparable(exported) == comparable(FIXTURE)
     # id новые — копия не мешает другим аккаунтам.
     assert {a["id"] for a in exported["areas"]}.isdisjoint({a["id"] for a in FIXTURE["areas"]})
@@ -153,7 +159,16 @@ def test_milestone_from_other_project_is_dropped(api):
 @pytest.mark.parametrize(
     ("change", "message"),
     [
-        (lambda d: d.update(version=7), "другой версии"),
+        (lambda d: d.update(version=8), "другой версии"),
+        (lambda d: next(g for g in d["goals"] if g["kind"] == "habit").update(daysPerWeek=8), "от 1 до 7"),
+        (lambda d: next(g for g in d["goals"] if g["kind"] == "target").update(deadline=None), "«deadline»"),
+        (lambda d: d["goals"][0].update(kind="routine"), "Цель 1: недопустимое значение поля «kind»"),
+        (lambda d: d["weeklyReviews"][0].update(weekStart="2026-09-22"), "с понедельника"),
+        (lambda d: d["weeklyReviews"].append({**copy.deepcopy(d["weeklyReviews"][0]), "id": "w2"}), "два обзора одной недели"),
+        (
+            lambda d: d["weeklyReviews"][0].update(focus=[{"id": f"f{i}", "text": "Дело", "done": False} for i in range(4)]),
+            "не больше 3",
+        ),
         (lambda d: d["tasks"][0].update(status="later"), "Задача 1: недопустимое значение поля «status»"),
         (lambda d: d["goals"][0].update(deadline="2020-01-01", startDate="2020-02-01"), "дедлайн раньше даты старта"),
         (lambda d: d["tasks"].append(copy.deepcopy(d["tasks"][0])), "Задачи: повторяется id"),
@@ -179,6 +194,17 @@ def test_import_rejects_invalid_data_and_keeps_old(api, user, change, message):
     assert Task.objects.filter(user=user, title="Не пропаду").exists()
 
 
+def test_habit_fields_of_other_kind_are_dropped(api):
+    """Как validateDb: срок у привычки и частота у цели к сроку не мешают загрузке, а отбрасываются."""
+    data = backup()
+    habit = next(g for g in data["goals"] if g["kind"] == "habit")
+    target = next(g for g in data["goals"] if g["kind"] == "target")
+    habit["deadline"], target["daysPerWeek"] = "2026-12-31", 3
+    assert api.post("/api/import/", data, format="json").status_code == 204
+    goals = {g["title"]: g for g in api.get("/api/goals/").json()}
+    assert goals[habit["title"]]["deadline"] is None and goals[target["title"]]["daysPerWeek"] is None
+
+
 def test_settings_are_clamped_on_import(api):
     api.post("/api/import/", backup(settings={"dailyReviewLimit": 500, "activeMaterialsLimit": "x", "newNotesPerDay": 3.4}), format="json")
     assert api.get("/api/settings/").json() == {"dailyReviewLimit": 100, "activeMaterialsLimit": 3, "newNotesPerDay": 3, "strictMode": False}
@@ -190,7 +216,9 @@ def test_reset(api, user):
     assert api.post("/api/reset/").status_code == 204
     exported = api.get("/api/export/").json()
     assert [a["name"] for a in exported["areas"]] == ["Чтение", "Языки", "Спорт", "Учёба"]
-    assert all(exported[k] == [] for k in ("goals", "entries", "materials", "notes", "reviews", "vacations", "tasks", "projects"))
+    assert all(
+        exported[k] == [] for k in ("goals", "entries", "materials", "notes", "reviews", "vacations", "tasks", "projects", "weeklyReviews")
+    )
     assert exported["settings"]["strictMode"] is False
 
 

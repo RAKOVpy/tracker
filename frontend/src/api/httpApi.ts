@@ -78,6 +78,11 @@ export function createHttpApi(http: Http): TrackerApi {
     updateProject: (id, changes) => patch(item('projects', id), changes, { what: 'Проект' }),
     deleteProject: (id) => remove(item('projects', id)),
 
+    listWeeklyReviews: () => get('/weekly-reviews/'),
+    createWeeklyReview: (input) => post('/weekly-reviews/', input),
+    updateWeeklyReview: (id, changes) => patch(item('weekly-reviews', id), changes, { what: 'Обзор недели' }),
+    deleteWeeklyReview: (id) => remove(item('weekly-reviews', id)),
+
     /** Хранилище читается в браузере, сопоставление с трекером — то же, что без сервера. */
     async syncObsidian(vault) {
       const [areas, materials, notes, settings, vacations] = await Promise.all([

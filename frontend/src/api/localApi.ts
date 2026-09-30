@@ -1,12 +1,13 @@
+import { applyGoalPatch } from '../domain/goals';
 import { detachRemovedParts } from '../domain/parts';
 import { applyProjectPatch, createProject, detachRemovedMilestones } from '../domain/projects';
 import { applyTaskUpdate, createTask } from '../domain/tasks';
-import type { Area, Goal, Material, Note, ProgressEntry, Review, Vacation } from '../domain/types';
+import type { Area, Goal, Material, Note, ProgressEntry, Review, Vacation, WeeklyReview } from '../domain/types';
 import { sortVacations, vacationError } from '../domain/vacation';
 import { todayIso } from '../lib/dates';
 import { applyVault } from '../obsidian/sync';
 import { createEmptyDb, migrate, SCHEMA_VERSION, systemCtx, toBackup, type Db } from './schema';
-import { NotFoundError, VacationError, type TrackerApi } from './types';
+import { ApiError, NotFoundError, VacationError, type TrackerApi } from './types';
 
 const STORAGE_KEY = 'tracker:data';
 /** Ключ версии 1. Не удаляется после миграции и служит запасной копией. */
@@ -94,7 +95,7 @@ export const localApi: TrackerApi = {
   async updateGoal(id, patch) {
     const db = load();
     const index = findIndex(db.goals, id, 'Цель');
-    db.goals[index] = { ...db.goals[index], ...patch };
+    db.goals[index] = applyGoalPatch(db.goals[index], patch);
     save(db);
     return db.goals[index];
   },
@@ -313,6 +314,33 @@ export const localApi: TrackerApi = {
     const db = load();
     db.projects = db.projects.filter((p) => p.id !== id);
     db.tasks = db.tasks.map((t) => (t.projectId === id ? { ...t, projectId: null, milestoneId: null } : t));
+    save(db);
+  },
+
+  async listWeeklyReviews() {
+    return load().weeklyReviews;
+  },
+
+  async createWeeklyReview(input) {
+    const db = load();
+    if (db.weeklyReviews.some((r) => r.weekStart === input.weekStart)) throw new ApiError('Обзор этой недели уже есть.', 400);
+    const review: WeeklyReview = { ...input, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+    db.weeklyReviews = [...db.weeklyReviews, review].sort((a, b) => a.weekStart.localeCompare(b.weekStart));
+    save(db);
+    return review;
+  },
+
+  async updateWeeklyReview(id, patch) {
+    const db = load();
+    const index = findIndex(db.weeklyReviews, id, 'Обзор недели');
+    db.weeklyReviews[index] = { ...db.weeklyReviews[index], ...patch };
+    save(db);
+    return db.weeklyReviews[index];
+  },
+
+  async deleteWeeklyReview(id) {
+    const db = load();
+    db.weeklyReviews = db.weeklyReviews.filter((r) => r.id !== id);
     save(db);
   },
 

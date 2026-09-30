@@ -1,7 +1,7 @@
 import type { AreaInput, ExplainAnswer, MaterialPart, NoteInput, Rating, TaskInput } from '../domain/types';
 import { anchorRecurrence } from '../domain/recurrence';
 import { taskInput } from '../domain/tasks';
-import { addDays, todayIso } from '../lib/dates';
+import { addDays, startOfWeek, todayIso } from '../lib/dates';
 import { api } from '.';
 
 /** Сферы ищем по иконке: пользователь мог их переименовать. Если сферы нет — создаём. */
@@ -10,12 +10,14 @@ async function findOrCreateArea(input: AreaInput): Promise<string> {
   return existing ? existing.id : (await api.createArea(input)).id;
 }
 
-/** Пример целей с историей прогресса, чтобы сразу увидеть, как выглядит приложение. */
+/** Пример целей и привычек с историей прогресса, чтобы сразу увидеть, как выглядит приложение. */
 export async function seedDemoData(): Promise<void> {
   const today = todayIso();
   const areaId = findOrCreateArea;
+  const target = { kind: 'target', daysPerWeek: null } as const;
 
   const book = await api.createGoal({
+    ...target,
     title: 'Прочитать «Атлант расправил плечи»',
     description: 'Том 1. Читать перед сном хотя бы полчаса.',
     areaId: await areaId({ name: 'Чтение', color: 'ochre', icon: 'book' }),
@@ -33,6 +35,7 @@ export async function seedDemoData(): Promise<void> {
   }
 
   const english = await api.createGoal({
+    ...target,
     title: 'Английский: 30 часов разговорной практики',
     description: 'Созвоны с преподавателем + подкасты.',
     areaId: await areaId({ name: 'Языки', color: 'slate', icon: 'languages' }),
@@ -49,29 +52,75 @@ export async function seedDemoData(): Promise<void> {
     }
   }
 
-  const sport = await api.createGoal({
-    title: '12 тренировок в зале за месяц',
-    description: '',
-    areaId: await areaId({ name: 'Спорт', color: 'sage', icon: 'dumbbell' }),
-    unit: 'тренировок',
-    targetValue: 12,
-    startDate: addDays(today, -6),
-    deadline: addDays(today, 23),
-    priority: 'medium',
+  await seedHabitsDemo();
+}
+
+/**
+ * Привычки: «английские слова» каждый день — два пропуска, прощённые заморозкой, сегодня ещё не отмечено;
+ * «зал» 3 раза в неделю — четыре недели, одна из них без одного раза, на этой неделе — с понедельника.
+ */
+async function seedHabitsDemo(): Promise<void> {
+  const today = todayIso();
+  const habit = { kind: 'habit', deadline: null, description: '', priority: 'medium' } as const;
+
+  const words = await api.createGoal({
+    ...habit,
+    title: 'Английские слова',
+    description: 'Карточки в приложении, пока пью утренний кофе.',
+    areaId: await findOrCreateArea({ name: 'Языки', color: 'slate', icon: 'languages' }),
+    unit: 'минут',
+    targetValue: 20,
+    startDate: addDays(today, -20),
+    daysPerWeek: 7,
   });
-  for (const offset of [-6, -4, -2, 0]) {
-    await api.createEntry({ goalId: sport.id, date: addDays(today, offset), value: 1, note: '' });
+  for (let offset = -20; offset < 0; offset++) {
+    if (offset !== -13 && offset !== -4) await api.createEntry({ goalId: words.id, date: addDays(today, offset), value: 20, note: '' });
   }
+
+  const monday = startOfWeek(today);
+  const gym = await api.createGoal({
+    ...habit,
+    title: 'Зал',
+    description: 'Три тренировки в неделю, в любые дни.',
+    areaId: await findOrCreateArea({ name: 'Спорт', color: 'sage', icon: 'dumbbell' }),
+    unit: 'раз',
+    targetValue: 1,
+    startDate: addDays(monday, -28),
+    daysPerWeek: 3,
+  });
+  // Пн, ср, пт каждой недели; за две недели до текущей — без пятницы.
+  const sessions = [-28, -26, -24, -21, -19, -17, -14, -12, -7, -5, -3, ...(today > monday ? [0] : [])];
+  for (const offset of sessions) {
+    await api.createEntry({ goalId: gym.id, date: addDays(monday, offset), value: 1, note: '' });
+  }
+}
+
+/** Прошлый обзор недели: фокус на эту неделю (одно дело уже сделано) и заметка «что получилось, что мешало». */
+export async function seedWeekDemo(): Promise<void> {
+  const weekStart = addDays(startOfWeek(todayIso()), -7);
+  const item = (text: string, done = false) => ({ id: crypto.randomUUID(), text, done });
+  await api.createWeeklyReview({
+    weekStart,
+    focus: [item('Собрать материал для доклада', true), item('Эссе Task 2 по критериям'), item('Зал три раза')],
+    reflection: 'Получилось: слова каждый день и конспект лекции про графы.\nМешало: засиживался допоздна — пропустил тренировку.',
+  });
 }
 
 type LogItem = [dayOffset: number, rating: Rating, explain?: ExplainAnswer, taught?: boolean];
 
-/** Пример для пустого трекера: цели, а если знаний, задач и проектов ещё нет — и они. */
+/** Пример для пустого трекера: цели и привычки, а если знаний, задач, проектов и обзоров недели ещё нет — и они. */
 export async function seedAllDemo(): Promise<void> {
   await seedDemoData();
-  const [materials, notes, tasks, projects] = await Promise.all([api.listMaterials(), api.listNotes(), api.listTasks(), api.listProjects()]);
+  const [materials, notes, tasks, projects, weeks] = await Promise.all([
+    api.listMaterials(),
+    api.listNotes(),
+    api.listTasks(),
+    api.listProjects(),
+    api.listWeeklyReviews(),
+  ]);
   if (materials.length === 0 && notes.length === 0) await seedKnowledgeDemo();
   if (tasks.length === 0 && projects.length === 0) await seedTasksDemo();
+  if (weeks.length === 0) await seedWeekDemo();
 }
 
 /**
@@ -82,7 +131,7 @@ export async function seedTasksDemo(): Promise<void> {
   const today = todayIso();
   const study = await findOrCreateArea({ name: 'Учёба', color: 'clay', icon: 'study' });
   const languages = await findOrCreateArea({ name: 'Языки', color: 'slate', icon: 'languages' });
-  const englishGoal = (await api.listGoals()).find((g) => g.areaId === languages && g.status === 'active');
+  const englishGoal = (await api.listGoals()).find((g) => g.kind === 'target' && g.areaId === languages && g.status === 'active');
   const milestone = (title: string, deadline: string | null = null) => ({ id: crypto.randomUUID(), title, deadline });
   const item = (text: string, done = false) => ({ id: crypto.randomUUID(), text, done });
 

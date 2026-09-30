@@ -2,8 +2,10 @@ import { DEFAULT_SETTINGS, SETTINGS_RANGES } from '../domain/load';
 import { AREA_COLORS, AREA_ICONS, DEFAULT_AREAS } from '../domain/meta';
 import type {
   Area,
+  ChecklistItem,
   ExplainAnswer,
   Goal,
+  GoalKind,
   GoalStatus,
   Material,
   MaterialPart,
@@ -23,15 +25,18 @@ import type {
   Task,
   TaskStatus,
   Vacation,
+  WeeklyReview,
 } from '../domain/types';
 import { REPEAT_INTERVAL_MAX } from '../domain/recurrence';
 import { sortVacations } from '../domain/vacation';
+import { FOCUS_LIMIT } from '../domain/week';
+import { weekdayIndex } from '../lib/dates';
 
 /**
  * Схема данных в хранилище и в файлах резервных копий.
  * При изменении модели: увеличить SCHEMA_VERSION и добавить шаг в MIGRATIONS.
  */
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 export interface Db {
   areas: Area[];
@@ -44,6 +49,7 @@ export interface Db {
   vacations: Vacation[];
   tasks: Task[];
   projects: Project[];
+  weeklyReviews: WeeklyReview[];
 }
 
 export interface Backup extends Db {
@@ -81,6 +87,7 @@ export function createEmptyDb(ctx: Ctx): Db {
     vacations: [],
     tasks: [],
     projects: [],
+    weeklyReviews: [],
   };
 }
 
@@ -150,6 +157,12 @@ function v7ToV8(raw: Raw): Raw {
   return { ...raw, tasks, materials };
 }
 
+/** v8 → v9: привычки (цели вида habit) и обзоры недели. Все прежние цели — цели к сроку. */
+function v8ToV9(raw: Raw): Raw {
+  const goals = asArray(raw.goals, 'goals').map((item) => ({ ...asObject(item, 'goal'), kind: 'target', daysPerWeek: null }));
+  return { ...raw, goals, weeklyReviews: [] };
+}
+
 const MIGRATIONS: Record<number, (raw: Raw, ctx: Ctx) => Raw> = {
   1: v1ToV2,
   2: v2ToV3,
@@ -158,6 +171,7 @@ const MIGRATIONS: Record<number, (raw: Raw, ctx: Ctx) => Raw> = {
   5: v5ToV6,
   6: v6ToV7,
   7: v7ToV8,
+  8: v8ToV9,
 };
 
 /** Приводит данные любой известной версии к текущей схеме и проверяет их. */
@@ -201,6 +215,7 @@ export function parseBackup(text: string, ctx: Ctx): Db {
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const PRIORITIES: Priority[] = ['low', 'medium', 'high'];
+const GOAL_KINDS: GoalKind[] = ['target', 'habit'];
 const STATUSES: GoalStatus[] = ['active', 'archived'];
 const MATERIAL_TYPES: MaterialType[] = ['book', 'course', 'lecture', 'article', 'video', 'other'];
 const MATERIAL_STATUSES: MaterialStatus[] = ['queued', 'active', 'done', 'dropped'];
@@ -297,6 +312,17 @@ function uniqueIds(items: { id: string }[], what: string): void {
   }
 }
 
+/** Список отметок { id, text, done }: подзадачи задачи и фокус недели. «Задача 1, пункт 2: …». */
+function checklistItems(value: unknown, where: string, labels: { list: string; item: string }): ChecklistItem[] {
+  const items = asArray(value, `${where}: ${labels.list}`).map((raw, j) => {
+    const at = `${where}, ${labels.item} ${j + 1}`;
+    const c = asObject(raw, at);
+    return { id: str(c, 'id', at), text: str(c, 'text', at), done: bool(c, 'done', at) };
+  });
+  uniqueIds(items, `${where}: ${labels.list}`);
+  return items;
+}
+
 /**
  * Проверяет данные и возвращает чистую копию только с известными полями.
  * Висячие ссылки чинятся: цель, материал, задача или проект удалённой сферы остаются без сферы, проект
@@ -325,23 +351,32 @@ export function validateDb(raw: unknown): Db {
   const goals: Goal[] = asArray(data.goals, 'goals').map((item, i) => {
     const g = asObject(item, `Цель ${i + 1}`);
     const where = `Цель ${i + 1}`;
-    const areaId = typeof g.areaId === 'string' && areaIds.has(g.areaId) ? g.areaId : null;
-    const goal: Goal = {
+    const kind = oneOf(g, 'kind', GOAL_KINDS, where);
+    const base = {
       id: str(g, 'id', where),
       title: str(g, 'title', where),
       description: str(g, 'description', where, { allowEmpty: true }),
-      areaId,
+      areaId: typeof g.areaId === 'string' && areaIds.has(g.areaId) ? g.areaId : null,
       unit: str(g, 'unit', where),
       targetValue: num(g, 'targetValue', where),
       startDate: date(g, 'startDate', where),
-      deadline: date(g, 'deadline', where),
       priority: oneOf(g, 'priority', PRIORITIES, where),
       status: oneOf(g, 'status', STATUSES, where),
       createdAt: str(g, 'createdAt', where),
     };
-    if (goal.targetValue <= 0) throw new DataError(`${where}: цель должна быть больше нуля`);
-    if (goal.deadline < goal.startDate) throw new DataError(`${where}: дедлайн раньше даты старта`);
-    return goal;
+    // Поле другого вида (срок у привычки, частота у цели) не мешает: оно просто отбрасывается.
+    if (kind === 'habit') {
+      if (base.targetValue <= 0) throw new DataError(`${where}: норма за день должна быть больше нуля`);
+      const daysPerWeek = num(g, 'daysPerWeek', where);
+      if (!Number.isInteger(daysPerWeek) || daysPerWeek < 1 || daysPerWeek > 7) {
+        throw new DataError(`${where}: сколько раз в неделю — целое число от 1 до 7`);
+      }
+      return { ...base, kind, deadline: null, daysPerWeek };
+    }
+    if (base.targetValue <= 0) throw new DataError(`${where}: цель должна быть больше нуля`);
+    const deadline = date(g, 'deadline', where);
+    if (deadline < base.startDate) throw new DataError(`${where}: дедлайн раньше даты старта`);
+    return { ...base, kind, deadline, daysPerWeek: null };
   });
   uniqueIds(goals, 'Цели');
   const goalIds = new Set(goals.map((g) => g.id));
@@ -485,12 +520,7 @@ export function validateDb(raw: unknown): Db {
   const tasks: Task[] = asArray(data.tasks, 'tasks').map((item, i) => {
     const t = asObject(item, `Задача ${i + 1}`);
     const where = `Задача ${i + 1}`;
-    const checklist = asArray(t.checklist, `${where}: checklist`).map((raw, j) => {
-      const c = asObject(raw, `${where}, пункт ${j + 1}`);
-      const at = `${where}, пункт ${j + 1}`;
-      return { id: str(c, 'id', at), text: str(c, 'text', at), done: bool(c, 'done', at) };
-    });
-    uniqueIds(checklist, `${where}: пункты`);
+    const checklist = checklistItems(t.checklist, where, { list: 'пункты', item: 'пункт' });
     const projectId = typeof t.projectId === 'string' && milestonesByProject.has(t.projectId) ? t.projectId : null;
     // Веха бывает только у задачи проекта и только из вех этого проекта.
     const milestoneId =
@@ -525,7 +555,31 @@ export function validateDb(raw: unknown): Db {
     if (task.repeatOf !== null && (!taskIds.has(task.repeatOf) || task.repeatOf === task.id)) task.repeatOf = null;
   }
 
-  return { areas, goals, entries, materials, notes, reviews, settings, vacations, tasks, projects };
+  const weeklyReviews: WeeklyReview[] = asArray(data.weeklyReviews, 'weeklyReviews')
+    .map((item, i) => {
+      const where = `Обзор недели ${i + 1}`;
+      const r = asObject(item, where);
+      const weekStart = date(r, 'weekStart', where);
+      if (weekdayIndex(weekStart) !== 0) throw new DataError(`${where}: неделя должна начинаться с понедельника`);
+      const focus = checklistItems(r.focus, where, { list: 'фокус', item: 'пункт фокуса' });
+      if (focus.length > FOCUS_LIMIT) throw new DataError(`${where}: в фокусе не больше ${FOCUS_LIMIT} пунктов`);
+      return {
+        id: str(r, 'id', where),
+        weekStart,
+        focus,
+        reflection: str(r, 'reflection', where, { allowEmpty: true }),
+        createdAt: str(r, 'createdAt', where),
+      };
+    })
+    .sort((a, b) => a.weekStart.localeCompare(b.weekStart));
+  uniqueIds(weeklyReviews, 'Обзоры недели');
+  weeklyReviews.forEach((review, i) => {
+    if (i > 0 && weeklyReviews[i - 1].weekStart === review.weekStart) {
+      throw new DataError(`Обзоры недели: два обзора одной недели (${review.weekStart})`);
+    }
+  });
+
+  return { areas, goals, entries, materials, notes, reviews, settings, vacations, tasks, projects, weeklyReviews };
 }
 
 function recurrence(r: Raw, where: string): Recurrence {

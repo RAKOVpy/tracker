@@ -29,7 +29,11 @@ export function ProjectCard({ project, tasks, area, goal, today }: Props) {
   const next = project.status === 'active' ? nextStep(project, tasks, today) : null;
   const milestone = milestoneText(project, tasks, today);
   const nextDeadline = next?.deadline ? deadlineTag(next.deadline, today) : null;
-  const meta = [area?.name, project.deadline && `до ${formatShort(project.deadline)}`, goal && `цель: ${goal.title}`].filter(Boolean);
+  const meta = [
+    area?.name,
+    project.deadline && `до ${formatShort(project.deadline)}`,
+    goal && `${goal.kind === 'habit' ? 'привычка' : 'цель'}: ${goal.title}`,
+  ].filter(Boolean);
 
   return (
     <article className={project.status === 'active' ? 'card project-card' : 'card project-card project-card--quiet'}>
