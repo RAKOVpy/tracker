@@ -93,7 +93,7 @@ export function GoalsPage() {
       {groups.length === 0 ? (
         <div className="card empty" style={{ marginTop: 24 }}>
           <h2>{data.length === 0 ? 'Целей пока нет' : 'В этой сфере целей нет'}</h2>
-          <Link className="btn btn--primary" to="/goals/new">
+          <Link className="btn btn--primary" to={selectedArea ? `/goals/new?area=${selectedArea.id}` : '/goals/new'}>
             <Plus size={16} aria-hidden /> Создать цель
           </Link>
         </div>

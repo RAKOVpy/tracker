@@ -198,9 +198,17 @@ function num(obj: Raw, key: string, where: string): number {
   return value;
 }
 
+/** Настоящая дата календаря: «2026-02-30» подходит под шаблон, но такого дня нет. */
+function isCalendarDate(value: string): boolean {
+  if (!ISO_DATE.test(value)) return false;
+  const [y, m, d] = value.split('-').map(Number);
+  const parsed = new Date(Date.UTC(y, m - 1, d));
+  return parsed.getUTCFullYear() === y && parsed.getUTCMonth() === m - 1 && parsed.getUTCDate() === d;
+}
+
 function date(obj: Raw, key: string, where: string): string {
   const value = str(obj, key, where);
-  if (!ISO_DATE.test(value)) throw new DataError(`${where}: поле «${key}» должно быть датой ГГГГ-ММ-ДД`);
+  if (!isCalendarDate(value)) throw new DataError(`${where}: поле «${key}» должно быть датой ГГГГ-ММ-ДД`);
   return value;
 }
 

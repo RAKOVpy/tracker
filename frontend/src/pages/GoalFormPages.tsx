@@ -1,5 +1,6 @@
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAreas, useCreateGoal, useGoalWithStats, useUpdateGoal } from '../api/hooks';
+import { useGoBack } from '../components/useGoBack';
 import { GoalForm } from '../components/GoalForm';
 import type { GoalInput } from '../domain/types';
 import { ErrorState, LoadingState } from './states';
@@ -9,6 +10,7 @@ export function NewGoalPage() {
   const [params] = useSearchParams();
   const areas = useAreas();
   const createGoal = useCreateGoal();
+  const goBack = useGoBack('/goals');
 
   if (areas.isLoading) return <LoadingState />;
   if (areas.error || !areas.data) return <ErrorState error={areas.error} />;
@@ -26,8 +28,10 @@ export function NewGoalPage() {
         defaultAreaId={defaultAreaId}
         submitLabel="Создать цель"
         isSubmitting={createGoal.isPending}
-        onSubmit={(input) => createGoal.mutate(input, { onSuccess: (goal) => navigate(`/goals/${goal.id}`) })}
-        onCancel={() => navigate(-1)}
+        onSubmit={(input) =>
+          createGoal.mutate(input, { onSuccess: (goal) => navigate(`/goals/${goal.id}`, { replace: true }) })
+        }
+        onCancel={goBack}
       />
     </>
   );
@@ -35,10 +39,10 @@ export function NewGoalPage() {
 
 export function EditGoalPage() {
   const { id = '' } = useParams();
-  const navigate = useNavigate();
   const goal = useGoalWithStats(id);
   const areas = useAreas();
   const updateGoal = useUpdateGoal(id);
+  const goBack = useGoBack(`/goals/${id}`);
 
   if (goal.isLoading || areas.isLoading) return <LoadingState />;
   if (areas.error || !areas.data) return <ErrorState error={areas.error} />;
@@ -69,8 +73,9 @@ export function EditGoalPage() {
         initial={initial}
         submitLabel="Сохранить"
         isSubmitting={updateGoal.isPending}
-        onSubmit={(input) => updateGoal.mutate(input, { onSuccess: () => navigate(`/goals/${id}`) })}
-        onCancel={() => navigate(-1)}
+        // После сохранения — назад к цели: форма уходит из истории.
+        onSubmit={(input) => updateGoal.mutate(input, { onSuccess: goBack })}
+        onCancel={goBack}
       />
     </>
   );

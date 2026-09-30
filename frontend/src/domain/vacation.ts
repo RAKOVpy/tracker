@@ -34,13 +34,16 @@ export function plannedVacation(vacations: Vacation[], today: IsoDate): Vacation
 /**
  * Срок повторения с учётом отпусков. `anchor` — день последнего повторения (или добавления заметки),
  * `due` — срок без отпусков. Отпуск, который начался до срока, сдвигает срок на своё число дней
- * после `anchor`; отпуск после срока, но не позже сегодняшнего дня, сдвигает просроченную заметку.
+ * после `anchor`. Отпуск, начавшийся, когда заметка уже была просрочена, сдвигает её только на дни
+ * по сегодняшний включительно: просрочка «замирает» на время отпуска, а не превращается в срок в будущем.
  */
 export function shiftForVacations(anchor: IsoDate, due: IsoDate, vacations: Vacation[], today: IsoDate): IsoDate {
   let result = due;
   for (const vacation of sortVacations(vacations)) {
-    if (vacation.start > result && vacation.start > today) break;
-    const end = vacationEnd(vacation, today);
+    const afterDue = vacation.start > result;
+    if (afterDue && vacation.start > today) break;
+    const fullEnd = vacationEnd(vacation, today);
+    const end = afterDue && fullEnd > today ? today : fullEnd;
     const from = vacation.start > anchor ? vacation.start : addDays(anchor, 1);
     if (end < from) continue;
     result = addDays(result, diffDays(from, end) + 1);

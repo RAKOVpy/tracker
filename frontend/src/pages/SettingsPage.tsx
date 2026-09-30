@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useAreas, useKnowledge } from '../api/hooks';
 import { AreaSettings } from '../components/AreaSettings';
 import { DataSettings } from '../components/DataSettings';
 import { LoadSettings } from '../components/LoadSettings';
@@ -8,11 +9,15 @@ import { VacationSettings } from '../components/VacationSettings';
 
 export function SettingsPage() {
   const { hash } = useLocation();
+  const areas = useAreas();
+  const knowledge = useKnowledge();
+  // Разделы выше подгружают данные и вырастают, поэтому прокручиваем, когда они уже на месте.
+  const ready = !areas.isLoading && !knowledge.isLoading;
 
   // Ссылки /settings#obsidian, #load, #vacation ведут сразу к нужному разделу.
   useEffect(() => {
-    if (hash) document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
-  }, [hash]);
+    if (hash && ready) document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
+  }, [hash, ready]);
 
   return (
     <>
@@ -64,7 +69,9 @@ export function SettingsPage() {
       <section className="card settings-section" aria-labelledby="settings-data">
         <div>
           <h2 id="settings-data">Данные</h2>
-          <p className="muted small">Резервная копия — это файл JSON со всеми целями, заметками, повторениями и сферами.</p>
+          <p className="muted small">
+            Резервная копия — это файл JSON со всеми целями, заметками, повторениями, сферами, настройками и отпусками.
+          </p>
         </div>
         <DataSettings />
       </section>

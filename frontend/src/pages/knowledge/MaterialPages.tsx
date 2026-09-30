@@ -11,6 +11,7 @@ import {
   useUpdateMaterial,
 } from '../../api/hooks';
 import { BackButton } from '../../components/BackButton';
+import { useGoBack } from '../../components/useGoBack';
 import { MATERIAL_ICONS } from '../../components/knowledge/format';
 import { MaterialForm } from '../../components/knowledge/MaterialForm';
 import { NoteRow } from '../../components/knowledge/parts';
@@ -171,6 +172,7 @@ export function NewMaterialPage() {
   const areas = useAreas();
   const knowledge = useKnowledge();
   const createMaterial = useCreateMaterial();
+  const goBack = useGoBack('/knowledge');
 
   if (areas.isLoading || knowledge.isLoading) return <LoadingState />;
   if (areas.error || knowledge.error || !areas.data || !knowledge.data) {
@@ -201,7 +203,7 @@ export function NewMaterialPage() {
         onSubmit={(input) =>
           createMaterial.mutate(input, { onSuccess: (m) => navigate(`/knowledge/materials/${m.id}`, { replace: true }) })
         }
-        onCancel={() => navigate(-1)}
+        onCancel={goBack}
       />
     </>
   );
@@ -209,10 +211,10 @@ export function NewMaterialPage() {
 
 export function EditMaterialPage() {
   const { id = '' } = useParams();
-  const navigate = useNavigate();
   const knowledge = useKnowledge();
   const areas = useAreas();
   const updateMaterial = useUpdateMaterial();
+  const goBack = useGoBack(`/knowledge/materials/${id}`);
 
   if (knowledge.isLoading || areas.isLoading) return <LoadingState />;
   if (knowledge.error || areas.error || !knowledge.data || !areas.data) {
@@ -250,10 +252,8 @@ export function EditMaterialPage() {
         startCheck={material.status === 'active' ? undefined : startCheckFor(knowledge.data, material.id)}
         submitLabel="Сохранить"
         isSubmitting={updateMaterial.isPending}
-        onSubmit={(patch) =>
-          updateMaterial.mutate({ id, patch }, { onSuccess: () => navigate(`/knowledge/materials/${id}`, { replace: true }) })
-        }
-        onCancel={() => navigate(-1)}
+        onSubmit={(patch) => updateMaterial.mutate({ id, patch }, { onSuccess: goBack })}
+        onCancel={goBack}
       />
     </>
   );

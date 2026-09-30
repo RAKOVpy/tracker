@@ -30,6 +30,11 @@ function isTyping(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
 }
 
+/** Enter и пробел на кнопке или ссылке должны нажимать её, а не открывать ответ. */
+function isControl(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && target.closest('a, button, input, select, textarea, summary, [contenteditable="true"]') !== null;
+}
+
 interface CardProps {
   item: NoteWithState;
   materialTitle: string | undefined;
@@ -50,8 +55,10 @@ function ReviewCard({ item, materialTitle, today, vacations, busy, initial, onRa
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (isTyping(event.target) || event.metaKey || event.ctrlKey || event.altKey) return;
+      // Зажатая клавиша повторяет нажатие — иначе одна «3» оценила бы подряд несколько заметок.
+      if (event.repeat || isTyping(event.target) || event.metaKey || event.ctrlKey || event.altKey) return;
       if (!revealed && (event.key === ' ' || event.key === 'Enter')) {
+        if (isControl(event.target)) return;
         event.preventDefault();
         setRevealed(true);
         return;

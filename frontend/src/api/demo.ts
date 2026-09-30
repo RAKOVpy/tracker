@@ -64,9 +64,18 @@ export async function seedDemoData(): Promise<void> {
 
 type LogItem = [dayOffset: number, rating: Rating, explain?: ExplainAnswer, taught?: boolean];
 
+/** Пример для пустого трекера: цели, а если знаний ещё нет — и материалы с заметками. */
+export async function seedAllDemo(): Promise<void> {
+  await seedDemoData();
+  const [materials, notes] = await Promise.all([api.listMaterials(), api.listNotes()]);
+  if (materials.length === 0 && notes.length === 0) await seedKnowledgeDemo();
+}
+
 /** Пример материалов и заметок с историей повторений: часть заметок ждёт повторения сегодня. */
 export async function seedKnowledgeDemo(): Promise<void> {
   const today = todayIso();
+  // Пример не должен сразу нарушать лимит «Изучаю» из настроек.
+  const { activeMaterialsLimit } = await api.getSettings();
 
   const algorithms = await api.createMaterial({
     title: 'Алгоритмы и структуры данных',
@@ -82,7 +91,7 @@ export async function seedKnowledgeDemo(): Promise<void> {
     author: 'Raymond Murphy',
     url: '',
     areaId: await findOrCreateArea({ name: 'Языки', color: 'slate', icon: 'languages' }),
-    status: 'active',
+    status: activeMaterialsLimit >= 2 ? 'active' : 'queued',
   });
   await api.createMaterial({
     title: 'Думай медленно… решай быстро',

@@ -19,7 +19,7 @@ function CurrentVacation({ vacation, today }: { vacation: Vacation; today: IsoDa
   return (
     <div className="vault-status vacation-status">
       <span className="vault-status__name">
-        <TreePalm size={16} aria-hidden /> Вы в отпуске: {formatVacation(vacation)}
+        <TreePalm size={16} aria-hidden /> Вы в отпуске: {formatVacation(vacation, today)}
       </span>
       <span className="muted small">
         {left === null
@@ -124,7 +124,8 @@ function VacationForm({ vacations, today }: { vacations: Vacation[]; today: IsoD
       )}
       <div>
         <button className="btn btn--primary btn--sm" type="submit" disabled={create.isPending}>
-          <TreePalm size={15} aria-hidden /> {start > today ? 'Запланировать отпуск' : 'Начать отпуск'}
+          <TreePalm size={15} aria-hidden />{' '}
+          {start > today ? 'Запланировать отпуск' : end !== null && end < today ? 'Отметить прошедший отпуск' : 'Начать отпуск'}
         </button>
       </div>
     </form>
@@ -143,26 +144,24 @@ export function VacationSettings() {
 
   return (
     <div className="stack">
-      {current ? (
-        <CurrentVacation vacation={current} today={today} />
-      ) : (
-        <>
-          {planned.map((vacation) => (
-            <div key={vacation.id} className="vault-status">
-              <span className="vault-status__name">Запланирован отпуск: {formatVacation(vacation)}</span>
-              <span className="muted small">
-                {formatDays(vacationDays(vacation, today))}. Сроки повторений уже сдвинуты с учётом отпуска.
-              </span>
-              <div>
-                <button className="btn btn--sm btn--ghost" type="button" disabled={remove.isPending} onClick={() => remove.mutate(vacation.id)}>
-                  Отменить
-                </button>
-              </div>
-            </div>
-          ))}
-          <VacationForm vacations={vacations} today={today} />
-        </>
-      )}
+      {current && <CurrentVacation vacation={current} today={today} />}
+
+      {planned.map((vacation) => (
+        <div key={vacation.id} className="vault-status">
+          <span className="vault-status__name">Запланирован отпуск: {formatVacation(vacation, today)}</span>
+          <span className="muted small">
+            {formatDays(vacationDays(vacation, today))}. Сроки повторений уже сдвинуты с учётом отпуска.
+          </span>
+          <div>
+            <button className="btn btn--sm btn--ghost" type="button" disabled={remove.isPending} onClick={() => remove.mutate(vacation.id)}>
+              Отменить
+            </button>
+          </div>
+        </div>
+      ))}
+
+      {/* Во время отпуска новый не нужен: чтобы продлить, можно вернуться и начать новый. */}
+      {!current && <VacationForm vacations={vacations} today={today} />}
 
       {past.length > 0 && (
         <details className="details">
@@ -170,12 +169,12 @@ export function VacationSettings() {
           <ul className="area-list vacation-list">
             {past.map((vacation) => (
               <li key={vacation.id} className="area-row">
-                <span className="area-row__name">{formatVacation(vacation)}</span>
+                <span className="area-row__name">{formatVacation(vacation, today)}</span>
                 <span className="muted small">{formatDays(vacationDays(vacation, today))}</span>
                 <button
                   className="icon-btn icon-btn--danger"
                   type="button"
-                  aria-label={`Удалить отпуск ${formatVacation(vacation)}`}
+                  aria-label={`Удалить отпуск ${formatVacation(vacation, today)}`}
                   title="Удалить: эти дни снова будут считаться в расписании"
                   disabled={remove.isPending}
                   onClick={() => remove.mutate(vacation.id)}

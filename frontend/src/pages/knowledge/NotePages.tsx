@@ -3,16 +3,24 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useCreateNote, useDeleteNote, useDeleteReview, useKnowledge, useUpdateNote } from '../../api/hooks';
 import { BackButton } from '../../components/BackButton';
+import { useGoBack } from '../../components/useGoBack';
 import { formatDue } from '../../components/knowledge/format';
 import { LevelLadder } from '../../components/knowledge/parts';
 import { NoteForm } from '../../components/knowledge/NoteForm';
 import { EXPLAIN_OPTIONS, LEVELS, RATINGS } from '../../domain/review';
-import type { NoteInput, Rating, Review } from '../../domain/types';
-import { formatLong, formatRelative, formatWeekday, type IsoDate } from '../../lib/dates';
+import type { NoteInput, Rating, Review, Vacation } from '../../domain/types';
+import { shiftForVacations } from '../../domain/vacation';
+import { addDays, formatLong, formatRelative, formatWeekday, type IsoDate } from '../../lib/dates';
 import { plural } from '../../lib/format';
 import { ErrorState, LoadingState, NotFoundState } from '../states';
 
 const RATING_TONE: Record<Rating, string> = { again: 'bad', hard: 'warn', good: 'good', easy: 'good' };
+
+/** Когда будет первое повторение новой заметки: на следующий день, но дни отпуска не считаются. */
+function firstReview(today: IsoDate, vacations: Vacation[], current: Vacation | null): string {
+  if (current && current.end === null) return 'после отпуска';
+  return formatDue(shiftForVacations(today, addDays(today, 1), vacations, today), today);
+}
 
 function ReviewHistory({ reviews, today }: { reviews: Review[]; today: IsoDate }) {
   const deleteReview = useDeleteReview();
@@ -250,8 +258,9 @@ export function NotePage() {
 export function NewNotePage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const { data, isLoading, error } = useKnowledge();
+  const { data, today, isLoading, error } = useKnowledge();
   const createNote = useCreateNote();
+  const goBack = useGoBack('/knowledge');
 
   if (isLoading) return <LoadingState />;
   if (error || !data) return <ErrorState error={error} />;
@@ -263,7 +272,7 @@ export function NewNotePage() {
     <>
       <div className="page-head">
         <div>
-          <p className="page-head__eyebrow">Первое повторение — завтра</p>
+          <p className="page-head__eyebrow">Первое повторение — {firstReview(today, data.vacations, data.load.vacation)}</p>
           <h1>Новая заметка</h1>
         </div>
       </div>
@@ -282,7 +291,7 @@ export function NewNotePage() {
         onSubmit={(input) =>
           createNote.mutate(input, { onSuccess: (note) => navigate(`/knowledge/notes/${note.id}`, { replace: true }) })
         }
-        onCancel={() => navigate(-1)}
+        onCancel={goBack}
       />
     </>
   );
@@ -290,9 +299,9 @@ export function NewNotePage() {
 
 export function EditNotePage() {
   const { id = '' } = useParams();
-  const navigate = useNavigate();
   const { data, isLoading, error } = useKnowledge();
   const updateNote = useUpdateNote();
+  const goBack = useGoBack(`/knowledge/notes/${id}`);
 
   if (isLoading) return <LoadingState />;
   if (error || !data) return <ErrorState error={error} />;
@@ -340,10 +349,8 @@ export function EditNotePage() {
         initial={initial}
         submitLabel="Сохранить"
         isSubmitting={updateNote.isPending}
-        onSubmit={(patch) =>
-          updateNote.mutate({ id, patch }, { onSuccess: () => navigate(`/knowledge/notes/${id}`, { replace: true }) })
-        }
-        onCancel={() => navigate(-1)}
+        onSubmit={(patch) => updateNote.mutate({ id, patch }, { onSuccess: goBack })}
+        onCancel={goBack}
       />
     </>
   );

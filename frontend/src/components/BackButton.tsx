@@ -1,12 +1,10 @@
 import { ChevronLeft } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useGoBack } from './useGoBack';
 
-/** «Назад» по истории браузера; если страницу открыли по прямой ссылке — на fallback. */
 export function BackButton({ fallback }: { fallback: string }) {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const goBack = useGoBack(fallback);
   return (
-    <button type="button" className="back-link" onClick={() => (location.key !== 'default' ? navigate(-1) : navigate(fallback))}>
+    <button type="button" className="back-link" onClick={goBack}>
       <ChevronLeft size={16} aria-hidden /> Назад
     </button>
   );

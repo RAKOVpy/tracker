@@ -1,8 +1,9 @@
-import { Archive, ArchiveRestore, CalendarClock, ChevronLeft, CircleCheck, Flag, Pencil, Trash2, TrendingUp, TriangleAlert } from 'lucide-react';
+import { Archive, ArchiveRestore, CalendarClock, CircleCheck, Flag, Pencil, Trash2, TrendingUp, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAreaMap, useDeleteGoal, useGoalWithStats, useUpdateGoal } from '../api/hooks';
 import { AreaMark } from '../components/AreaIcon';
+import { BackButton } from '../components/BackButton';
 import { EntryForm } from '../components/EntryForm';
 import { EntryHistory } from '../components/EntryHistory';
 import { describePace, formatAmount, type Tone } from '../components/pace';
@@ -44,7 +45,6 @@ function paceAdvice(goal: Goal, stats: GoalStats): string {
 export function GoalPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
   const { data, today, isLoading, error } = useGoalWithStats(id);
   const areas = useAreaMap();
   const updateGoal = useUpdateGoal(id);
@@ -70,17 +70,10 @@ export function GoalPage() {
   const pace = describePace(goal, stats);
   const PaceIcon = TONE_ICONS[pace.tone];
   const isArchived = goal.status === 'archived';
-  const canGoBack = location.key !== 'default';
 
   return (
     <>
-      <button
-        type="button"
-        className="back-link"
-        onClick={() => (canGoBack ? navigate(-1) : navigate('/'))}
-      >
-        <ChevronLeft size={16} aria-hidden /> Назад
-      </button>
+      <BackButton fallback="/goals" />
 
       <div className="page-head" style={{ alignItems: 'flex-start' }}>
         <div className="goal-card__head">

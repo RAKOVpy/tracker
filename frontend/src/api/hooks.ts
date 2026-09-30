@@ -181,9 +181,11 @@ export function useDeleteArea() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.deleteArea(id),
+    // Цели и материалы удалённой сферы остаются без сферы.
     onSuccess: () => {
       client.invalidateQueries({ queryKey: keys.areas });
       client.invalidateQueries({ queryKey: keys.goals });
+      client.invalidateQueries({ queryKey: keys.materials });
     },
   });
 }

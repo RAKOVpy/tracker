@@ -106,6 +106,10 @@ describe('validateDb', () => {
       'дедлайн раньше даты старта',
     );
     expect(() => validateDb({ ...db, entries: [{ ...db.entries[0], date: '02.09.2026' }] })).toThrow('ГГГГ-ММ-ДД');
+    // Шаблон подходит, но такого дня нет: иначе расчёты по датам молча съехали бы на март.
+    expect(() => validateDb({ ...db, entries: [{ ...db.entries[0], date: '2026-02-30' }] })).toThrow('ГГГГ-ММ-ДД');
+    expect(() => validateDb({ ...db, goals: [{ ...db.goals[0], startDate: '2026-13-01' }] })).toThrow('ГГГГ-ММ-ДД');
+    expect(validateDb({ ...db, entries: [{ ...db.entries[0], date: '2028-02-29' }] }).entries[0].date).toBe('2028-02-29');
     expect(() => validateDb({ ...db, goals: [db.goals[0], db.goals[0]] })).toThrow('повторяется id');
   });
 });

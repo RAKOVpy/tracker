@@ -74,7 +74,7 @@ export function DataSettings() {
   function confirmReset() {
     resetData.mutate(undefined, {
       onSuccess: () => {
-        setStatus({ kind: 'success', text: 'Все данные удалены. Сферы вернулись к исходным.' });
+        setStatus({ kind: 'success', text: 'Все данные удалены. Сферы и настройки вернулись к исходным.' });
         setConfirmingReset(false);
       },
     });
@@ -130,7 +130,10 @@ export function DataSettings() {
       <div style={{ marginTop: 12 }}>
         {confirmingReset ? (
           <div className="confirm">
-            <p>Удалить все цели, заметки, повторения и сферы в этом браузере? Если резервной копии нет, вернуть их не получится.</p>
+            <p>
+              Удалить все цели, материалы, заметки, повторения, сферы, настройки и отпуска в этом браузере? Если резервной копии
+              нет, вернуть их не получится.
+            </p>
             <div className="row">
               <button className="btn btn--sm btn--danger-solid" type="button" disabled={resetData.isPending} onClick={confirmReset}>
                 Удалить всё

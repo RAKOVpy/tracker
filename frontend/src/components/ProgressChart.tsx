@@ -49,7 +49,8 @@ export function ProgressChart({ goal, stats, today }: Props) {
           <g key={tick}>
             <line className="chart__grid" x1={PAD.left} x2={W - PAD.right} y1={y(tick)} y2={y(tick)} />
             <text className="chart__axis-label" x={PAD.left - 8} y={y(tick) + 4} textAnchor="end">
-              {formatNumber(Math.round(tick))}
+              {/* Для маленькой цели середина дробная: у «3 книг» это 1,5, а не 2. */}
+              {formatNumber(target >= 10 ? Math.round(tick) : tick)}
             </text>
           </g>
         ))}

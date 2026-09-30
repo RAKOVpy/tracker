@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Sparkles, Target } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { seedDemoData, seedKnowledgeDemo } from '../api/demo';
+import { seedAllDemo } from '../api/demo';
 import { useAreaMap, useGoalsWithStats, useKnowledge, useNow } from '../api/hooks';
 import { GoalCard } from '../components/GoalCard';
 import { DueReviewsCard } from '../components/knowledge/DueReviewsCard';
@@ -106,8 +106,7 @@ function EmptyState() {
   async function seed() {
     setSeeding(true);
     try {
-      await seedDemoData();
-      await seedKnowledgeDemo();
+      await seedAllDemo();
       await client.invalidateQueries();
     } finally {
       setSeeding(false);
