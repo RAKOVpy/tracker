@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { checkStart, forecastReviews, planReviews, type ForecastDay, type ReviewLoad, type StartCheck } from '../domain/load';
 import { computeGoalStats, type GoalWithStats } from '../domain/progress';
@@ -35,6 +35,13 @@ import { finishVacation } from '../domain/vacation';
 import { todayIso } from '../lib/dates';
 import { api, type Db } from '.';
 
+declare module '@tanstack/react-query' {
+  interface Register {
+    /** ownErrors — экран сам показывает ошибку, общее сообщение «не сохранилось» не нужно. */
+    mutationMeta: { ownErrors?: boolean };
+  }
+}
+
 const keys = {
   areas: ['areas'] as const,
   goals: ['goals'] as const,
@@ -48,6 +55,22 @@ const keys = {
   tasks: ['tasks'] as const,
   projects: ['projects'] as const,
 };
+
+/**
+ * Быстрые правки одного вида (галочки задач, части материала, счётчики нагрузки) уходят на сервер
+ * по очереди (scope), чтобы не обогнать друг друга в сети. Список перечитывается после последней
+ * правки в очереди: иначе ответ на первую на миг вернул бы на экран состояние без следующих.
+ */
+const queues = {
+  task: ['update-task'] as const,
+  material: ['update-material'] as const,
+  settings: ['update-settings'] as const,
+};
+
+/** В обработчике завершения своя правка ещё считается незавершённой — поэтому «последняя» значит «одна». */
+function isLastInQueue(client: QueryClient, mutationKey: readonly string[]): boolean {
+  return client.isMutating({ mutationKey: [...mutationKey] }) <= 1;
+}
 
 /** Текущее время с точностью до минуты: экран обновится, если приложение открыто через полночь. */
 export function useNow(): Date {
@@ -210,6 +233,7 @@ export function useImportData() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (db: Db) => api.importData(db),
+    meta: { ownErrors: true },
     onSuccess: () => client.resetQueries(),
   });
 }
@@ -233,6 +257,8 @@ export function useUpdateSettings() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (patch: SettingsPatch) => api.updateSettings(patch),
+    mutationKey: queues.settings,
+    scope: { id: 'update-settings' },
     onMutate: (patch) => {
       const previous = client.getQueryData<Settings>(keys.settings);
       if (previous) client.setQueryData(keys.settings, { ...previous, ...patch });
@@ -241,7 +267,9 @@ export function useUpdateSettings() {
     onError: (_error, _patch, context) => {
       if (context?.previous) client.setQueryData(keys.settings, context.previous);
     },
-    onSuccess: (settings) => client.setQueryData(keys.settings, settings),
+    onSuccess: (settings) => {
+      if (isLastInQueue(client, queues.settings)) client.setQueryData(keys.settings, settings);
+    },
   });
 }
 
@@ -253,6 +281,7 @@ export function useCreateVacation() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (input: VacationInput) => api.createVacation(input),
+    meta: { ownErrors: true },
     onSuccess: () => client.invalidateQueries({ queryKey: keys.vacations }),
   });
 }
@@ -356,8 +385,11 @@ export function useUpdateMaterial() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: MaterialPatch }) => api.updateMaterial(id, patch),
+    mutationKey: queues.material,
+    scope: { id: 'update-material' },
     // Удалённые части снимаются с задач. При ошибке кэш тоже перечитывается — после правки частей наперёд.
     onSettled: () => {
+      if (!isLastInQueue(client, queues.material)) return;
       client.invalidateQueries({ queryKey: keys.materials });
       client.invalidateQueries({ queryKey: keys.tasks });
     },
@@ -371,7 +403,9 @@ export function useUpdateMaterial() {
 export function useEditParts() {
   const client = useQueryClient();
   const update = useUpdateMaterial();
-  const edit = (material: Material, change: (parts: MaterialPart[]) => MaterialPart[], options?: { onSuccess?: () => void }) => {
+  const edit = async (material: Material, change: (parts: MaterialPart[]) => MaterialPart[], options?: { onSuccess?: () => void }) => {
+    // Список, который как раз перечитывается, не должен затереть правку старыми данными.
+    await client.cancelQueries({ queryKey: keys.materials });
     const latest = client.getQueryData<Material[]>(keys.materials)?.find((m) => m.id === material.id) ?? material;
     const parts = change(latest.parts);
     client.setQueryData<Material[]>(keys.materials, (list) => list?.map((m) => (m.id === material.id ? { ...m, parts } : m)));
@@ -454,6 +488,8 @@ export function useUpdateTask() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: TaskPatch }) => api.updateTask(id, patch),
+    mutationKey: queues.task,
+    scope: { id: 'update-task' },
     onMutate: async ({ id, patch }) => {
       await client.cancelQueries({ queryKey: keys.tasks });
       const previous = client.getQueryData<Task[]>(keys.tasks);
@@ -469,7 +505,9 @@ export function useUpdateTask() {
     onError: (_error, _variables, context) => {
       if (context?.previous) client.setQueryData(keys.tasks, context.previous);
     },
-    onSettled: () => client.invalidateQueries({ queryKey: keys.tasks }),
+    onSettled: () => {
+      if (isLastInQueue(client, queues.task)) return client.invalidateQueries({ queryKey: keys.tasks });
+    },
   });
 }
 

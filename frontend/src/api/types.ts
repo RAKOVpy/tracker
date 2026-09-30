@@ -31,8 +31,8 @@ import type { ParsedVault, SyncReport } from '../obsidian/sync';
 import type { Backup, Db } from './schema';
 
 /**
- * Контракт хранилища. UI работает только через него, поэтому localStorage-реализацию
- * можно заменить HTTP-клиентом к DRF, не трогая компоненты.
+ * Контракт хранилища. UI работает только через него: данные лежат либо в браузере (localApi),
+ * либо на сервере (httpApi) — компоненты этого не различают.
  */
 export interface TrackerApi {
   listAreas(): Promise<Area[]>;
@@ -122,5 +122,31 @@ export class NotFoundError extends Error {
   constructor(what: string) {
     super(`${what} не найдено`);
     this.name = 'NotFoundError';
+  }
+}
+
+/** Сервер отказал: неверные данные, превышен лимит попыток, внутренняя ошибка. Текст — для пользователя. */
+export class ApiError extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+/** Запрос не дошёл до сервера или сервер не ответил вовремя. */
+export class NetworkError extends Error {
+  constructor(message = 'Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.') {
+    super(message);
+    this.name = 'NetworkError';
+  }
+}
+
+/** Сессия закончилась или вход не выполнен — нужно войти снова. */
+export class AuthError extends Error {
+  constructor() {
+    super('Сессия закончилась. Войдите снова.');
+    this.name = 'AuthError';
   }
 }

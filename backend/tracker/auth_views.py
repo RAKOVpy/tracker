@@ -4,7 +4,7 @@
 """
 
 from django.conf import settings
-from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.contrib.auth import authenticate, get_user_model, login, logout, update_session_auth_hash
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
@@ -28,6 +28,7 @@ UserSchema = inline_serializer("User", {"id": serializers.IntegerField(), "email
 SessionSchema = inline_serializer("Session", {"user": UserSchema, "registration": serializers.BooleanField()})
 LoggedInSchema = inline_serializer("LoggedIn", {"user": UserSchema})
 CredentialsSchema = inline_serializer("Credentials", {"email": serializers.EmailField(), "password": serializers.CharField()})
+PasswordSchema = inline_serializer("PasswordChange", {"current_password": serializers.CharField(), "new_password": serializers.CharField()})
 
 
 def user_data(user) -> dict | None:
@@ -37,6 +38,13 @@ def user_data(user) -> dict | None:
 def _enforce_csrf(request) -> None:
     """DRF проверяет CSRF только у вошедших; вход и регистрацию тоже защищаем — от подмены аккаунта."""
     SessionAuthentication().enforce_csrf(request)
+
+
+def _check_password(password: str, user) -> None:
+    try:
+        validate_password(password, user)
+    except DjangoValidationError as error:
+        raise ValidationError({"detail": " ".join(error.messages)}) from None
 
 
 def _credentials(request) -> tuple[str, str]:
@@ -49,13 +57,18 @@ def _credentials(request) -> tuple[str, str]:
 
 @method_decorator(ensure_csrf_cookie, name="get")
 class SessionView(APIView):
-    """Кто вошёл (или null) и открыта ли регистрация. Заодно ставит куку CSRF и запоминает часовой пояс."""
+    """
+    Кто вошёл (или null) и открыта ли регистрация. Заодно ставит куку CSRF и запоминает часовой пояс.
+    Фронтенд спрашивает это при каждом открытии, и срок сессии отсчитывается заново: кто пользуется
+    трекером, не будет выходить из него раз в 90 дней.
+    """
 
     permission_classes = [AllowAny]
 
     @extend_schema(responses=SessionSchema)
     def get(self, request):
         if request.user.is_authenticated:
+            request.session.modified = True
             tz = request.headers.get("X-Timezone")
             settings_obj = user_settings(request.user)
             if zone(tz) is not None and settings_obj.timezone != tz:
@@ -106,12 +119,30 @@ class RegisterView(APIView):
             raise ValidationError({"detail": "Похоже, в адресе почты опечатка."}) from None
         if User.objects.filter(username=email).exists():
             raise ValidationError({"detail": "Такая почта уже зарегистрирована. Войдите."})
-        candidate = User(username=email, email=email)
-        try:
-            validate_password(password, candidate)
-        except DjangoValidationError as error:
-            raise ValidationError({"detail": " ".join(error.messages)}) from None
+        _check_password(password, User(username=email, email=email))
         # Сферы по умолчанию и настройки создаёт сигнал (signals.py).
         user = User.objects.create_user(username=email, email=email, password=password)
         login(request, user)
         return Response({"user": user_data(user)}, status=status.HTTP_201_CREATED)
+
+
+class PasswordView(APIView):
+    """Смена пароля. Другие входы в аккаунт (телефон, чужой компьютер) завершаются, этот остаётся."""
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth"
+
+    @extend_schema(request=PasswordSchema, responses={204: None})
+    def post(self, request):
+        current = request.data.get("current_password")
+        new = request.data.get("new_password")
+        if not isinstance(current, str) or not isinstance(new, str) or not current or not new:
+            raise ValidationError({"detail": "Введите текущий и новый пароль."})
+        user = request.user
+        if not user.check_password(current):
+            raise ValidationError({"detail": "Текущий пароль введён неверно."})
+        _check_password(new, user)
+        user.set_password(new)
+        user.save(update_fields=["password"])
+        update_session_auth_hash(request, user)
+        return Response(status=status.HTTP_204_NO_CONTENT)

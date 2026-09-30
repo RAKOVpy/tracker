@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAreas, useKnowledge } from '../api/hooks';
+import { serverMode } from '../api';
 import { AreaSettings } from '../components/AreaSettings';
+import { AccountSettings } from '../components/auth/AccountSettings';
 import { DataSettings } from '../components/DataSettings';
 import { LoadSettings } from '../components/LoadSettings';
 import { ObsidianSettings } from '../components/obsidian/ObsidianSettings';
@@ -29,7 +31,7 @@ export function SettingsPage() {
         <div>
           <h2 id="settings-areas">Сферы жизни</h2>
           <p className="muted small">
-            Сферы группируют цели и материалы для изучения: чтение, английский, спорт. Позже к ним добавятся задачи.
+            Сферы группируют цели, задачи, проекты и материалы для изучения: чтение, английский, спорт.
           </p>
         </div>
         <AreaSettings />
@@ -76,6 +78,16 @@ export function SettingsPage() {
         </div>
         <DataSettings />
       </section>
+
+      {serverMode && (
+        <section className="card settings-section" id="account" aria-labelledby="settings-account">
+          <div>
+            <h2 id="settings-account">Аккаунт</h2>
+            <p className="muted small">Пароль и выход. После выхода данные остаются на сервере и вернутся при следующем входе.</p>
+          </div>
+          <AccountSettings />
+        </section>
+      )}
     </>
   );
 }

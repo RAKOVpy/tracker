@@ -121,7 +121,7 @@ class Area(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
-        ordering = ["order", "created_at"]
+        ordering = ["order", "created_at", "id"]
 
     def __str__(self) -> str:
         return self.name
@@ -144,7 +144,7 @@ class Goal(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
-        ordering = ["created_at"]
+        ordering = ["created_at", "id"]
         constraints = [
             models.CheckConstraint(condition=Q(deadline__gte=F("start_date")), name="goal_deadline_after_start"),
             models.CheckConstraint(condition=Q(target_value__gt=0), name="goal_target_positive"),
@@ -165,7 +165,7 @@ class ProgressEntry(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
-        ordering = ["date", "created_at"]
+        ordering = ["date", "created_at", "id"]
         indexes = [models.Index(fields=["goal", "date"])]
         constraints = [models.CheckConstraint(condition=Q(value__gt=0), name="entry_value_positive")]
 
@@ -186,7 +186,7 @@ class Material(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
-        ordering = ["created_at"]
+        ordering = ["created_at", "id"]
 
     def __str__(self) -> str:
         return self.title
@@ -224,7 +224,7 @@ class Note(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
-        ordering = ["created_at"]
+        ordering = ["created_at", "id"]
 
     def __str__(self) -> str:
         return self.title
@@ -242,7 +242,7 @@ class Review(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
-        ordering = ["date", "created_at"]
+        ordering = ["date", "created_at", "id"]
         indexes = [models.Index(fields=["note", "date"])]
 
 
@@ -289,7 +289,7 @@ class Project(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
-        ordering = ["created_at"]
+        ordering = ["created_at", "id"]
 
     def __str__(self) -> str:
         return self.title
@@ -333,7 +333,7 @@ class Task(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
-        ordering = ["created_at"]
+        ordering = ["created_at", "id"]
         indexes = [models.Index(fields=["user", "status", "planned_date"])]
 
     def __str__(self) -> str:

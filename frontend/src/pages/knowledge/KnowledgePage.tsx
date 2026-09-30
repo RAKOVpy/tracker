@@ -1,6 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { Brain, NotebookPen, Plus, Sparkles } from 'lucide-react';
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { seedKnowledgeDemo } from '../../api/demo';
 import { useAreaMap, useKnowledge, useTasks } from '../../api/hooks';
@@ -16,20 +14,10 @@ import type { NoteWithState } from '../../domain/review';
 import type { Material, MaterialStatus } from '../../domain/types';
 import { plural } from '../../lib/format';
 import { ErrorState, LoadingState } from '../states';
+import { useSeedDemo } from '../../components/useSeedDemo';
 
 function EmptyKnowledge() {
-  const client = useQueryClient();
-  const [seeding, setSeeding] = useState(false);
-
-  async function seed() {
-    setSeeding(true);
-    try {
-      await seedKnowledgeDemo();
-      await client.invalidateQueries();
-    } finally {
-      setSeeding(false);
-    }
-  }
+  const { seeding, seed } = useSeedDemo(seedKnowledgeDemo);
 
   return (
     <div className="card empty">

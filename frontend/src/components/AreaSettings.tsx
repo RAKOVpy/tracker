@@ -49,8 +49,12 @@ export function AreaSettings() {
     const a = list[index];
     const b = list[index + direction];
     if (!b) return;
-    await updateArea.mutateAsync({ id: a.id, patch: { order: b.order } });
-    await updateArea.mutateAsync({ id: b.id, patch: { order: a.order } });
+    try {
+      await updateArea.mutateAsync({ id: a.id, patch: { order: b.order } });
+      await updateArea.mutateAsync({ id: b.id, patch: { order: a.order } });
+    } catch {
+      // Сообщение «не сохранилось» уже показано.
+    }
   }
 
   return (

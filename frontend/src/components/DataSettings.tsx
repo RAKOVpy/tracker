@@ -1,6 +1,6 @@
 import { Download, RotateCcw, Upload } from 'lucide-react';
 import { useRef, useState, type ChangeEvent } from 'react';
-import { api, readBackup, type Db } from '../api';
+import { api, readBackup, serverMode, type Db } from '../api';
 import { useImportData, useResetData } from '../api/hooks';
 import { todayIso } from '../lib/dates';
 import { downloadText } from '../lib/download';
@@ -84,10 +84,17 @@ export function DataSettings() {
 
   return (
     <div className="stack">
-      <p className="notice">
-        Пока данные хранятся только в этом браузере. Если очистить данные сайта или открыть трекер на другом устройстве,
-        их там не будет. Сохраняйте резервную копию хотя бы раз в неделю.
-      </p>
+      {serverMode ? (
+        <p className="notice">
+          Данные хранятся на сервере: каждое изменение сохраняется сразу, и на любом устройстве после входа трекер открывается
+          с теми же данными. Резервная копия — на случай, если с сервером что-то случится.
+        </p>
+      ) : (
+        <p className="notice">
+          Пока данные хранятся только в этом браузере. Если очистить данные сайта или открыть трекер на другом устройстве,
+          их там не будет. Сохраняйте резервную копию хотя бы раз в неделю.
+        </p>
+      )}
 
       <div className="row">
         <button className="btn btn--sm" type="button" onClick={exportBackup}>
@@ -110,7 +117,7 @@ export function DataSettings() {
       {pending && (
         <div className="confirm">
           <p>
-            В файле «{pending.fileName}»: {describeCounts(pending.db)}. Текущие данные в этом браузере будут заменены.
+            В файле «{pending.fileName}»: {describeCounts(pending.db)}. {serverMode ? 'Все текущие данные аккаунта будут заменены.' : 'Текущие данные в этом браузере будут заменены.'}
           </p>
           <div className="row">
             <button className="btn btn--sm btn--danger-solid" type="button" disabled={importData.isPending} onClick={confirmImport}>
@@ -133,8 +140,9 @@ export function DataSettings() {
         {confirmingReset ? (
           <div className="confirm">
             <p>
-              Удалить все задачи, проекты, цели, материалы, заметки, повторения, сферы, настройки и отпуска в этом браузере? Если
-              резервной копии нет, вернуть их не получится.
+              Удалить все задачи, проекты, цели, материалы, заметки, повторения, сферы, настройки и отпуска{' '}
+              {serverMode ? 'в аккаунте — на всех устройствах' : 'в этом браузере'}? Если резервной копии нет, вернуть их не
+              получится.
             </p>
             <div className="row">
               <button className="btn btn--sm btn--danger-solid" type="button" disabled={resetData.isPending} onClick={confirmReset}>

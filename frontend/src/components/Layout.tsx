@@ -5,6 +5,7 @@ import { useAreas, useKnowledge, useToday, useWork } from '../api/hooks';
 import { isForToday } from '../domain/tasks';
 import { isTyping } from '../lib/keyboard';
 import { LoadingState } from '../pages/states';
+import { OfflineNotice } from './OfflineNotice';
 import { QuickCaptureContext, useQuickCapture } from './quickCapture';
 import { QuickCapture } from './tasks/QuickCapture';
 
@@ -217,6 +218,7 @@ export function Layout() {
         <div className="content">
           <MobileTop />
           <main className="container">
+            <OfflineNotice />
             <Suspense fallback={<LoadingState />}>
               <Outlet />
             </Suspense>

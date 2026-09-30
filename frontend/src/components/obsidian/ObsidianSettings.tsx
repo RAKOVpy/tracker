@@ -1,5 +1,6 @@
 import { FolderOpen, RefreshCw, Unplug } from 'lucide-react';
 import { useRef, type ChangeEvent, type ReactNode } from 'react';
+import { serverMode } from '../../api';
 import { formatDateTime } from '../../lib/dates';
 import { useObsidian, type SyncPhase } from '../../obsidian/useObsidian';
 import { ObsidianGuide } from './ObsidianGuide';
@@ -113,8 +114,11 @@ export function ObsidianSettings() {
           </div>
           <p className="muted small">
             {canPickFolder
-              ? 'Браузер запомнит папку — дальше хватит кнопки «Синхронизировать». Файлы читаются только на этом компьютере и никуда не отправляются.'
-              : 'В этом браузере папку нужно выбирать при каждой синхронизации. В Chrome или Edge она запоминается. Файлы никуда не отправляются.'}
+              ? 'Браузер запомнит папку — дальше хватит кнопки «Синхронизировать».'
+              : 'В этом браузере папку нужно выбирать при каждой синхронизации. В Chrome или Edge она запоминается.'}{' '}
+            {serverMode
+              ? 'Папка читается на этом компьютере, а на сервер уходят только вопросы и суть заметок с тегом #review и описания материалов.'
+              : 'Файлы читаются только на этом компьютере и никуда не отправляются.'}
           </p>
         </>
       )}

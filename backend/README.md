@@ -25,6 +25,19 @@ DATABASE_URL=postgres://… .venv/bin/python -m pytest        # те же тес
 .venv/bin/python manage.py spectacular --file schema.yml    # OpenAPI-схема (или GET /api/schema/)
 ```
 
+## Вместе с фронтендом
+
+Django на порту 8000, фронтенд — с адресом API:
+
+```bash
+cd frontend
+VITE_API_URL=/api npm run dev        # http://localhost:5173
+```
+
+Vite проксирует `/api` на `http://127.0.0.1:8000` (другой адрес — переменная `BACKEND_URL`),
+поэтому для браузера сайт и API на одном адресе и кука сессии работает как на рабочем сервере.
+Первый аккаунт создаётся на экране входа кнопкой «Зарегистрироваться».
+
 ## Вход
 
 Почта и пароль, сессия в httpOnly-куке. Запросы с изменениями передают CSRF-токен из куки
@@ -36,5 +49,12 @@ DATABASE_URL=postgres://… .venv/bin/python -m pytest        # те же тес
 
 Фронтенд присылает часовой пояс в заголовке `X-Timezone` (например, `Europe/Moscow`):
 по нему сервер понимает, какое у пользователя «сегодня» — это нужно для повторяющихся задач.
+
+Сессия живёт 90 дней с последнего открытия трекера. Пароль меняется в настройках трекера
+(`POST /api/auth/password/`), забытый — на сервере:
+
+```bash
+.venv/bin/python manage.py changepassword me@example.com
+```
 
 Регистрацию на личном сервере стоит закрыть после создания своего аккаунта: `ALLOW_REGISTRATION=0`.

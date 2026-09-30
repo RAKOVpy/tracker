@@ -1,6 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Sparkles, Target } from 'lucide-react';
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { seedAllDemo } from '../api/demo';
 import { useAreaMap, useGoalsWithStats, useKnowledge, useNow, useWork } from '../api/hooks';
@@ -14,6 +12,7 @@ import { completedOn, isForToday } from '../domain/tasks';
 import type { Area } from '../domain/types';
 import { formatLong, formatWeekday, type IsoDate } from '../lib/dates';
 import { ErrorState, LoadingState } from './states';
+import { useSeedDemo } from '../components/useSeedDemo';
 
 interface Groups {
   todo: GoalWithStats[];
@@ -102,18 +101,7 @@ function Section({ title, items, areas, today, compact }: SectionProps) {
 }
 
 function EmptyState() {
-  const client = useQueryClient();
-  const [seeding, setSeeding] = useState(false);
-
-  async function seed() {
-    setSeeding(true);
-    try {
-      await seedAllDemo();
-      await client.invalidateQueries();
-    } finally {
-      setSeeding(false);
-    }
-  }
+  const { seeding, seed } = useSeedDemo(seedAllDemo);
 
   return (
     <div className="card empty">

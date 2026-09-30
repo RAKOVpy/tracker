@@ -102,3 +102,43 @@ def test_session_remembers_timezone(api, user):
     assert UserSettings.objects.get(user=user).timezone == "Europe/Moscow"
     api.get("/api/auth/session/", HTTP_X_TIMEZONE="Not/AZone")
     assert UserSettings.objects.get(user=user).timezone == "Europe/Moscow"
+
+
+def test_opening_the_app_extends_the_session(api):
+    """Срок сессии отсчитывается от последнего открытия трекера, а не от входа."""
+    response = api.get("/api/auth/session/")
+    assert int(response.cookies["sessionid"]["max-age"]) == 60 * 60 * 24 * 90
+    assert "sessionid" not in APIClient().get("/api/auth/session/").cookies
+
+
+def login(email: str = "me@example.com", password: str = PASSWORD) -> APIClient:
+    client, token = csrf_client()
+    response = client.post("/api/auth/login/", {"email": email, "password": password}, format="json", HTTP_X_CSRFTOKEN=token)
+    assert response.status_code == 200
+    return client
+
+
+def test_change_password(user):
+    phone, laptop = login(), login()
+    post = lambda body: laptop.post(  # noqa: E731
+        "/api/auth/password/", body, format="json", HTTP_X_CSRFTOKEN=laptop.cookies["csrftoken"].value
+    )
+    assert post({"currentPassword": "nope", "newPassword": "new long passphrase"}).json()["detail"] == "Текущий пароль введён неверно."
+    assert post({"currentPassword": PASSWORD, "newPassword": "123"}).status_code == 400
+    assert post({"currentPassword": PASSWORD}).json()["detail"] == "Введите текущий и новый пароль."
+    assert post({"currentPassword": PASSWORD, "newPassword": "new long passphrase"}).status_code == 204
+
+    # Этот вход остаётся, другой завершается, старый пароль больше не подходит.
+    assert laptop.get("/api/tasks/").status_code == 200
+    assert phone.get("/api/tasks/").status_code == 401
+    client, token = csrf_client()
+    old = client.post("/api/auth/login/", {"email": "me@example.com", "password": PASSWORD}, format="json", HTTP_X_CSRFTOKEN=token)
+    assert old.status_code == 400
+    login(password="new long passphrase")
+
+
+def test_change_password_needs_login_and_csrf(user):
+    assert APIClient().post("/api/auth/password/", {}, format="json").status_code == 401
+    client = login()
+    response = client.post("/api/auth/password/", {"currentPassword": PASSWORD, "newPassword": "new long passphrase"}, format="json")
+    assert response.status_code == 403
