@@ -5,6 +5,7 @@ import {
   extractTags,
   linkTarget,
   listItems,
+  parseVault,
   parseVaultFile,
   splitFrontmatter,
   type ParsedFile,
@@ -76,6 +77,16 @@ describe('пример хранилища', () => {
     for (const name of ['Заметка', 'Конспект', 'Материал']) {
       expect(parseVaultFile(vaultFile(`Шаблоны/${name}.md`))).toEqual({ kind: 'skip', reason: 'template' });
     }
+  });
+
+  // Демо-аккаунт на сервере (manage.py demo) берёт заметки и материалы из этого разбора: так они совпадают
+  // с хранилищем, и первая синхронизация ничего не меняет. После правки хранилища: npx vitest run -u.
+  it('разбор для демо-аккаунта сохранён в backend/tracker/demo/vault.json', async () => {
+    const files = Object.entries(exampleVault)
+      .map(([key, content]) => ({ path: key.slice(key.indexOf('example-vault/') + 'example-vault/'.length), content }))
+      .sort((a, b) => (a.path < b.path ? -1 : 1));
+    const vault = parseVault('example-vault', files);
+    await expect(`${JSON.stringify(vault, null, 2)}\n`).toMatchFileSnapshot('../../../backend/tracker/demo/vault.json');
   });
 });
 

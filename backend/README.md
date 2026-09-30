@@ -26,6 +26,7 @@ python3 -m venv .venv
 .venv/bin/python -m pytest                                  # тесты (SQLite)
 DATABASE_URL=postgres://… .venv/bin/python -m pytest        # те же тесты на PostgreSQL
 .venv/bin/python manage.py createsuperuser                  # админка: /admin/
+.venv/bin/python manage.py demo                             # демо-аккаунт с историей (docs/DEMO.md)
 .venv/bin/python manage.py spectacular --file schema.yml    # OpenAPI-схема (или GET /api/schema/)
 ```
 
