@@ -13,7 +13,9 @@ COPY frontend/ ./
 COPY obsidian/ ../obsidian/
 # Фронтенд работает через сервер на том же адресе.
 ENV VITE_API_URL=/api
-RUN npm run build
+# Только сборка, без проверки типов (tsc из npm run build): на одном ядре VPS она шла бы минуты и заняла бы
+# ещё 400 МБ памяти, а сайту не нужна — типы проверяются при разработке. Сборке хватает 400 МБ.
+RUN npx vite build
 
 # ---------- сервер ----------
 FROM python:3.12-slim AS app
