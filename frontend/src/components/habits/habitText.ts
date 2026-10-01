@@ -39,8 +39,9 @@ export function stateText(goal: HabitGoal, stats: HabitStats): { text: string; t
       return { text: 'отпуск — на паузе' };
     case 'done':
       return isDaily(goal) ? null : { text: weekText, tone: week.done >= week.quota ? 'good' : undefined };
+    case 'started':
+      return { text: `сегодня ${formatAmount(stats.todayValue, goal.unit)} из ${formatAmount(goal.targetValue, goal.unit)}`, tone: 'warn' };
     case 'due':
-      if (stats.todayValue > 0) return { text: `сегодня ${formatAmount(stats.todayValue, goal.unit)} из ${formatAmount(goal.targetValue, goal.unit)}` };
       return isDaily(goal) ? null : { text: `${weekText} — нужно сегодня`, tone: 'warn' };
     case 'open':
       return { text: weekText };

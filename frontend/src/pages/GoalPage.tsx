@@ -332,6 +332,12 @@ function habitAdvice({ goal, stats }: HabitWithStats, today: IsoDate): { tone: T
         title: 'Сегодня отмечено',
         text: isDaily(goal) ? `Так держать.${freezeText}` : `${weekText}.${week.done >= week.quota ? ' Норма недели выполнена.' : ''}`,
       };
+    case 'started':
+      return {
+        tone: 'warn',
+        title: `Сегодня ${formatAmount(stats.todayValue, goal.unit)} из ${formatAmount(goal.targetValue, goal.unit)}`,
+        text: `Ещё ${formatAmount(stats.todayLeft, goal.unit)} — и ${isDaily(goal) ? 'день засчитан' : 'раз засчитается'}.${freezeText}`,
+      };
     case 'due':
       return isDaily(goal)
         ? { tone: freezeText ? 'warn' : 'muted', title: 'Сегодня ещё не отмечено', text: freezeText.trim() || 'Одна отметка — и день засчитан.' }
