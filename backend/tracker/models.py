@@ -379,3 +379,24 @@ class WeeklyReview(models.Model):
 
     def __str__(self) -> str:
         return f"Обзор недели {self.week_start}"
+
+
+class SiteSettings(models.Model):
+    """Настройки сервера, общие для всех аккаунтов: одна строка, pk=1. Меняет администратор в «Настройках»."""
+
+    # Открыта ли регистрация на экране входа; null — как задано в ALLOW_REGISTRATION.
+    registration_open = models.BooleanField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "настройки сервера"
+        verbose_name_plural = "настройки сервера"
+
+    @classmethod
+    def load(cls, *, lock: bool = False) -> "SiteSettings":
+        """`lock` — до конца транзакции: две регистрации подряд не решат одновременно, что они первые."""
+        objects = cls.objects.select_for_update() if lock else cls.objects
+        return objects.get_or_create(pk=1)[0]
+
+    @property
+    def registration(self) -> bool:
+        return settings.ALLOW_REGISTRATION if self.registration_open is None else self.registration_open

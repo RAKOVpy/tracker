@@ -1,11 +1,13 @@
-import { Check, Flame } from 'lucide-react';
+import { Check, Flame, Plus } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useToggleHabit } from '../../api/hooks';
 import type { CalendarWeek, HabitWithStats } from '../../domain/habits';
 import type { Area } from '../../domain/types';
 import { formatShort, formatWeekday, type IsoDate } from '../../lib/dates';
 import { formatNumber } from '../../lib/format';
-import { scheduleText, stateText, streakText } from './habitText';
+import { HabitAddForm } from './HabitAdd';
+import { amountText, scheduleText, stateText, streakText } from './habitText';
 
 /**
  * Отметка привычки за сегодня одним нажатием: записывает недостающее до нормы дня.
@@ -69,6 +71,21 @@ export function HabitRow({ item, today, week, area }: Props) {
   const { goal, stats } = item;
   const archived = goal.status === 'archived';
   const state = archived ? { text: 'в архиве' } : stateText(goal, stats);
+  // У нормы с количеством («60 отжиманий») день набирается частями: «+» открывает ввод.
+  const canAdd = !archived && stats.state !== 'upcoming' && !stats.todayDone && amountText(goal) !== null;
+  const [adding, setAdding] = useState(false);
+  // Ввод закрылся — фокус обратно на «+», чтобы с клавиатуры не начинать со страницы сначала.
+  const addButton = useRef<HTMLButtonElement>(null);
+  const refocus = useRef(false);
+  useEffect(() => {
+    if (adding || !refocus.current) return;
+    refocus.current = false;
+    addButton.current?.focus();
+  }, [adding]);
+  const close = () => {
+    refocus.current = true;
+    setAdding(false);
+  };
   return (
     <li className={stats.todayDone ? 'task-row habit-row habit-row--done' : 'task-row habit-row'}>
       <HabitCheck item={item} today={today} />
@@ -91,7 +108,20 @@ export function HabitRow({ item, today, week, area }: Props) {
           )}
         </div>
       </div>
+      {canAdd && !adding && (
+        <button
+          ref={addButton}
+          type="button"
+          className="icon-btn habit-row__add"
+          aria-label={`Добавить часть за сегодня: ${goal.title}`}
+          title="Добавить часть за сегодня"
+          onClick={() => setAdding(true)}
+        >
+          <Plus size={16} strokeWidth={2.2} aria-hidden />
+        </button>
+      )}
       {week && !archived && <HabitWeekDots week={week} unit={goal.unit} />}
+      {canAdd && adding && <HabitAddForm goal={goal} today={today} autoFocus onAdded={close} onCancel={close} />}
     </li>
   );
 }

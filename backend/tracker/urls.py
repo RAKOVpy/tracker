@@ -2,7 +2,7 @@ from django.urls import path
 from drf_spectacular.views import SpectacularAPIView
 from rest_framework.routers import SimpleRouter
 
-from . import auth_views, views
+from . import auth_views, server_views, views
 
 router = SimpleRouter()
 router.register("areas", views.AreaViewSet, basename="area")
@@ -22,6 +22,10 @@ urlpatterns = [
     path("auth/logout/", auth_views.LogoutView.as_view(), name="auth-logout"),
     path("auth/register/", auth_views.RegisterView.as_view(), name="auth-register"),
     path("auth/password/", auth_views.PasswordView.as_view(), name="auth-password"),
+    path("site/", server_views.SiteView.as_view(), name="site"),
+    path("accounts/", server_views.AccountListView.as_view(), name="account-list"),
+    path("accounts/<int:pk>/", server_views.AccountView.as_view(), name="account"),
+    path("accounts/<int:pk>/password/", server_views.AccountPasswordView.as_view(), name="account-password"),
     path("health/", views.HealthView.as_view(), name="health"),
     path("settings/", views.SettingsView.as_view(), name="settings"),
     path("export/", views.ExportView.as_view(), name="export"),

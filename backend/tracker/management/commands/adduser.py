@@ -10,15 +10,18 @@ from django.core.validators import validate_email
 
 class Command(BaseCommand):
     help = (
-        "Создаёт аккаунт трекера — например, на сервере с закрытой регистрацией (ALLOW_REGISTRATION=0). "
-        "Пароль спрашивает дважды; без терминала читает его одной строкой из stdin."
+        "Создаёт аккаунт трекера — например, на сервере с закрытой регистрацией. "
+        "Пароль спрашивает дважды; без терминала читает его одной строкой из stdin. "
+        "С --admin у уже существующего аккаунта только добавляет права администратора."
     )
     # Тесты подставляют свой ввод.
     stealth_options = ("stdin",)
 
     def add_arguments(self, parser):
         parser.add_argument("email", help="Почта — с ней входят в трекер.")
-        parser.add_argument("--admin", action="store_true", help="Ещё и доступ в админку /admin/.")
+        parser.add_argument(
+            "--admin", action="store_true", help="Администратор: раздел «Сервер» в настройках трекера и админка /admin/."
+        )
 
     def handle(self, *args, email, admin, **options):
         User = get_user_model()
@@ -27,7 +30,12 @@ class Command(BaseCommand):
             validate_email(email)
         except ValidationError:
             raise CommandError("Похоже, в адресе почты опечатка.") from None
-        if User.objects.filter(username=email).exists():
+        existing = User.objects.filter(username=email).first()
+        if existing and admin:
+            User.objects.filter(pk=existing.pk).update(is_staff=True, is_superuser=True)
+            self.stdout.write(self.style.SUCCESS(f"{email} теперь администратор: раздел «Сервер» — в настройках трекера."))
+            return
+        if existing:
             raise CommandError(f"Аккаунт {email} уже есть. Сменить пароль: manage.py changepassword {email}")
 
         stdin = options.get("stdin") or sys.stdin
@@ -41,7 +49,7 @@ class Command(BaseCommand):
         User.objects.create_user(username=email, email=email, password=password, is_staff=admin, is_superuser=admin)
         self.stdout.write(self.style.SUCCESS(f"Аккаунт {email} создан: входите с этой почтой и паролем."))
         if admin:
-            self.stdout.write("Админка: /admin/ — с той же почтой и паролем.")
+            self.stdout.write("Администратор: раздел «Сервер» — в настройках трекера, админка — /admin/.")
 
     def ask_password(self, user) -> str:
         while True:

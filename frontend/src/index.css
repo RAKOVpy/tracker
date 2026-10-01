@@ -1030,7 +1030,7 @@ textarea {
   font-size: var(--text-md);
 }
 
-.banner svg {
+.banner > svg {
   flex: none;
   margin-top: 2px;
 }
@@ -3271,6 +3271,58 @@ textarea {
   max-width: 380px;
 }
 
+/* Раздел «Сервер»: аккаунты с действиями справа, подтверждение и временный пароль — под строкой. */
+.account-row {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.account-row:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.account-row__main {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.account-row__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+
+.account-row__actions {
+  gap: 6px;
+}
+
+.account-row__result {
+  flex-basis: 100%;
+  display: grid;
+  gap: 10px;
+}
+
+.confirm--quiet {
+  background: var(--sheet-2);
+}
+
+.temp-password {
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--sheet);
+  color: var(--ink);
+  font-size: var(--text-md);
+  letter-spacing: 0.04em;
+  user-select: all;
+}
+
 @media (max-width: 480px) {
   .auth {
     align-items: start;
@@ -3413,14 +3465,68 @@ textarea {
   flex: 1 1 14rem;
 }
 
-.banner--action .btn {
+.banner--action > .btn {
   flex: none;
 }
 
 @media (max-width: 640px) {
-  .banner--action .btn {
+  .banner--action > .btn {
     margin-left: 28px;
   }
+}
+
+/* Часть нормы за сегодня: «Сделано сейчас [20] отжиманий [Добавить]». */
+.habit-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  color: var(--ink);
+}
+
+.habit-add__label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.habit-add__amount,
+.habit-add__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.habit-add__input {
+  width: 5.5rem;
+  height: 32px;
+  font-variant-numeric: tabular-nums;
+}
+
+.habit-add__unit {
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+
+/* В баннере — своей строкой под текстом и кнопкой, вровень с текстом. */
+.banner--action .habit-add {
+  flex-basis: 100%;
+  padding-left: 28px;
+}
+
+/* В строке привычки — под названием на всю ширину строки, «+» — рядом с точками недели. */
+.habit-row {
+  flex-wrap: wrap;
+}
+
+.habit-row .habit-add {
+  flex-basis: 100%;
+  margin-top: -2px;
+  padding-left: 34px;
+}
+
+.habit-row__add {
+  align-self: center;
+  margin: -4px -4px -4px 0;
 }
 
 /* Календарь: строка — неделя, дни с понедельника и итог «засчитано из нужного». */

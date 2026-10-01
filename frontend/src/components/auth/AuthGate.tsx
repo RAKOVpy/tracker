@@ -8,7 +8,7 @@ import { AuthScreen, UnreachableScreen } from './AuthScreen';
 type State =
   | { kind: 'checking' }
   | { kind: 'unreachable'; message: string }
-  | { kind: 'signed-out'; registration: boolean; expired: boolean }
+  | { kind: 'signed-out'; registration: boolean; firstAccount: boolean; expired: boolean }
   | { kind: 'signed-in'; user: User };
 
 /** Без сервера данные в браузере — приложение открывается сразу. С сервером — после входа. */
@@ -29,7 +29,7 @@ function ServerGate({ children }: { children: ReactNode }) {
         setState(
           session.user
             ? { kind: 'signed-in', user: session.user }
-            : { kind: 'signed-out', registration: session.registration, expired },
+            : { kind: 'signed-out', registration: session.registration, firstAccount: session.firstAccount, expired },
         );
       } catch (error) {
         setState({ kind: 'unreachable', message: error instanceof Error ? error.message : 'Неизвестная ошибка.' });
@@ -79,6 +79,7 @@ function ServerGate({ children }: { children: ReactNode }) {
       return (
         <LoginPage
           registration={state.registration}
+          firstAccount={state.firstAccount}
           expired={state.expired}
           onSignedIn={(user) => setState({ kind: 'signed-in', user })}
         />
