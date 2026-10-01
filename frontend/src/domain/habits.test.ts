@@ -150,10 +150,24 @@ describe('привычка «3 раза в неделю»', () => {
     expect(computeHabitStats(minutes(), entries, '2026-10-08', [vacation('2026-10-08', '2026-10-08')]).state).toBe('started');
     // В архиве — нет.
     expect(computeHabitStats(minutes({ status: 'archived' }), entries, '2026-10-08').state).toBe('rest');
-    // Без сегодняшней записи — просто «можно сегодня», в дела дня не входит.
-    const open = computeHabitStats(minutes(), entries.slice(0, 2), '2026-10-08');
+  });
+
+  it('дело на сегодня, пока норма недели не набрана; набрана, отмечена или отпуск — нет', () => {
+    const weekly = () => habit({ daysPerWeek: 3 });
+    // Четверг, 2 из 3: сегодня не обязательно, но можно — в дела дня входит.
+    const open = computeHabitStats(weekly(), [entry('2026-10-05'), entry('2026-10-07')], '2026-10-08');
     expect(open.state).toBe('open');
-    expect(isLeftToday(open)).toBe(false);
+    expect(isLeftToday(open)).toBe(true);
+    const rest = computeHabitStats(weekly(), [entry('2026-10-05'), entry('2026-10-06'), entry('2026-10-07')], '2026-10-08');
+    expect(rest.state).toBe('rest');
+    expect(isLeftToday(rest)).toBe(false);
+    const done = computeHabitStats(weekly(), [entry('2026-10-05'), entry('2026-10-08')], '2026-10-08');
+    expect(done.state).toBe('done');
+    expect(isLeftToday(done)).toBe(false);
+    const paused = computeHabitStats(weekly(), [entry('2026-10-05')], '2026-10-08', [vacation('2026-10-08', '2026-10-09')]);
+    expect(paused.state).toBe('paused');
+    expect(isLeftToday(paused)).toBe(false);
+    expect(isLeftToday(computeHabitStats(weekly(), [], '2026-10-08'))).toBe(true);
   });
 
   it('два раза в один день — один засчитанный день', () => {
