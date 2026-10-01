@@ -76,6 +76,28 @@ function countStreak(totals: Map<IsoDate, number>, today: IsoDate, vacations: Va
   return streak;
 }
 
+/** День, когда набрано целевое значение (записи до старта тоже считаются); null — ещё не набрано. */
+export function achievedOn(goal: Pick<TargetGoal, 'targetValue'>, dailyTotals: Map<IsoDate, number>): IsoDate | null {
+  let sum = 0;
+  for (const date of [...dailyTotals.keys()].sort()) {
+    sum += dailyTotals.get(date) ?? 0;
+    if (sum >= goal.targetValue - EPS) return date;
+  }
+  return null;
+}
+
+/**
+ * Докуда рисовать график цели. У цели в работе — по сегодня (`live`: есть отметка «сегодня»).
+ * У достигнутой и архивной время для цели остановилось: график кончается днём последней записи
+ * и не тянется пустой линией дальше, сколько бы дней ни прошло.
+ */
+export function chartRange(goal: TargetGoal, stats: Pick<GoalStats, 'status' | 'dailyTotals'>, today: IsoDate): { end: IsoDate; live: boolean } {
+  if (stats.status !== 'achieved' && goal.status !== 'archived') return { end: today, live: true };
+  let last = goal.startDate;
+  for (const date of stats.dailyTotals.keys()) if (date > last && date <= today) last = date;
+  return { end: last > today ? today : last, live: false };
+}
+
 export function computeGoalStats(goal: TargetGoal, entries: ProgressEntry[], today: IsoDate, vacations: Vacation[] = []): GoalStats {
   const { targetValue: target, startDate, deadline } = goal;
   const dailyTotals = sumByDate(entries);

@@ -1,4 +1,4 @@
-import type { GoalStats } from '../domain/progress';
+import { achievedOn, chartRange, type GoalStats } from '../domain/progress';
 import type { TargetGoal } from '../domain/types';
 import { addDays, diffDays, formatShort, type IsoDate } from '../lib/dates';
 import { formatNumber } from '../lib/format';
@@ -14,11 +14,16 @@ const W = 640;
 const H = 220;
 const PAD = { top: 12, right: 12, bottom: 26, left: 44 };
 
-/** Накопленный прогресс по дням против линейного плана. */
+/**
+ * Накопленный прогресс по дням против линейного плана. У достигнутой цели график кончается
+ * последней записью, а не тянется до сегодня.
+ */
 export function ProgressChart({ goal, stats, today }: Props) {
   const { targetValue: target, startDate } = goal;
-  const todayIndex = diffDays(startDate, today); // 0 — день старта
-  const days = Math.max(stats.totalDays, todayIndex + 1);
+  const range = chartRange(goal, stats, today);
+  const endIndex = diffDays(startDate, range.end); // 0 — день старта
+  const days = Math.max(stats.totalDays, endIndex + 1);
+  const achieved = stats.status === 'achieved' ? achievedOn(goal, stats.dailyTotals) : null;
 
   // Точка i — накопленный итог на конец (i - 1)-го дня; точка 0 — всё, что внесено до старта.
   let cumulative = 0;
@@ -26,7 +31,7 @@ export function ProgressChart({ goal, stats, today }: Props) {
     if (date < startDate) cumulative += value;
   }
   const actual: { i: number; value: number }[] = [{ i: 0, value: cumulative }];
-  const lastIndex = Math.min(todayIndex, days - 1);
+  const lastIndex = Math.min(endIndex, days - 1);
   for (let d = 0; d <= lastIndex; d++) {
     cumulative += stats.dailyTotals.get(addDays(startDate, d)) ?? 0;
     actual.push({ i: d + 1, value: cumulative });
@@ -39,7 +44,7 @@ export function ProgressChart({ goal, stats, today }: Props) {
   const actualPath = actual.map((p, idx) => `${idx === 0 ? 'M' : 'L'}${x(p.i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
   const areaPath = `${actualPath} L${x(actual[actual.length - 1].i).toFixed(1)},${y(0)} L${x(0)},${y(0)} Z`;
   const last = actual[actual.length - 1];
-  const hasActual = todayIndex >= 0;
+  const hasActual = endIndex >= 0;
   const yTicks = [0, target / 2, target];
 
   return (
@@ -66,7 +71,7 @@ export function ProgressChart({ goal, stats, today }: Props) {
 
         {hasActual && (
           <>
-            <line className="chart__today" x1={x(last.i)} x2={x(last.i)} y1={PAD.top} y2={H - PAD.bottom} />
+            {range.live && <line className="chart__today" x1={x(last.i)} x2={x(last.i)} y1={PAD.top} y2={H - PAD.bottom} />}
             <path className="chart__area" d={areaPath} />
             <path className="chart__actual" d={actualPath} />
             <circle className="chart__dot" cx={x(last.i)} cy={y(last.value)} r={5} />
@@ -82,11 +87,12 @@ export function ProgressChart({ goal, stats, today }: Props) {
           <span className="legend__swatch legend__swatch--plan" />
           План
         </span>
-        {hasActual && todayIndex < stats.totalDays && (
+        {range.live && hasActual && endIndex < stats.totalDays && (
           <span>
             По плану к концу дня: {formatAmount(stats.expectedByToday, goal.unit)}
           </span>
         )}
+        {achieved && <span>Цель достигнута {formatShort(achieved)}</span>}
       </figcaption>
     </figure>
   );

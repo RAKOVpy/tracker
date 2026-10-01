@@ -10,6 +10,7 @@ import { VacationBanner } from '../components/VacationBanner';
 import { WeekFocusCard } from '../components/week/WeekFocusCard';
 import { compareForToday, type GoalWithStats } from '../domain/progress';
 import { summarizeDay } from '../domain/day';
+import { isLeftToday } from '../domain/habits';
 import { completedOn, isForToday } from '../domain/tasks';
 import type { Area } from '../domain/types';
 import { formatLong, formatWeekday, type IsoDate } from '../lib/dates';
@@ -150,7 +151,7 @@ export function TodayPage() {
   const day = summarizeDay({
     tasksLeft: work.data?.inWork.filter((t) => isForToday(t, today)).length ?? 0,
     tasksDone: work.data?.inWork.filter((t) => t.status === 'done' && completedOn(t) === today).length ?? 0,
-    habitsLeft: habits.filter((h) => h.stats.state === 'due').length,
+    habitsLeft: habits.filter((h) => isLeftToday(h.stats)).length,
     habitsDone: habits.filter((h) => h.stats.todayDone).length,
     goalsLeft: groups.todo.length,
     goalsDone: groups.doneToday.length,

@@ -1,5 +1,6 @@
-import { Plus, X } from 'lucide-react';
-import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { CalendarArrowDown, ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { milestonesInDeadlineOrder, moveMilestone, sortMilestonesByDeadline } from '../../domain/projects';
 import type { Area, Goal, Milestone, ProjectInput } from '../../domain/types';
 import { AREA_ICON_COMPONENTS } from '../areaIcons';
 
@@ -25,6 +26,18 @@ export function ProjectForm({ areas, goals, initial, milestoneTasks, submitLabel
   const [milestones, setMilestones] = useState<Milestone[]>(initial.milestones);
   const [submitted, setSubmitted] = useState(false);
   const focusId = useRef<string | null>(null);
+  const list = useRef<HTMLOListElement>(null);
+  /** Веха, которую только что сдвинули: фокус остаётся на её стрелке, чтобы двигать дальше. */
+  const moved = useRef<{ id: string; shift: -1 | 1 } | null>(null);
+
+  useEffect(() => {
+    if (!moved.current || !list.current) return;
+    const { id, shift } = moved.current;
+    moved.current = null;
+    const button = (dir: -1 | 1) => list.current?.querySelector<HTMLButtonElement>(`[data-move="${id}:${dir}"]`);
+    const target = button(shift);
+    (target && !target.disabled ? target : button(shift === -1 ? 1 : -1))?.focus();
+  }, [milestones]);
 
   const titleError = values.title.trim() ? null : 'Как называется проект?';
   // Веха без названия при сохранении пропадёт — так же, как удалённая.
@@ -43,6 +56,11 @@ export function ProjectForm({ areas, goals, initial, milestoneTasks, submitLabel
 
   function updateMilestone(id: string, patch: Partial<Milestone>) {
     setMilestones((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+  }
+
+  function move(index: number, shift: -1 | 1) {
+    moved.current = { id: milestones[index].id, shift };
+    setMilestones((prev) => moveMilestone(prev, index, shift));
   }
 
   function onMilestoneKey(event: KeyboardEvent<HTMLInputElement>, index: number) {
@@ -171,9 +189,10 @@ export function ProjectForm({ areas, goals, initial, milestoneTasks, submitLabel
         </span>
         <span className="field__hint">
           Этапы проекта по порядку: «Диагностика», «Writing», «Пробный экзамен». Необязательно — можно добавить позже.
+          Порядок меняется стрелками.
         </span>
         {milestones.length > 0 && (
-          <ol className="milestone-inputs" aria-labelledby="project-milestones-label">
+          <ol className="milestone-inputs" aria-labelledby="project-milestones-label" ref={list}>
             {milestones.map((milestone, index) => (
               <li key={milestone.id} className="milestone-inputs__row">
                 <span className="question-inputs__n num" aria-hidden>
@@ -200,22 +219,49 @@ export function ProjectForm({ areas, goals, initial, milestoneTasks, submitLabel
                   onChange={(e) => updateMilestone(milestone.id, { deadline: e.target.value || null })}
                   aria-label={`Срок вехи ${index + 1}`}
                 />
-                <button
-                  type="button"
-                  className="icon-btn icon-btn--danger"
-                  aria-label={`Удалить веху ${index + 1}`}
-                  onClick={() => setMilestones((prev) => prev.filter((m) => m.id !== milestone.id))}
-                >
-                  <X size={15} aria-hidden />
-                </button>
+                <div className="milestone-inputs__actions">
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    aria-label={`Поднять веху ${index + 1} выше`}
+                    data-move={`${milestone.id}:-1`}
+                    disabled={index === 0}
+                    onClick={() => move(index, -1)}
+                  >
+                    <ChevronUp size={16} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    aria-label={`Опустить веху ${index + 1} ниже`}
+                    data-move={`${milestone.id}:1`}
+                    disabled={index === milestones.length - 1}
+                    onClick={() => move(index, 1)}
+                  >
+                    <ChevronDown size={16} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-btn icon-btn--danger"
+                    aria-label={`Удалить веху ${index + 1}`}
+                    onClick={() => setMilestones((prev) => prev.filter((m) => m.id !== milestone.id))}
+                  >
+                    <X size={15} aria-hidden />
+                  </button>
+                </div>
               </li>
             ))}
           </ol>
         )}
-        <div>
+        <div className="row">
           <button type="button" className="btn btn--sm btn--ghost" onClick={() => addMilestone(milestones.length - 1)}>
             <Plus size={15} aria-hidden /> Добавить веху
           </button>
+          {!milestonesInDeadlineOrder(milestones) && (
+            <button type="button" className="btn btn--sm btn--ghost" onClick={() => setMilestones(sortMilestonesByDeadline)}>
+              <CalendarArrowDown size={15} aria-hidden /> Расставить по срокам
+            </button>
+          )}
         </div>
         {removedWithTasks.length > 0 && (
           <p className="notice notice--warn">

@@ -5,14 +5,17 @@ import {
   detachRemovedMilestones,
   isReadyToFinish,
   isStalled,
+  milestonesInDeadlineOrder,
   milestoneState,
+  moveMilestone,
   nextStep,
   projectProgress,
+  sortMilestonesByDeadline,
   tasksInWork,
   workTask,
 } from './projects';
 import { isForToday, taskInput } from './tasks';
-import type { Project, Task } from './types';
+import type { Milestone, Project, Task } from './types';
 
 const TODAY = '2026-10-07';
 
@@ -156,5 +159,42 @@ describe('состояние проекта', () => {
       ['b', 'm2'],
       ['c', 'm1'],
     ]);
+  });
+});
+
+describe('порядок вех', () => {
+  const m = (id: string, deadline: string | null = null): Milestone => ({ id, title: id, deadline });
+  const ids = (list: Milestone[]) => list.map((x) => x.id);
+
+  it('по срокам: вехи со сроком — по датам, без срока — на своих местах', () => {
+    const list = [m('a', '2026-11-20'), m('b'), m('c', '2026-10-15'), m('d', '2026-11-01'), m('e')];
+    expect(ids(sortMilestonesByDeadline(list))).toEqual(['c', 'b', 'd', 'a', 'e']);
+    expect(milestonesInDeadlineOrder(list)).toBe(false);
+    expect(milestonesInDeadlineOrder(sortMilestonesByDeadline(list))).toBe(true);
+  });
+
+  it('одинаковые даты сохраняют порядок; уже по срокам — ничего не меняется', () => {
+    const list = [m('a', '2026-10-15'), m('b', '2026-10-15'), m('c'), m('d', '2026-10-20')];
+    expect(ids(sortMilestonesByDeadline(list))).toEqual(['a', 'b', 'c', 'd']);
+    expect(milestonesInDeadlineOrder(list)).toBe(true);
+    expect(milestonesInDeadlineOrder([m('a'), m('b')])).toBe(true);
+    expect(milestonesInDeadlineOrder([])).toBe(true);
+  });
+
+  it('выше и ниже: соседи меняются местами, за край не уходит', () => {
+    const list = [m('a'), m('b'), m('c')];
+    expect(ids(moveMilestone(list, 2, -1))).toEqual(['a', 'c', 'b']);
+    expect(ids(moveMilestone(list, 0, 1))).toEqual(['b', 'a', 'c']);
+    expect(moveMilestone(list, 0, -1)).toBe(list);
+    expect(moveMilestone(list, 2, 1)).toBe(list);
+  });
+
+  it('следующий шаг и текущая веха идут за новым порядком', () => {
+    const p = project({ milestones: [m('late', '2026-11-20'), m('soon', '2026-10-15')] });
+    const tasks = [task('t1', { milestoneId: 'late' }), task('t2', { milestoneId: 'soon' })];
+    expect(nextStep(p, tasks, TODAY)?.id).toBe('t1');
+    const sorted = { ...p, milestones: sortMilestonesByDeadline(p.milestones) };
+    expect(nextStep(sorted, tasks, TODAY)?.id).toBe('t2');
+    expect(currentMilestone(sorted, tasks, TODAY)).toMatchObject({ number: 1, milestone: { id: 'soon' } });
   });
 });

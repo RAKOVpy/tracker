@@ -2695,6 +2695,11 @@ textarea {
   gap: 8px;
 }
 
+.milestone-inputs__actions {
+  display: flex;
+  gap: 2px;
+}
+
 .goal-projects {
   display: grid;
   margin: 0;

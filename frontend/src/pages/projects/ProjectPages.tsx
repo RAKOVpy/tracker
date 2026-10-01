@@ -1,4 +1,4 @@
-import { CircleCheck, FolderKanban, Pencil, Plus, Repeat, Target, Trash2 } from 'lucide-react';
+import { CalendarArrowDown, CircleCheck, FolderKanban, Pencil, Plus, Repeat, Target, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
@@ -26,11 +26,13 @@ import {
   compareProjectTasks,
   isReadyToFinish,
   isStalled,
+  milestonesInDeadlineOrder,
   milestoneState,
   nextStep,
   PROJECT_STATUS_ORDER,
   PROJECT_STATUSES,
   projectProgress,
+  sortMilestonesByDeadline,
 } from '../../domain/projects';
 import { taskInput } from '../../domain/tasks';
 import type { Area, Milestone, Project, ProjectStatus, Task } from '../../domain/types';
@@ -301,6 +303,23 @@ export function ProjectPage() {
           </p>
         )}
 
+        {!milestonesInDeadlineOrder(project.milestones) && (
+          <div className="banner banner--muted banner--action">
+            <CalendarArrowDown size={18} aria-hidden />
+            <div className="banner__text spacer">
+              <strong>Вехи идут не по срокам</strong>
+              <span>Порядок можно поменять стрелками в «Изменить» или расставить по датам одним нажатием.</span>
+            </div>
+            <button
+              className="btn btn--sm"
+              type="button"
+              disabled={update.isPending}
+              onClick={() => update.mutate({ id: project.id, patch: { milestones: sortMilestonesByDeadline(project.milestones) } })}
+            >
+              Расставить по срокам
+            </button>
+          </div>
+        )}
         {project.milestones.map((milestone, index) => (
           <TaskSection
             key={milestone.id}

@@ -41,10 +41,17 @@ export interface HabitWeek {
 /**
  * Что с привычкой сегодня:
  * - upcoming — ещё не началась; paused — отпуск; done — сегодня отмечена;
+ * - started — сегодня начата, но до нормы дня не хватает: доделать — дело на сегодня, даже если сегодня
+ *   её можно было не делать;
  * - due — нужна сегодня: ежедневная, или недельная, которую иначе не успеть выполнить;
  * - open — недельная, можно сегодня, но не обязательно; rest — норма недели уже выполнена.
  */
-export type HabitState = 'upcoming' | 'paused' | 'done' | 'due' | 'open' | 'rest';
+export type HabitState = 'upcoming' | 'paused' | 'done' | 'started' | 'due' | 'open' | 'rest';
+
+/** Привычка — дело на сегодня, которое ещё не сделано: нужна сегодня или уже начата. */
+export function isLeftToday(stats: Pick<HabitStats, 'state'>): boolean {
+  return stats.state === 'due' || stats.state === 'started';
+}
 
 export interface HabitStats {
   todayValue: number;
@@ -191,6 +198,7 @@ export function computeHabitStats(goal: HabitGoal, entries: ProgressEntry[], tod
   let state: HabitState;
   if (today < goal.startDate) state = 'upcoming';
   else if (todayDone) state = 'done';
+  else if (todayValue > 0 && goal.status !== 'archived') state = 'started';
   else if (days.isVacation(today)) state = 'paused';
   else if (goal.status === 'archived') state = 'rest';
   else if (isDaily(goal) || neededToday(days, week, today)) state = 'due';
@@ -210,9 +218,9 @@ export function computeHabitStats(goal: HabitGoal, entries: ProgressEntry[], tod
   };
 }
 
-const STATE_ORDER: Record<HabitState, number> = { due: 0, open: 1, paused: 2, done: 3, rest: 4, upcoming: 5 };
+const STATE_ORDER: Record<HabitState, number> = { started: 0, due: 1, open: 2, paused: 3, done: 4, rest: 5, upcoming: 6 };
 
-/** Порядок на «Сегодня»: сначала нужные сегодня, потом «можно сегодня», сделанные — в конце; затем по приоритету. */
+/** Порядок на «Сегодня»: сначала начатые, потом нужные сегодня, потом «можно сегодня», сделанные — в конце; затем по приоритету. */
 export function compareHabits(a: HabitWithStats, b: HabitWithStats): number {
   return (
     STATE_ORDER[a.stats.state] - STATE_ORDER[b.stats.state] ||

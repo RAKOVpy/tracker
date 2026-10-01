@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addDays, type IsoDate } from '../lib/dates';
-import { compareHabits, computeHabitStats, habitCalendar, type HabitWithStats } from './habits';
+import { compareHabits, computeHabitStats, habitCalendar, isLeftToday, type HabitWithStats } from './habits';
 import type { HabitGoal, ProgressEntry, Vacation } from './types';
 
 // 2026-09-28 — понедельник.
@@ -46,7 +46,7 @@ describe('ежедневная привычка', () => {
     const monday = computeHabitStats(habit(), entries, '2026-10-05');
     expect(monday).toMatchObject({ todayValue: 20, todayDone: true, todayLeft: 0, state: 'done' });
     const tuesday = computeHabitStats(habit(), entries, '2026-10-06');
-    expect(tuesday).toMatchObject({ todayValue: 15, todayDone: false, todayLeft: 5, state: 'due' });
+    expect(tuesday).toMatchObject({ todayValue: 15, todayDone: false, todayLeft: 5, state: 'started' });
   });
 
   it('серия считается со вчера, пока сегодня не отмечено', () => {
@@ -134,6 +134,26 @@ describe('привычка «3 раза в неделю»', () => {
     const entries = log('2026-10-05', '2026-10-06', '2026-10-07');
     expect(computeHabitStats(gym(), entries, '2026-10-08').state).toBe('rest');
     expect(computeHabitStats(gym(), [...entries, entry('2026-10-08', 1)], '2026-10-08').state).toBe('done');
+  });
+
+  it('начатая сегодня, но не доделанная — дело на сегодня, даже если сегодня можно было не делать', () => {
+    const minutes = (overrides: Partial<HabitGoal> = {}) => habit({ daysPerWeek: 3, ...overrides });
+    // Четверг: два раза из трёх есть — сегодня можно не делать, но начато 10 минут из 20.
+    const entries = [entry('2026-10-05'), entry('2026-10-07'), entry('2026-10-08', 10)];
+    const stats = computeHabitStats(minutes(), entries, '2026-10-08');
+    expect(stats).toMatchObject({ state: 'started', todayLeft: 10, week: { done: 2, quota: 3 } });
+    expect(isLeftToday(stats)).toBe(true);
+    // Норма недели уже выполнена — начатое всё равно не «отдых».
+    const full = [entry('2026-10-05'), entry('2026-10-06'), entry('2026-10-07'), entry('2026-10-08', 10)];
+    expect(computeHabitStats(minutes(), full, '2026-10-08').state).toBe('started');
+    // В отпуске тоже: раз начал — доделать.
+    expect(computeHabitStats(minutes(), entries, '2026-10-08', [vacation('2026-10-08', '2026-10-08')]).state).toBe('started');
+    // В архиве — нет.
+    expect(computeHabitStats(minutes({ status: 'archived' }), entries, '2026-10-08').state).toBe('rest');
+    // Без сегодняшней записи — просто «можно сегодня», в дела дня не входит.
+    const open = computeHabitStats(minutes(), entries.slice(0, 2), '2026-10-08');
+    expect(open.state).toBe('open');
+    expect(isLeftToday(open)).toBe(false);
   });
 
   it('два раза в один день — один засчитанный день', () => {
@@ -241,14 +261,15 @@ describe('habitCalendar', () => {
 });
 
 describe('compareHabits', () => {
-  it('нужные сегодня — первыми, сделанные — в конце, затем по приоритету', () => {
+  it('начатые и нужные сегодня — первыми, сделанные — в конце, затем по приоритету', () => {
     const today = '2026-10-08';
     const make = (goal: HabitGoal, entries: ProgressEntry[]): HabitWithStats => ({ goal, entries, stats: computeHabitStats(goal, entries, today) });
     const done = make(habit({ id: 'done', priority: 'high' }), [entry(today)]);
     const due = make(habit({ id: 'due', priority: 'low' }), []);
     const dueHigh = make(habit({ id: 'due-high', priority: 'high' }), []);
     const open = make(gym({ id: 'open' }), [entry('2026-10-05', 1)]);
-    const sorted = [done, open, due, dueHigh].sort(compareHabits).map((h) => h.goal.id);
-    expect(sorted).toEqual(['due-high', 'due', 'open', 'done']);
+    const started = make(habit({ id: 'started', priority: 'low' }), [entry(today, 5)]);
+    const sorted = [done, open, due, started, dueHigh].sort(compareHabits).map((h) => h.goal.id);
+    expect(sorted).toEqual(['started', 'due-high', 'due', 'open', 'done']);
   });
 });

@@ -1,7 +1,7 @@
 import { Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAreaMap } from '../../api/hooks';
-import { compareHabits, habitCalendar, type HabitWithStats } from '../../domain/habits';
+import { compareHabits, habitCalendar, isLeftToday, type HabitWithStats } from '../../domain/habits';
 import type { Vacation } from '../../domain/types';
 import type { IsoDate } from '../../lib/dates';
 import { HabitRow } from './HabitRow';
@@ -13,14 +13,14 @@ interface Props {
 }
 
 /**
- * Привычки на «Сегодня»: отметка одним нажатием. Сначала нужные сегодня, потом те, что можно
+ * Привычки на «Сегодня»: отметка одним нажатием. Сначала начатые и нужные сегодня, потом те, что можно
  * сделать сегодня или в другой день недели, отмеченные — в конце.
  */
 export function TodayHabits({ habits, today, vacations }: Props) {
   const areas = useAreaMap();
   const list = habits.filter((h) => h.goal.status === 'active' && h.stats.state !== 'upcoming').sort(compareHabits);
   if (list.length === 0) return null;
-  const due = list.filter((h) => h.stats.state === 'due').length;
+  const due = list.filter((h) => isLeftToday(h.stats)).length;
 
   return (
     <section className="section" aria-labelledby="today-habits">
