@@ -3271,6 +3271,58 @@ textarea {
   max-width: 380px;
 }
 
+/* Раздел «Сервер»: аккаунты с действиями справа, подтверждение и временный пароль — под строкой. */
+.account-row {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.account-row:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.account-row__main {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.account-row__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+
+.account-row__actions {
+  gap: 6px;
+}
+
+.account-row__result {
+  flex-basis: 100%;
+  display: grid;
+  gap: 10px;
+}
+
+.confirm--quiet {
+  background: var(--sheet-2);
+}
+
+.temp-password {
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--sheet);
+  color: var(--ink);
+  font-size: var(--text-md);
+  letter-spacing: 0.04em;
+  user-select: all;
+}
+
 @media (max-width: 480px) {
   .auth {
     align-items: start;

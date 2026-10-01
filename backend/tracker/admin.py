@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Area, Goal, Material, Note, ProgressEntry, Project, Review, Task, UserSettings, Vacation, WeeklyReview
+from .models import Area, Goal, Material, Note, ProgressEntry, Project, Review, SiteSettings, Task, UserSettings, Vacation, WeeklyReview
 
 
 @admin.register(Area)
@@ -51,3 +51,8 @@ admin.site.register(ProgressEntry)
 admin.site.register(Review)
 admin.site.register(Vacation)
 admin.site.register(UserSettings)
+
+
+@admin.register(SiteSettings)
+class SiteSettingsAdmin(admin.ModelAdmin):
+    list_display = ["registration_open"]

@@ -1,9 +1,9 @@
 """
 Вход по почте и паролю. Сессия — в httpOnly-куке, запросы с изменениями защищены CSRF-токеном
 (кука csrftoken → заголовок X-CSRFToken). Фронтенд сначала запрашивает /api/auth/session/.
+Регистрацию открывает и закрывает администратор; первый аккаунт на сервере становится администратором.
 """
 
-from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model, login, logout, update_session_auth_hash
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -20,19 +20,25 @@ from rest_framework.views import APIView
 
 from .auth import SessionAuthentication
 from .defaults import user_settings
+from .models import SiteSettings
 from .rules.dates import zone
 
 User = get_user_model()
 
-UserSchema = inline_serializer("User", {"id": serializers.IntegerField(), "email": serializers.EmailField()})
-SessionSchema = inline_serializer("Session", {"user": UserSchema, "registration": serializers.BooleanField()})
+UserSchema = inline_serializer(
+    "User", {"id": serializers.IntegerField(), "email": serializers.EmailField(), "is_admin": serializers.BooleanField()}
+)
+SessionSchema = inline_serializer(
+    "Session",
+    {"user": UserSchema, "registration": serializers.BooleanField(), "first_account": serializers.BooleanField()},
+)
 LoggedInSchema = inline_serializer("LoggedIn", {"user": UserSchema})
 CredentialsSchema = inline_serializer("Credentials", {"email": serializers.EmailField(), "password": serializers.CharField()})
 PasswordSchema = inline_serializer("PasswordChange", {"current_password": serializers.CharField(), "new_password": serializers.CharField()})
 
 
 def user_data(user) -> dict | None:
-    return {"id": user.pk, "email": user.email} if user.is_authenticated else None
+    return {"id": user.pk, "email": user.email, "is_admin": user.is_staff} if user.is_authenticated else None
 
 
 def _enforce_csrf(request) -> None:
@@ -58,7 +64,8 @@ def _credentials(request) -> tuple[str, str]:
 @method_decorator(ensure_csrf_cookie, name="get")
 class SessionView(APIView):
     """
-    Кто вошёл (или null) и открыта ли регистрация. Заодно ставит куку CSRF и запоминает часовой пояс.
+    Кто вошёл (или null), открыта ли регистрация и нет ли ещё ни одного аккаунта. Заодно ставит куку CSRF
+    и запоминает часовой пояс.
     Фронтенд спрашивает это при каждом открытии, и срок сессии отсчитывается заново: кто пользуется
     трекером, не будет выходить из него раз в 90 дней.
     """
@@ -74,7 +81,13 @@ class SessionView(APIView):
             if zone(tz) is not None and settings_obj.timezone != tz:
                 settings_obj.timezone = tz
                 settings_obj.save(update_fields=["timezone"])
-        return Response({"user": user_data(request.user), "registration": settings.ALLOW_REGISTRATION})
+        return Response(
+            {
+                "user": user_data(request.user),
+                "registration": SiteSettings.load().registration,
+                "first_account": not User.objects.exists(),
+            }
+        )
 
 
 class LoginView(APIView):
@@ -103,14 +116,17 @@ class LogoutView(APIView):
 
 
 class RegisterView(APIView):
+    """Новый аккаунт. Самый первый на сервере — администратор: он управляет регистрацией и аккаунтами."""
+
     permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
-    throttle_scope = "auth"
+    throttle_scope = "register"
 
     @extend_schema(request=CredentialsSchema, responses={201: LoggedInSchema})
     def post(self, request):
         _enforce_csrf(request)
-        if not settings.ALLOW_REGISTRATION:
+        # Блокировка до конца запроса: из двух одновременных регистраций первой будет только одна.
+        if not SiteSettings.load(lock=True).registration:
             raise PermissionDenied("Регистрация на этом сервере закрыта.")
         email, password = _credentials(request)
         try:
@@ -120,8 +136,9 @@ class RegisterView(APIView):
         if User.objects.filter(username=email).exists():
             raise ValidationError({"detail": "Такая почта уже зарегистрирована. Войдите."})
         _check_password(password, User(username=email, email=email))
+        first = not User.objects.exists()
         # Сферы по умолчанию и настройки создаёт сигнал (signals.py).
-        user = User.objects.create_user(username=email, email=email, password=password)
+        user = User.objects.create_user(username=email, email=email, password=password, is_staff=first, is_superuser=first)
         login(request, user)
         return Response({"user": user_data(user)}, status=status.HTTP_201_CREATED)
 
