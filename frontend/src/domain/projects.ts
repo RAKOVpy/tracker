@@ -99,6 +99,31 @@ export function milestoneState(milestone: Milestone, tasks: Task[], today: IsoDa
   return { done, total: own.length, completed, overdue: !completed && milestone.deadline !== null && milestone.deadline < today };
 }
 
+/**
+ * Вехи по срокам: вехи со сроком встают по датам (с одинаковой датой — в прежнем порядке),
+ * вехи без срока остаются на своих местах — их место в плане знает только человек.
+ */
+export function sortMilestonesByDeadline(milestones: Milestone[]): Milestone[] {
+  const dated = milestones.filter((m) => m.deadline !== null).sort((a, b) => a.deadline!.localeCompare(b.deadline!));
+  let next = 0;
+  return milestones.map((m) => (m.deadline === null ? m : dated[next++]));
+}
+
+/** Вехи со сроком идут по датам — расставлять нечего. */
+export function milestonesInDeadlineOrder(milestones: Milestone[]): boolean {
+  const dates = milestones.flatMap((m) => (m.deadline === null ? [] : [m.deadline]));
+  return dates.every((date, i) => i === 0 || dates[i - 1] <= date);
+}
+
+/** Веха `index` на `shift` позиций выше (−1) или ниже (+1); за край списка не уходит. */
+export function moveMilestone(milestones: Milestone[], index: number, shift: -1 | 1): Milestone[] {
+  const target = index + shift;
+  if (target < 0 || target >= milestones.length) return milestones;
+  const next = [...milestones];
+  [next[index], next[target]] = [next[target], next[index]];
+  return next;
+}
+
 /** Первая неготовая веха (номер с единицы); `done` — все вехи пройдены; null — вех нет. */
 export function currentMilestone(project: Project, tasks: Task[], today: IsoDate): { number: number; milestone: Milestone } | 'done' | null {
   if (project.milestones.length === 0) return null;
