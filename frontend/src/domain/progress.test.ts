@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeGoalStats, compareForToday, roundUpNorm, type GoalWithStats } from './progress';
+import { achievedOn, chartRange, computeGoalStats, compareForToday, roundUpNorm, type GoalWithStats } from './progress';
 import type { ProgressEntry, TargetGoal } from './types';
 
 function makeGoal(overrides: Partial<TargetGoal> = {}): TargetGoal {
@@ -150,5 +150,46 @@ describe('compareForToday', () => {
 
     const sorted = [onTrackMediumLate, onTrackHigh, onTrackMediumSoon, behindLow].sort(compareForToday);
     expect(sorted.map((x) => x.goal.id)).toEqual(['b', 'a', 'c', 'd']);
+  });
+});
+
+describe('график цели', () => {
+  const entries = [entry('2026-10-03', 100), entry('2026-10-10', 150), entry('2026-10-12', 60)];
+
+  it('у цели в работе — по сегодня', () => {
+    const goal = makeGoal();
+    const s = computeGoalStats(goal, entries.slice(0, 2), '2026-11-20');
+    expect(s.status).toBe('overdue');
+    expect(chartRange(goal, s, '2026-11-20')).toEqual({ end: '2026-11-20', live: true });
+  });
+
+  it('у достигнутой — до последней записи, сколько бы дней ни прошло', () => {
+    const goal = makeGoal();
+    const s = computeGoalStats(goal, entries, '2026-12-25');
+    expect(s.status).toBe('achieved');
+    expect(achievedOn(goal, s.dailyTotals)).toBe('2026-10-12');
+    expect(chartRange(goal, s, '2026-12-25')).toEqual({ end: '2026-10-12', live: false });
+    expect(chartRange(goal, s, '2026-10-12')).toEqual({ end: '2026-10-12', live: false });
+  });
+
+  it('запись сверх цели после достижения тоже на графике', () => {
+    const goal = makeGoal();
+    const more = [...entries, entry('2026-10-20', 20)];
+    const s = computeGoalStats(goal, more, '2026-11-30');
+    expect(achievedOn(goal, s.dailyTotals)).toBe('2026-10-12');
+    expect(chartRange(goal, s, '2026-11-30').end).toBe('2026-10-20');
+  });
+
+  it('у архивной — до последней записи, без записей — день старта', () => {
+    const archived = makeGoal({ status: 'archived' });
+    const s = computeGoalStats(archived, entries.slice(0, 1), '2026-12-01');
+    expect(chartRange(archived, s, '2026-12-01')).toEqual({ end: '2026-10-03', live: false });
+    expect(chartRange(archived, computeGoalStats(archived, [], '2026-12-01'), '2026-12-01').end).toBe('2026-10-01');
+  });
+
+  it('ещё не набрано — null; записи до старта считаются', () => {
+    const goal = makeGoal();
+    expect(achievedOn(goal, computeGoalStats(goal, entries.slice(0, 2), '2026-10-10').dailyTotals)).toBeNull();
+    expect(achievedOn(goal, computeGoalStats(goal, [entry('2026-09-20', 200), entry('2026-10-02', 100)], '2026-10-05').dailyTotals)).toBe('2026-10-02');
   });
 });
