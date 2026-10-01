@@ -20,6 +20,7 @@ import { AreaMark } from '../components/AreaIcon';
 import { BackButton } from '../components/BackButton';
 import { EntryForm } from '../components/EntryForm';
 import { EntryHistory } from '../components/EntryHistory';
+import { HabitAddForm } from '../components/habits/HabitAdd';
 import { HabitCalendar } from '../components/habits/HabitCalendar';
 import { amountText, frequencyText, scheduleText, streakText } from '../components/habits/habitText';
 import { describePace, formatAmount, type Tone } from '../components/pace';
@@ -416,6 +417,7 @@ function HabitView({ item, area, today }: { item: Extract<GoalView, { kind: 'hab
                 )}
               </button>
             )}
+            {canCheck && !stats.todayDone && amountText(goal) && <HabitAddForm goal={goal} today={today} />}
           </div>
 
           <p className="muted small" style={{ margin: 0 }}>
