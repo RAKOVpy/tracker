@@ -20,13 +20,13 @@ export function TodayHabits({ habits, today, vacations }: Props) {
   const areas = useAreaMap();
   const list = habits.filter((h) => h.goal.status === 'active' && h.stats.state !== 'upcoming').sort(compareHabits);
   if (list.length === 0) return null;
-  const due = list.filter((h) => isLeftToday(h.stats)).length;
+  const left = list.filter((h) => isLeftToday(h.stats)).length;
 
   return (
     <section className="section" aria-labelledby="today-habits">
       <div className="panel-head">
         <h2 className="section__title" id="today-habits" style={{ margin: 0 }}>
-          Привычки {due > 0 && <span className="section__count">{due}</span>}
+          Привычки {left > 0 && <span className="section__count">{left}</span>}
         </h2>
         <Link className="btn btn--sm btn--ghost" to="/goals/new?kind=habit">
           <Plus size={15} aria-hidden /> Привычка

@@ -3,7 +3,7 @@ import { plural } from '../lib/format';
 export interface DayCounts {
   tasksLeft: number;
   tasksDone: number;
-  /** Привычки, нужные или начатые сегодня (см. isLeftToday), и отмеченные сегодня. */
+  /** Привычки, которые сегодня нужны, начаты или ещё не добрали норму недели (см. isLeftToday), и отмеченные сегодня. */
   habitsLeft: number;
   habitsDone: number;
   goalsLeft: number;
