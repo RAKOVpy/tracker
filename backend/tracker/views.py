@@ -5,10 +5,12 @@ API трекера. Каждый пользователь видит и меня
 
 import uuid
 
+from django.db import connection
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema, inline_serializer
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -140,6 +142,19 @@ class WeeklyReviewViewSet(OwnedViewSet):
 
     model = WeeklyReview
     serializer_class = WeeklyReviewSerializer
+
+
+class HealthView(APIView):
+    """Для Docker и мониторинга: сервер отвечает и база доступна. Без входа; база недоступна — ошибка 500."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    @extend_schema(responses=inline_serializer("Health", {"status": serializers.CharField()}))
+    def get(self, request):
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+        return Response({"status": "ok"})
 
 
 class SettingsView(APIView):

@@ -1,0 +1,13 @@
+# В образы — только код. Зависимости ставятся заново, данные и настройки остаются на сервере.
+.git
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/*.pyc
+frontend/dist
+frontend/*.local
+backend/.venv
+backend/db.sqlite3
+backend/staticfiles
+**/.env
+deploy/backups

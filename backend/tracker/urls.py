@@ -22,6 +22,7 @@ urlpatterns = [
     path("auth/logout/", auth_views.LogoutView.as_view(), name="auth-logout"),
     path("auth/register/", auth_views.RegisterView.as_view(), name="auth-register"),
     path("auth/password/", auth_views.PasswordView.as_view(), name="auth-password"),
+    path("health/", views.HealthView.as_view(), name="health"),
     path("settings/", views.SettingsView.as_view(), name="settings"),
     path("export/", views.ExportView.as_view(), name="export"),
     path("import/", views.ImportView.as_view(), name="import"),

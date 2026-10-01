@@ -25,6 +25,7 @@ python3 -m venv .venv
 ```bash
 .venv/bin/python -m pytest                                  # тесты (SQLite)
 DATABASE_URL=postgres://… .venv/bin/python -m pytest        # те же тесты на PostgreSQL
+.venv/bin/python manage.py adduser me@example.com          # аккаунт, когда регистрация закрыта (--admin — и админка)
 .venv/bin/python manage.py createsuperuser                  # админка: /admin/
 .venv/bin/python manage.py demo                             # демо-аккаунт с историей (docs/DEMO.md)
 .venv/bin/python manage.py spectacular --file schema.yml    # OpenAPI-схема (или GET /api/schema/)
@@ -65,4 +66,11 @@ Vite проксирует `/api` на `http://127.0.0.1:8000` (другой ад
 .venv/bin/python manage.py changepassword me@example.com
 ```
 
-Регистрацию на личном сервере стоит закрыть после создания своего аккаунта: `ALLOW_REGISTRATION=0`.
+Регистрацию на личном сервере стоит закрыть: `ALLOW_REGISTRATION=0`, а аккаунты создавать командой
+`manage.py adduser почта`.
+
+## На сервере
+
+Развёртывание в Docker с PostgreSQL, HTTPS и резервными копиями — [docs/DEPLOY.md](../docs/DEPLOY.md).
+Команды `manage.py` там запускаются в контейнере: `docker compose exec app python manage.py …`.
+`GET /api/health/` отвечает `{"status": "ok"}`, когда сервер и база работают, — для проверок Docker и мониторинга.
