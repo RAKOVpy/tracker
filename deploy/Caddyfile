@@ -1,0 +1,36 @@
+# Трекер на своём домене. Сертификат Let's Encrypt Caddy получает и продлевает сам,
+# http перенаправляет на https. /api, /admin и /static — Django (app), остальное — собранный фронтенд.
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+		X-Frame-Options "DENY"
+		# Личный трекер поисковикам не нужен.
+		X-Robots-Tag "noindex, nofollow"
+		-Server
+	}
+
+	@backend path /api/* /admin /admin/* /static/*
+	handle @backend {
+		reverse_proxy app:8000
+	}
+
+	handle {
+		root * /srv
+		# Скрипты — только свои: внедрённый чужой скрипт не выполнится.
+		header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		# Файлы сборки с хешем в имени не меняются — кэш на год. index.html — проверять каждый раз,
+		# иначе после обновления браузер откроет старую версию.
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		@pages not path /assets/*
+		header @pages Cache-Control "no-cache"
+		# Адреса приложения (/goals, /tasks/…) — это index.html, дальше разбирается React Router.
+		try_files {path} /index.html
+		file_server
+	}
+}

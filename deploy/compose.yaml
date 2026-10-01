@@ -1,0 +1,108 @@
+# Трекер на своём сервере: docker compose up -d --build в этой папке.
+# Настройки — в deploy/.env (создаёт ./setup.sh), инструкция — docs/DEPLOY.md.
+#
+#   web    — Caddy: HTTPS, фронтенд, прокси к app; единственный, кто открыт в интернет (порты 80 и 443)
+#   app    — Django и gunicorn
+#   db     — PostgreSQL, данные в томе tracker_pgdata
+#   backup — копии базы каждый день в deploy/backups
+
+name: tracker
+
+# Логи контейнеров не разрастаются: не больше 3 файлов по 10 МБ на сервис.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tracker
+      POSTGRES_USER: tracker
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте POSTGRES_PASSWORD в deploy/.env (./setup.sh)}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracker -d tracker"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  app:
+    build:
+      context: ..
+      target: app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DJANGO_DEBUG: "0"
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?задайте DJANGO_SECRET_KEY в deploy/.env (./setup.sh)}
+      DJANGO_ALLOWED_HOSTS: ${DOMAIN:?задайте DOMAIN в deploy/.env (./setup.sh)}
+      DJANGO_CSRF_TRUSTED_ORIGINS: https://${DOMAIN}
+      DATABASE_URL: postgres://tracker:${POSTGRES_PASSWORD}@db:5432/tracker
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-0}
+      BEHIND_HTTPS_PROXY: "1"
+      COOKIE_SECURE: "1"
+    healthcheck:
+      # Django отвечает только на запросы к своему домену — проверка представляется им.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import os, urllib.request as u; u.urlopen(u.Request('http://127.0.0.1:8000/api/health/', headers={'Host': os.environ['DJANGO_ALLOWED_HOSTS']}), timeout=5)"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+      start_interval: 2s
+    logging: *logging
+
+  web:
+    build:
+      context: ..
+      target: web
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      # Сертификаты: без тома Caddy запрашивал бы их заново при каждом перезапуске.
+      - caddy_data:/data
+      - caddy_config:/config
+    logging: *logging
+
+  backup:
+    build:
+      context: ..
+      target: backup
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    # Отсюда BACKUP_*, TZ и RCLONE_* — расписание, хранение и облако для копий.
+    env_file: .env
+    environment:
+      PGHOST: db
+      PGUSER: tracker
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: tracker
+    volumes:
+      - ./backups:/backups
+    logging: *logging
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
