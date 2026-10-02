@@ -53,10 +53,8 @@ git clone https://github.com/RAKOVpy/tracker.git && cd tracker
 git checkout claude/fervent-faraday-f7chiv                      # пока последние этапы не в main
 cd deploy && ./setup.sh tracker.example.ru                      # .env с доменом и паролями
 docker compose up -d --build                                    # сборка и запуск
+docker compose exec app python manage.py adduser me@example.com # свой аккаунт
 ```
-
-Затем откройте сайт и зарегистрируйтесь: первый аккаунт становится администратором и в «Настройках» →
-«Сервер» открывает и закрывает регистрацию, выдаёт временный пароль вместо забытого и удаляет аккаунты.
 
 ## Запуск на своём компьютере
 

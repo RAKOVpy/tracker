@@ -3,9 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useAreas, useKnowledge } from '../api/hooks';
 import { serverMode } from '../api';
 import { AreaSettings } from '../components/AreaSettings';
-import { useAccount } from '../components/auth/account';
 import { AccountSettings } from '../components/auth/AccountSettings';
-import { ServerSettings } from '../components/auth/ServerSettings';
 import { DataSettings } from '../components/DataSettings';
 import { LoadSettings } from '../components/LoadSettings';
 import { ObsidianSettings } from '../components/obsidian/ObsidianSettings';
@@ -15,7 +13,6 @@ export function SettingsPage() {
   const { hash } = useLocation();
   const areas = useAreas();
   const knowledge = useKnowledge();
-  const account = useAccount();
   // Разделы выше подгружают данные и вырастают, поэтому прокручиваем, когда они уже на месте.
   const ready = !areas.isLoading && !knowledge.isLoading;
 
@@ -89,19 +86,6 @@ export function SettingsPage() {
             <p className="muted small">Пароль и выход. После выхода данные остаются на сервере и вернутся при следующем входе.</p>
           </div>
           <AccountSettings />
-        </section>
-      )}
-
-      {account?.user.isAdmin && (
-        <section className="card settings-section" id="server" aria-labelledby="settings-server">
-          <div>
-            <h2 id="settings-server">Сервер</h2>
-            <p className="muted small">
-              Видно только администратору. Писем сервер не отправляет: если кто-то забыл пароль, выдайте ему временный и
-              передайте сами.
-            </p>
-          </div>
-          <ServerSettings />
         </section>
       )}
     </>

@@ -3,8 +3,6 @@ import type { Http } from './http';
 export interface User {
   id: number;
   email: string;
-  /** Управляет сервером: регистрацией и аккаунтами. Первый аккаунт на сервере — администратор. */
-  isAdmin: boolean;
 }
 
 export interface Session {
@@ -12,8 +10,6 @@ export interface Session {
   user: User | null;
   /** Можно ли завести новый аккаунт на этом сервере. */
   registration: boolean;
-  /** Аккаунтов ещё нет: первый станет администратором. */
-  firstAccount: boolean;
 }
 
 export interface AuthApi {

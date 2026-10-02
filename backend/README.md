@@ -25,7 +25,7 @@ python3 -m venv .venv
 ```bash
 .venv/bin/python -m pytest                                  # тесты (SQLite)
 DATABASE_URL=postgres://… .venv/bin/python -m pytest        # те же тесты на PostgreSQL
-.venv/bin/python manage.py adduser me@example.com          # аккаунт из консоли (--admin — администратор)
+.venv/bin/python manage.py adduser me@example.com          # аккаунт, когда регистрация закрыта (--admin — и админка)
 .venv/bin/python manage.py createsuperuser                  # админка: /admin/
 .venv/bin/python manage.py demo                             # демо-аккаунт с историей (docs/DEMO.md)
 .venv/bin/python manage.py spectacular --file schema.yml    # OpenAPI-схема (или GET /api/schema/)
@@ -52,8 +52,7 @@ Vite проксирует `/api` на `http://127.0.0.1:8000` (другой ад
 Почта и пароль, сессия в httpOnly-куке. Запросы с изменениями передают CSRF-токен из куки
 `csrftoken` в заголовке `X-CSRFToken`. Порядок для клиента:
 
-1. `GET /api/auth/session/` — кто вошёл (`user` с `isAdmin` или `null`), открыта ли регистрация (`registration`)
-   и нет ли ещё ни одного аккаунта (`firstAccount`); ставит куку CSRF.
+1. `GET /api/auth/session/` — кто вошёл (`user` или `null`) и открыта ли регистрация; ставит куку CSRF.
 2. `POST /api/auth/login/` или `/api/auth/register/` с `{ "email", "password" }`.
 3. Дальше — любые запросы к `/api/…`. Без входа — `401`, без CSRF-токена — `403`.
 
@@ -61,27 +60,14 @@ Vite проксирует `/api` на `http://127.0.0.1:8000` (другой ад
 по нему сервер понимает, какое у пользователя «сегодня» — это нужно для повторяющихся задач.
 
 Сессия живёт 90 дней с последнего открытия трекера. Пароль меняется в настройках трекера
-(`POST /api/auth/password/`).
-
-**Администратор** — первый зарегистрированный аккаунт (или созданный `manage.py adduser почта --admin`;
-с `--admin` у существующего аккаунта команда только добавляет права). В настройках трекера у него раздел
-«Сервер»:
-
-- `GET` / `PATCH /api/site/` — `{ "registration": true }`: открыть или закрыть регистрацию. Пока её
-  не переключали, действует `ALLOW_REGISTRATION` (по умолчанию открыта);
-- `GET /api/accounts/` — аккаунты: почта, администратор ли, когда зарегистрирован и последний вход;
-- `POST /api/accounts/{id}/password/` — временный пароль вместо забытого (`{ "password": "k7mq-x3vp-9wtr" }`):
-  прежний перестаёт работать, входы на устройствах завершаются;
-- `DELETE /api/accounts/{id}/` — удалить аккаунт со всеми данными. Свой аккаунт так не удалить
-  и пароль себе так не сбросить.
-
-Писем сервер не отправляет. Забыл пароль сам администратор — на сервере:
+(`POST /api/auth/password/`), забытый — на сервере:
 
 ```bash
 .venv/bin/python manage.py changepassword me@example.com
 ```
 
-Регистраций с одного адреса — не больше 10 в час.
+Регистрацию на личном сервере стоит закрыть: `ALLOW_REGISTRATION=0`, а аккаунты создавать командой
+`manage.py adduser почта`.
 
 ## На сервере
 
