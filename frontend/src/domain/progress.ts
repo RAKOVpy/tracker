@@ -34,8 +34,14 @@ export interface GoalStats {
   gap: number;
   todayValue: number;
   /**
-   * Сколько нужно сделать сегодня, чтобы успеть к дедлайну: остаток на начало дня,
+   * Сколько делать в день, чтобы успеть к дедлайну: остаток на начало дня,
    * поделённый на оставшиеся дни. Не меняется в течение дня, когда вносишь прогресс.
+   */
+  requiredDaily: number;
+  /**
+   * Норма на сегодня: сколько сделать, чтобы к концу дня не отстать от плана. Если уже отстаём,
+   * не больше requiredDaily: отставание раскладываем на оставшиеся дни, а не на один сегодняшний.
+   * 0 — запаса впереди плана хватает и на сегодня. Тоже считается от начала дня.
    */
   todayTarget: number;
   todayLeft: number;
@@ -137,7 +143,9 @@ export function computeGoalStats(goal: TargetGoal, entries: ProgressEntry[], tod
   }
 
   const canWorkToday = !isUpcoming && daysLeft > 0 && before < target - EPS;
-  const todayTarget = canWorkToday ? Math.min(target - before, roundUpNorm((target - before) / daysLeft, dailyPlan)) : 0;
+  const requiredDaily = canWorkToday ? Math.min(target - before, roundUpNorm((target - before) / daysLeft, dailyPlan)) : 0;
+  const toPlanLine = Math.max(0, roundUpNorm(expectedByToday - before, dailyPlan));
+  const todayTarget = Math.min(requiredDaily, toPlanLine);
   const todayLeft = status === 'achieved' ? 0 : Math.max(0, todayTarget - todayValue);
 
   return {
@@ -152,6 +160,7 @@ export function computeGoalStats(goal: TargetGoal, entries: ProgressEntry[], tod
     status,
     gap,
     todayValue,
+    requiredDaily,
     todayTarget,
     todayLeft: todayLeft < EPS ? 0 : todayLeft,
     streak: countStreak(dailyTotals, today, vacations),

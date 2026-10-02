@@ -57,6 +57,33 @@ describe('computeGoalStats', () => {
     expect(s.gap).toBe(30); // к началу 5-го должно быть 40, сделано 10
     expect(s.daysLeft).toBe(26);
     expect(s.todayTarget).toBe(12); // (300 - 10) / 26 = 11.15 → 12
+    expect(s.requiredDaily).toBe(12);
+  });
+
+  it('чуть впереди плана — на сегодня только остаток до линии плана', () => {
+    const s = computeGoalStats(makeGoal(), [entry('2026-10-01', 15)], '2026-10-02');
+    expect(s.status).toBe('on_track');
+    expect(s.requiredDaily).toBe(10); // (300 - 15) / 29 = 9.83 → 10
+    expect(s.todayTarget).toBe(5); // к концу дня по плану 20, сделано 15
+    expect(s.todayLeft).toBe(5);
+  });
+
+  it('запаса хватает на сегодня — норма на сегодня нулевая', () => {
+    // 4 урока за 7 дней: 0,57 в день. К концу 2 октября по плану 1,7, сделано 2.
+    const goal = makeGoal({ targetValue: 4, unit: 'урок', startDate: '2026-09-30', deadline: '2026-10-06' });
+    const s = computeGoalStats(goal, [entry('2026-09-30', 1), entry('2026-10-01', 1)], '2026-10-02');
+    expect(s.status).toBe('on_track');
+    expect(s.requiredDaily).toBeCloseTo(0.4);
+    expect(s.todayTarget).toBe(0);
+    expect(s.todayLeft).toBe(0);
+  });
+
+  it('опережение — сегодня ничего не нужно, но темп до срока известен', () => {
+    const s = computeGoalStats(makeGoal(), [entry('2026-10-01', 40)], '2026-10-02');
+    expect(s.status).toBe('ahead');
+    expect(s.todayTarget).toBe(0);
+    expect(s.todayLeft).toBe(0);
+    expect(s.requiredDaily).toBe(9); // 260 / 29 = 8.97 → 9
   });
 
   it('норма на сегодня не меняется, пока вносишь прогресс в течение дня', () => {
@@ -71,6 +98,7 @@ describe('computeGoalStats', () => {
     const s = computeGoalStats(makeGoal(), [entry('2026-10-29', 295)], '2026-10-30');
     expect(s.daysLeft).toBe(1);
     expect(s.todayTarget).toBe(5);
+    expect(s.requiredDaily).toBe(5);
   });
 
   it('цель достигнута', () => {
