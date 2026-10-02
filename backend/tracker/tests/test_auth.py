@@ -19,7 +19,7 @@ def csrf_client() -> tuple[APIClient, str]:
 def test_session_anonymous():
     response = APIClient().get("/api/auth/session/")
     assert response.status_code == 200
-    assert response.json() == {"user": None, "registration": True, "firstAccount": True}
+    assert response.json() == {"user": None, "registration": True}
     assert "csrftoken" in response.cookies
 
 

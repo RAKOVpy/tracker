@@ -3,7 +3,7 @@ import { auth, type User } from '../api';
 import { AuthScreen } from '../components/auth/AuthScreen';
 import { PasswordInput } from '../components/auth/PasswordInput';
 
-type Mode = 'login' | 'register' | 'first';
+type Mode = 'login' | 'register';
 
 const TEXT: Record<Mode, { title: string; lead: string; submit: string; pending: string }> = {
   login: {
@@ -18,29 +18,19 @@ const TEXT: Record<Mode, { title: string; lead: string; submit: string; pending:
     submit: 'Создать аккаунт',
     pending: 'Создаём…',
   },
-  first: {
-    title: 'Первый аккаунт',
-    lead: 'На этом сервере ещё нет аккаунтов. Первый станет администратором: сможет закрыть регистрацию и выдать временный пароль тому, кто забыл свой.',
-    submit: 'Создать аккаунт',
-    pending: 'Создаём…',
-  },
 };
 
 export function LoginPage({
   registration,
-  firstAccount,
   expired,
   onSignedIn,
 }: {
   registration: boolean;
-  /** Аккаунтов ещё нет: при открытой регистрации экран сразу предлагает создать первый. */
-  firstAccount: boolean;
   expired: boolean;
   onSignedIn: (user: User) => void;
 }) {
   const id = useId();
-  const [mode, setMode] = useState<Mode>(firstAccount && registration ? 'first' : 'login');
-  const creating = mode !== 'login';
+  const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +42,7 @@ export function LoginPage({
     setError(null);
     setPending(true);
     try {
-      const user = creating ? await auth!.register(email, password) : await auth!.login(email, password);
+      const user = mode === 'login' ? await auth!.login(email, password) : await auth!.register(email, password);
       onSignedIn(user);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Не получилось. Попробуйте ещё раз.');
@@ -85,7 +75,7 @@ export function LoginPage({
               className="input"
               type="email"
               inputMode="email"
-              autoComplete={creating ? 'email' : 'username'}
+              autoComplete={mode === 'login' ? 'username' : 'email'}
               autoCapitalize="none"
               spellCheck={false}
               required
@@ -102,10 +92,10 @@ export function LoginPage({
               id={`${id}-password`}
               value={password}
               onChange={setPassword}
-              autoComplete={creating ? 'new-password' : 'current-password'}
-              describedBy={creating ? `${id}-hint` : undefined}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              describedBy={mode === 'register' ? `${id}-hint` : undefined}
             />
-            {creating && (
+            {mode === 'register' && (
               <span id={`${id}-hint`} className="field__hint">
                 Не короче 8 символов, не только цифры и не из списка самых частых.
               </span>
@@ -131,15 +121,9 @@ export function LoginPage({
             </button>
           </p>
         )}
-        {mode === 'login' && firstAccount && !registration && (
-          <p className="notice">
-            Аккаунтов ещё нет, а регистрация закрыта. Создайте аккаунт на сервере командой{' '}
-            <code>python manage.py adduser почта --admin</code>.
-          </p>
-        )}
-        {mode === 'login' && !firstAccount && (
+        {mode === 'login' && (
           <p className="auth__switch auth__switch--quiet">
-            Забыли пароль? Попросите администратора этого сервера: он выдаст временный пароль в настройках трекера.
+            Забыли пароль? На сервере его меняет команда <code>python manage.py changepassword почта</code>.
           </p>
         )}
         {mode === 'register' && (

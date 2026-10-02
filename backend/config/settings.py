@@ -33,7 +33,7 @@ if not SECRET_KEY:
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", ["localhost", "127.0.0.1"])
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS", [])
 
-# Открыта ли регистрация, пока администратор не переключил её в «Настройках» (SiteSettings).
+# Регистрация новых пользователей. Для личного сервера её выключают, создав свой аккаунт.
 ALLOW_REGISTRATION = env_bool("ALLOW_REGISTRATION", True)
 
 INSTALLED_APPS = [
@@ -87,10 +87,6 @@ DATABASES = {
 }
 # Каждый запрос — одна транзакция: закрытие задачи и её следующий повтор сохраняются вместе.
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
-# SQLite (разработка): транзакция сразу берёт блокировку записи. Иначе из двух одновременных запросов
-# с записью (вход и сохранение сессии) один падает с «database is locked», вместо того чтобы подождать.
-if DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
-    DATABASES["default"].setdefault("OPTIONS", {}).update({"transaction_mode": "IMMEDIATE", "timeout": 20})
 
 # Резервная копия с сотнями заметок больше стандартных 2,5 МБ.
 DATA_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024
@@ -131,8 +127,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PARSER_CLASSES": ["djangorestframework_camel_case.parser.CamelCaseJSONParser"],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "tracker.errors.exception_handler",
-    # Регистраций с одного адреса — не больше 10 в час: открытую регистрацию не завалят ботами.
-    "DEFAULT_THROTTLE_RATES": {"auth": "20/min", "register": "10/hour"},
+    "DEFAULT_THROTTLE_RATES": {"auth": "20/min"},
     # Сколько прокси перед сервером: ограничение попыток входа считает по настоящему адресу клиента.
     "NUM_PROXIES": int(os.environ.get("NUM_PROXIES", "1" if BEHIND_HTTPS_PROXY else "0")),
     "UNAUTHENTICATED_USER": "django.contrib.auth.models.AnonymousUser",

@@ -46,7 +46,7 @@ services:
       DJANGO_ALLOWED_HOSTS: ${DOMAIN:?задайте DOMAIN в deploy/.env (./setup.sh)}
       DJANGO_CSRF_TRUSTED_ORIGINS: https://${DOMAIN}
       DATABASE_URL: postgres://tracker:${POSTGRES_PASSWORD}@db:5432/tracker
-      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-1}
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-0}
       BEHIND_HTTPS_PROXY: "1"
       COOKIE_SECURE: "1"
     healthcheck:

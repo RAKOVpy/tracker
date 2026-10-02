@@ -4,7 +4,6 @@ import { obsidianUri } from '../obsidian/uri';
 import { createAuthApi } from './auth';
 import { createHttp, onUnauthorized } from './http';
 import { createHttpApi } from './httpApi';
-import { createServerApi } from './server';
 import { SCHEMA_VERSION } from './schema';
 import { ApiError, AuthError, NetworkError, NotFoundError, VacationError } from './types';
 
@@ -229,21 +228,9 @@ describe('httpApi', () => {
 
 describe('auth', () => {
   it('logs in and unwraps the user', async () => {
-    replies.push(json(200, { user: { id: 1, email: 'me@example.com', isAdmin: false } }));
+    replies.push(json(200, { user: { id: 1, email: 'me@example.com' } }));
     const user = await createAuthApi(createHttp('/api')).login('me@example.com', 'secret');
-    expect(user).toEqual({ id: 1, email: 'me@example.com', isAdmin: false });
+    expect(user).toEqual({ id: 1, email: 'me@example.com' });
     expect(calls[0].body).toEqual({ email: 'me@example.com', password: 'secret' });
-  });
-});
-
-describe('server', () => {
-  it('switches registration and manages accounts', async () => {
-    const server = createServerApi(createHttp('/api'));
-    replies.push(json(200, { registration: false }), json(200, { password: 'k7mq-x3vp-9wtr' }), json(204));
-    expect(await server.setRegistration(false)).toBe(false);
-    expect(await server.resetPassword(7)).toBe('k7mq-x3vp-9wtr');
-    await server.deleteAccount(7);
-    expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual(['PATCH /api/site/', 'POST /api/accounts/7/password/', 'DELETE /api/accounts/7/']);
-    expect(calls[0].body).toEqual({ registration: false });
   });
 });
