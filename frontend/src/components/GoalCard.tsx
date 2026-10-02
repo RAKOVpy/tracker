@@ -23,6 +23,8 @@ export function GoalCard({ item, area, today, compact = false }: Props) {
   const pace = describePace(goal, stats);
   const planPercent = (stats.expectedByToday / goal.targetValue) * 100;
   const barTone = stats.status === 'achieved' ? 'good' : stats.status === 'overdue' ? 'bad' : 'accent';
+  // Впереди плана норма на сегодня может быть нулевой, но записать прогресс впрок всё равно можно.
+  const showToday = stats.todayTarget > 0 || stats.status === 'ahead' || stats.status === 'on_track';
 
   const meta = [
     area?.name,
@@ -60,7 +62,7 @@ export function GoalCard({ item, area, today, compact = false }: Props) {
         </div>
       </div>
 
-      {!compact && stats.todayTarget > 0 && (
+      {!compact && showToday && (
         <div className={stats.todayLeft > 0 ? 'today-box' : 'today-box today-box--done'}>
           <span className="today-box__label">
             {stats.todayLeft > 0 ? (
@@ -68,12 +70,24 @@ export function GoalCard({ item, area, today, compact = false }: Props) {
                 Сегодня <strong className="num">{formatNumber(stats.todayValue)}</strong> из{' '}
                 {formatAmount(stats.todayTarget, goal.unit)}
               </span>
-            ) : (
+            ) : stats.todayTarget > 0 ? (
               <>
                 <Check size={16} strokeWidth={2.5} aria-hidden />
                 <span>
                   Сегодня <strong className="num">{formatAmount(stats.todayValue, goal.unit)}</strong>, норма выполнена
                 </span>
+              </>
+            ) : stats.todayValue > 0 ? (
+              <>
+                <Check size={16} strokeWidth={2.5} aria-hidden />
+                <span>
+                  Сегодня <strong className="num">{formatAmount(stats.todayValue, goal.unit)}</strong> впрок
+                </span>
+              </>
+            ) : (
+              <>
+                <Check size={16} strokeWidth={2.5} aria-hidden />
+                <span>Впереди плана, сегодня можно отдохнуть</span>
               </>
             )}
           </span>

@@ -20,6 +20,8 @@ import { useSeedDemo } from '../components/useSeedDemo';
 interface Groups {
   todo: GoalWithStats[];
   doneToday: GoalWithStats[];
+  /** Впереди плана: сегодня можно ничего не делать. В итог дня не входят. */
+  ahead: GoalWithStats[];
   overdue: GoalWithStats[];
   upcoming: GoalWithStats[];
   achieved: GoalWithStats[];
@@ -27,15 +29,16 @@ interface Groups {
 }
 
 function groupGoals(items: GoalWithStats[]): Groups {
-  const groups: Groups = { todo: [], doneToday: [], overdue: [], upcoming: [], achieved: [], archived: [] };
+  const groups: Groups = { todo: [], doneToday: [], ahead: [], overdue: [], upcoming: [], achieved: [], archived: [] };
   for (const item of [...items].sort(compareForToday)) {
-    const { status, todayLeft } = item.stats;
+    const { status, todayLeft, todayValue } = item.stats;
     if (item.goal.status === 'archived') groups.archived.push(item);
     else if (status === 'achieved') groups.achieved.push(item);
     else if (status === 'upcoming') groups.upcoming.push(item);
     else if (status === 'overdue') groups.overdue.push(item);
     else if (todayLeft > 0) groups.todo.push(item);
-    else groups.doneToday.push(item);
+    else if (todayValue > 0) groups.doneToday.push(item);
+    else groups.ahead.push(item);
   }
   return groups;
 }
@@ -211,6 +214,7 @@ export function TodayPage() {
           <Section title="Цели: норма на сегодня" items={groups.todo} {...sectionProps} />
           <Section title="Цели: срок прошёл" items={groups.overdue} {...sectionProps} />
           <Section title="Цели: норма выполнена" items={groups.doneToday} {...sectionProps} />
+          <Section title="Цели: впереди плана" items={groups.ahead} {...sectionProps} />
           <Section title="Цели запланированы" items={groups.upcoming} {...sectionProps} compact />
           <Section title="Цели достигнуты" items={groups.achieved} {...sectionProps} compact />
         </>

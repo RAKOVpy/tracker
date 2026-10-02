@@ -52,11 +52,11 @@ function paceAdvice(goal: TargetGoal, stats: GoalStats): string {
     case 'ahead':
       return 'Можно держать темп или немного сбавить.';
     case 'on_track':
-      return stats.todayLeft > 0
-        ? `Сегодня нужно ещё ${formatAmount(stats.todayLeft, goal.unit)}, чтобы не отстать.`
-        : 'Норма на сегодня выполнена.';
+      if (stats.todayLeft > 0) return `Сегодня нужно ещё ${formatAmount(stats.todayLeft, goal.unit)}, чтобы не отстать.`;
+      if (stats.todayTarget > 0 || stats.todayValue > 0) return 'Норма на сегодня выполнена.';
+      return 'Вы чуть впереди плана: сегодня можно не заниматься и всё равно не отстать.';
     case 'behind':
-      return `Если делать по ${formatAmount(stats.todayTarget, goal.unit)} в день, успеете к ${formatShort(goal.deadline)}.`;
+      return `Если делать по ${formatAmount(stats.requiredDaily, goal.unit)} в день, успеете к ${formatShort(goal.deadline)}.`;
   }
 }
 
@@ -250,7 +250,7 @@ function TargetView({ item, area, today }: { item: Extract<GoalView, { kind: 'ta
               <div className="stat__value">
                 {stats.status === 'achieved' || stats.daysLeft === 0
                   ? '—'
-                  : formatAmount(stats.status === 'upcoming' ? stats.dailyNorm : stats.todayTarget, goal.unit)}
+                  : formatAmount(stats.status === 'upcoming' ? stats.dailyNorm : stats.requiredDaily, goal.unit)}
               </div>
               <div className="stat__sub">по плану {formatAmount(stats.dailyNorm, goal.unit)}</div>
             </div>
